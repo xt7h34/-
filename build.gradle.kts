@@ -1,3 +1,5 @@
+import java.util.Base64
+
 plugins {
     id("com.android.application") version "8.7.3"
     id("org.jetbrains.kotlin.android") version "2.0.21"
@@ -10,7 +12,7 @@ fun decodeBase64File(root: File, source: String, target: File) {
     val src = File(root, source)
     if (src.exists()) {
         target.parentFile.mkdirs()
-        target.writeBytes(java.util.Base64.getMimeDecoder().decode(src.readText().trim()))
+        target.writeBytes(Base64.getMimeDecoder().decode(src.readText().trim()))
     }
 }
 
@@ -23,7 +25,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.kanade"
+        applicationId = "com.rigen.kanade"
         minSdk = 26
         targetSdk = 35
         versionCode = 3
