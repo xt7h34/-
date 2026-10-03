@@ -25,7 +25,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.rigen.kanade"
+        applicationId = "com.kanade"
         minSdk = 26
         targetSdk = 35
         versionCode = 3
