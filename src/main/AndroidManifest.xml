@@ -2,7 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <application
-        android:label="Rigen Volume UI"
+        android:icon="@mipmap/ic_launcher"
+        android:label="Kanade System"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
 
@@ -18,7 +19,7 @@
         <service
             android:name=".VolumeAccessibilityService"
             android:exported="false"
-            android:label="Rigen Volume UI"
+            android:label="Kanade System"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter>
                 <action android:name="android.accessibilityservice.AccessibilityService" />
