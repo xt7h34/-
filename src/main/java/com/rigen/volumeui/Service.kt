@@ -118,7 +118,7 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
     private val handler = Handler(Looper.getMainLooper())
     private val hideRunnable = Runnable { hidePanel() }
     private val removeRunnable = Runnable { removePanel() }
-    private val collapseRunnable = Runnable { updateExpanded(false) }
+    private val collapseRunnable = Runnable { setExpanded(false) }
     private lateinit var windowManager: WindowManager
     private lateinit var controller: VolumeController
 
@@ -152,29 +152,34 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
     private var heldSince = 0L
     private val repeatRunnable = object : Runnable {
         override fun run() {
-            if (heldDirection == 0) return
-            if (SystemClock.uptimeMillis() - heldSince > MAX_HOLD_MS) {
-                stopRepeat()
-                return
+            try {
+                if (heldDirection == 0) return
+                if (SystemClock.uptimeMillis() - heldSince > MAX_HOLD_MS) {
+                    stopRepeat()
+                    return
+                }
+                wasRepeating = true
+                val stream = controller.activeStream()
+                val changed = stepVolume(stream, heldDirection > 0, settings.volumeLimits)
+                showPanel(stream)
+                if (changed) haptic()
+                handler.postDelayed(this, REPEAT_INTERVAL_MS)
+            } catch (e: Throwable) {
+                logError("repeat", e)
             }
-            wasRepeating = true
-            val stream = controller.activeStream()
-            val changed = stepVolume(stream, heldDirection > 0, settings.volumeLimits)
-            showPanel(stream)
-            if (changed) haptic()
-            handler.postDelayed(this, REPEAT_INTERVAL_MS)
         }
     }
 
     private val actions = PanelActions(
         onSeek = { stream, fraction -> seekStream(stream, fraction) },
         onTouch = { down -> onPanelTouch(down) },
-        onToggleStation = { updateExpanded(!expanded) },
+        onToggleStation = { setExpanded(!expanded) },
         onMedia = { keyCode -> sendMedia(keyCode) },
     )
 
     override fun onCreate() {
         super.onCreate()
+        Diag.mark(this, "svc_created")
         savedStateController.performAttach()
         savedStateController.performRestore(null)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
@@ -187,17 +192,32 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
+        Diag.mark(this, "svc_connected")
+    }
+
+    /** Keeps a note of an error (shown in the app) without ever crashing the service. */
+    private fun logError(where: String, e: Throwable) {
+        Log.e(TAG, where, e)
+        try {
+            Diag.error(applicationContext, where, e)
+        } catch (ignored: Throwable) {
+            // Nothing more we can do here.
+        }
     }
 
     // ───────────── Which app is in front ─────────────
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        if (event == null || event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
-        val pkg = event.packageName?.toString() ?: return
-        // Ignore ourselves, the system UI and anything that is not a normal app (keyboards...).
-        if (pkg == packageName || pkg == "com.android.systemui" || pkg == "android") return
-        if (!isLaunchable(pkg)) return
-        foregroundPackage = pkg
+        try {
+            if (event == null || event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+            val pkg = event.packageName?.toString() ?: return
+            // Ignore ourselves, the system UI and anything that is not a normal app (keyboards...).
+            if (pkg == packageName || pkg == "com.android.systemui" || pkg == "android") return
+            if (!isLaunchable(pkg)) return
+            foregroundPackage = pkg
+        } catch (e: Throwable) {
+            logError("onAccessibilityEvent", e)
+        }
     }
 
     private fun isLaunchable(pkg: String): Boolean =
@@ -208,6 +228,15 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
     // ───────────── Keys ─────────────
 
     override fun onKeyEvent(event: KeyEvent): Boolean {
+        return try {
+            handleKey(event)
+        } catch (e: Throwable) {
+            logError("onKeyEvent", e)
+            false
+        }
+    }
+
+    private fun handleKey(event: KeyEvent): Boolean {
         val code = event.keyCode
         if (code != KeyEvent.KEYCODE_VOLUME_UP && code != KeyEvent.KEYCODE_VOLUME_DOWN) return false
 
@@ -253,7 +282,7 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
             val before = controller.level(stream)
             controller.step(stream, raise, limits) != before
         } catch (e: Exception) {
-            Log.e(TAG, "Could not change volume", e)
+            logError("Could not change volume", e)
             false
         }
     }
@@ -285,7 +314,7 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
                 controller.setLevel(stream, restore.coerceAtLeast(1), limits)
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Could not toggle mute", e)
+            logError("Could not toggle mute", e)
         }
     }
 
@@ -305,6 +334,14 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
     // ───────────── Showing the panel ─────────────
 
     fun showPanel(stream: Int = controller.activeStream(), ignoreRules: Boolean = false) {
+        try {
+            showPanelNow(stream, ignoreRules)
+        } catch (e: Throwable) {
+            logError("showPanel", e)
+        }
+    }
+
+    private fun showPanelNow(stream: Int, ignoreRules: Boolean) {
         // Re-read the saved settings every time, so changes made in the app apply immediately.
         val loaded = Prefs.load(this)
         val pkg = foregroundPackage
@@ -347,9 +384,9 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
             stationLevels[stream] = after
         } catch (e: SecurityException) {
             // Ring and notification volumes can need "Do Not Disturb access".
-            Toast.makeText(this, getString(R.string.toast_dnd_needed), Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, Prefs.localized(this).getString(R.string.toast_dnd_needed), Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
-            Log.e(TAG, "Could not set volume", e)
+            logError("Could not set volume", e)
         }
         if (expanded) resetIdle()
     }
@@ -374,7 +411,7 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
     }
 
     /** Opens or closes the Volume Station part of the panel. */
-    private fun updateExpanded(value: Boolean) {
+    private fun setExpanded(value: Boolean) {
         if (expanded == value) return
         expanded = value
         handler.removeCallbacks(collapseRunnable)
@@ -396,7 +433,7 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
     }
 
     private fun onOutsideTouch() {
-        if (expanded) updateExpanded(false)
+        if (expanded) setExpanded(false)
     }
 
     // ───────────── The window ─────────────
@@ -476,7 +513,7 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
         try {
             windowManager.updateViewLayout(view, buildLayoutParams())
         } catch (e: Exception) {
-            Log.e(TAG, "Could not move volume panel", e)
+            logError("Could not move volume panel", e)
         }
     }
 
@@ -550,7 +587,7 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
             panelCompose = compose
             visibleState = vs
         } catch (e: Exception) {
-            Log.e(TAG, "Could not show volume panel", e)
+            logError("Could not show volume panel", e)
         }
     }
 
@@ -578,11 +615,12 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
             windowManager.removeView(root)
             compose?.disposeComposition()
         } catch (e: Exception) {
-            Log.e(TAG, "Could not hide volume panel", e)
+            logError("Could not hide volume panel", e)
         }
     }
 
     override fun onDestroy() {
+        Diag.mark(this, "svc_destroyed")
         handler.removeCallbacks(hideRunnable)
         handler.removeCallbacks(removeRunnable)
         handler.removeCallbacks(collapseRunnable)
