@@ -118,7 +118,7 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
     private val handler = Handler(Looper.getMainLooper())
     private val hideRunnable = Runnable { hidePanel() }
     private val removeRunnable = Runnable { removePanel() }
-    private val collapseRunnable = Runnable { setExpanded(false) }
+    private val collapseRunnable = Runnable { changeExpanded(false) }
     private lateinit var windowManager: WindowManager
     private lateinit var controller: VolumeController
 
@@ -173,7 +173,7 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
     private val actions = PanelActions(
         onSeek = { stream, fraction -> seekStream(stream, fraction) },
         onTouch = { down -> onPanelTouch(down) },
-        onToggleStation = { setExpanded(!expanded) },
+        onToggleStation = { changeExpanded(!expanded) },
         onMedia = { keyCode -> sendMedia(keyCode) },
     )
 
@@ -411,7 +411,7 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
     }
 
     /** Opens or closes the Volume Station part of the panel. */
-    private fun setExpanded(value: Boolean) {
+    private fun changeExpanded(value: Boolean) {
         if (expanded == value) return
         expanded = value
         handler.removeCallbacks(collapseRunnable)
@@ -433,7 +433,7 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
     }
 
     private fun onOutsideTouch() {
-        if (expanded) setExpanded(false)
+        if (expanded) changeExpanded(false)
     }
 
     // ───────────── The window ─────────────
