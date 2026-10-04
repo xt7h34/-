@@ -15,6 +15,7 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -31,6 +32,12 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
@@ -38,7 +45,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -65,8 +75,10 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -77,9 +89,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
@@ -88,8 +103,11 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import java.text.DateFormat
 import java.util.Date
@@ -166,51 +184,116 @@ private val ICON_ORANGE = Color(0xFFF29900)
 private val ICON_PINK = Color(0xFFE0558A)
 private val ICON_RED = Color(0xFFE5484D)
 
-private const val PAGE_HOME = "home"
-private const val PAGE_PANEL = "panel"
-private const val PAGE_BEHAVIOR = "behavior"
-private const val PAGE_STATION = "station"
-private const val PAGE_APPS = "apps"
-private const val PAGE_APP = "app"
+private val LocalPageScroll = compositionLocalOf<ScrollState> { error("No page scroll state") }
+private val LocalPageList = compositionLocalOf<LazyListState> { error("No page list state") }
 
-/** A page with a large collapsing title, like the system Settings app. */
-@OptIn(ExperimentalMaterial3Api::class)
+private val HEADER_EXPANDED = 250.dp
+private val HEADER_COLLAPSED = 96.dp
+
+/** The empty room at the top of a page where the big title lives. */
+@Composable
+private fun HeaderSpacer() {
+    Spacer(
+        Modifier
+            .statusBarsPadding()
+            .height(HEADER_EXPANDED),
+    )
+}
+
+/**
+ * The page title. It starts big and centered. Scrolling moves it to the top corner and makes it
+ * smaller, and scrolling further makes it fade away, like in the system Settings app.
+ */
+@Composable
+private fun CollapsingTitle(title: String, startPad: Dp, scrollPx: () -> Int) {
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    val screenW = LocalConfiguration.current.screenWidthDp.dp
+    val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    Text(
+        text = title,
+        color = MaterialTheme.colorScheme.primary,
+        fontSize = 36.sp,
+        fontWeight = FontWeight.SemiBold,
+        maxLines = 1,
+        softWrap = false,
+        modifier = Modifier
+            .padding(start = startPad, top = statusTop)
+            .graphicsLayer {
+                val expandedPx = HEADER_EXPANDED.toPx()
+                val collapsedPx = HEADER_COLLAPSED.toPx()
+                val status = statusTop.toPx()
+                val range = (expandedPx - collapsedPx).coerceAtLeast(1f)
+                val s = scrollPx().toFloat()
+                val p = (s / range).coerceIn(0f, 1f)
+
+                val scale = 1f + (0.62f - 1f) * p
+                transformOrigin = TransformOrigin(if (rtl) 1f else 0f, 0.5f)
+                scaleX = scale
+                scaleY = scale
+
+                // From the middle of the screen to the corner.
+                val centerShift = ((screenW.toPx() - size.width) / 2f - startPad.toPx()) * (1f - p)
+                translationX = if (rtl) -centerShift else centerShift
+
+                // From the big header's middle to the small header's middle.
+                val center0 = status + expandedPx * 0.42f
+                val center1 = status + collapsedPx * 0.45f
+                val center = center0 + (center1 - center0) * p
+                translationY = center - (status + size.height / 2f)
+
+                // Once the page has scrolled further, the title fades out.
+                val fade = ((s - range) / 60.dp.toPx()).coerceIn(0f, 1f)
+                alpha = 1f - fade
+            },
+    )
+}
+
+@Composable
+private fun BackButton(onBack: () -> Unit) {
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    IconButton(
+        onClick = onBack,
+        modifier = Modifier
+            .statusBarsPadding()
+            .padding(start = 8.dp, top = 6.dp)
+            .background(MaterialTheme.colorScheme.background.copy(alpha = 0.6f), CircleShape),
+    ) {
+        PathIcon(
+            Glyph.BACK.pathData,
+            MaterialTheme.colorScheme.onBackground,
+            24.dp,
+            if (rtl) Modifier.scale(-1f, 1f) else Modifier,
+        )
+    }
+}
+
+/** A page with the Settings-style title. Set [lazy] when the page scrolls with a LazyColumn. */
 @Composable
 private fun PageScaffold(
     title: String,
     onBack: (() -> Unit)?,
+    lazy: Boolean = false,
     content: @Composable (PaddingValues) -> Unit,
 ) {
-    val behavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-    Scaffold(
-        modifier = Modifier.nestedScroll(behavior.nestedScrollConnection),
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            LargeTopAppBar(
-                title = { Text(title) },
-                navigationIcon = {
-                    if (onBack != null) {
-                        IconButton(onClick = onBack) {
-                            PathIcon(
-                                Glyph.BACK.pathData,
-                                MaterialTheme.colorScheme.onBackground,
-                                24.dp,
-                                if (rtl) Modifier.scale(-1f, 1f) else Modifier,
-                            )
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.largeTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    scrolledContainerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.primary,
-                ),
-                scrollBehavior = behavior,
-            )
-        },
-        content = content,
-    )
+    val scroll = rememberScrollState()
+    val list = rememberLazyListState()
+    CompositionLocalProvider(LocalPageScroll provides scroll, LocalPageList provides list) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
+        ) {
+            content(PaddingValues(0.dp))
+            CollapsingTitle(title, if (onBack != null) 64.dp else 24.dp) {
+                if (lazy) {
+                    if (list.firstVisibleItemIndex == 0) list.firstVisibleItemScrollOffset else Int.MAX_VALUE / 4
+                } else {
+                    scroll.value
+                }
+            }
+            if (onBack != null) BackButton(onBack)
+        }
+    }
 }
 
 @Composable
@@ -218,12 +301,18 @@ private fun PageColumn(padding: PaddingValues, content: @Composable ColumnScope.
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(padding)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .verticalScroll(LocalPageScroll.current)
+            .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
-        content = content,
-    )
+    ) {
+        HeaderSpacer()
+        content()
+        Spacer(
+            Modifier
+                .navigationBarsPadding()
+                .height(24.dp),
+        )
+    }
 }
 
 /** A rounded group of rows, like the groups in the system Settings. */
@@ -253,12 +342,15 @@ private fun SettingsItem(
     iconColor: Color,
     title: String,
     summary: String? = null,
+    enabled: Boolean = true,
     onClick: (() -> Unit)? = null,
 ) {
     var rowModifier = Modifier.fillMaxWidth()
-    if (onClick != null) rowModifier = rowModifier.clickable(onClick = onClick)
+    if (enabled && onClick != null) rowModifier = rowModifier.clickable(onClick = onClick)
     Row(
-        modifier = rowModifier.padding(horizontal = 20.dp, vertical = 14.dp),
+        modifier = rowModifier
+            .padding(horizontal = 20.dp, vertical = 14.dp)
+            .alpha(if (enabled) 1f else 0.45f),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
@@ -457,7 +549,56 @@ private fun AccountCard() {
 }
 
 @Composable
-private fun HomePage(settings: PanelSettings, serviceEnabled: Boolean, onOpen: (String) -> Unit) {
+private fun HomePage(serviceEnabled: Boolean, onOpen: (String) -> Unit) {
+    val context = LocalContext.current
+
+    PageScaffold(stringResource(R.string.app_title), null) { padding ->
+        PageColumn(padding) {
+            AccountCard()
+
+            SettingsGroup {
+                SettingsItem(
+                    glyph = Glyph.ACCESS,
+                    iconColor = if (serviceEnabled) ICON_GREEN else ICON_ORANGE,
+                    title = stringResource(if (serviceEnabled) R.string.service_on else R.string.service_off),
+                    summary = stringResource(
+                        if (serviceEnabled) R.string.service_on_summary else R.string.service_off_summary,
+                    ),
+                ) {
+                    context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                }
+            }
+
+            SettingsGroup {
+                SettingsItem(
+                    Glyph.VOLUME, ICON_BLUE,
+                    stringResource(R.string.item_volume_title),
+                    stringResource(R.string.item_volume_summary),
+                ) { onOpen(PAGE_VOLUME) }
+                ItemDivider()
+                // Not available yet: it arrives with the Kanade ecosystem.
+                SettingsItem(
+                    Glyph.CLOCK, ICON_PURPLE,
+                    stringResource(R.string.clock_title),
+                    stringResource(R.string.clock_summary),
+                    enabled = false,
+                )
+            }
+
+            SettingsGroup {
+                SettingsItem(
+                    Glyph.PALETTE, ICON_PINK,
+                    stringResource(R.string.item_app_title),
+                    stringResource(R.string.item_app_summary),
+                ) { onOpen(PAGE_APP) }
+            }
+        }
+    }
+}
+
+/** The "Volume Panel" option: a live preview and the pages that belong to it. */
+@Composable
+private fun VolumeHubPage(settings: PanelSettings, onOpen: (String) -> Unit, onBack: () -> Unit) {
     val context = LocalContext.current
     // The preview is interactive: tap the three dots, drag the bars.
     val levels = remember {
@@ -471,28 +612,34 @@ private fun HomePage(settings: PanelSettings, serviceEnabled: Boolean, onOpen: (
     }
     val maxes = remember { STREAMS.associate { it.stream to 15 } }
     var expanded by remember { mutableStateOf(false) }
+    var previewDnd by remember { mutableStateOf(false) }
     val actions = remember {
         PanelActions(
             onSeek = { stream, f -> levels[stream] = (f * 15).roundToInt().coerceIn(0, 15) },
             onTouch = { },
             onToggleStation = { expanded = !expanded },
             onMedia = { },
+            onMuteAll = {
+                val anyOn = STREAMS.any { (levels[it.stream] ?: 0) > 0 }
+                STREAMS.forEach { levels[it.stream] = if (anyOn) 0 else 8 }
+            },
+            onToggleDnd = { previewDnd = !previewDnd },
+            // In the preview the gear just closes the card.
+            onOpenSettings = { expanded = false },
         )
     }
 
-    PageScaffold(stringResource(R.string.app_title), null) { padding ->
+    PageScaffold(stringResource(R.string.item_volume_title), onBack) { padding ->
         PageColumn(padding) {
-            AccountCard()
-
             Section(stringResource(R.string.preview_title)) {
                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    VolumePanel(
+                    PanelOrStation(
                         settings = settings,
                         state = PanelState(
                             stream = AudioManager.STREAM_MUSIC,
                             level = levels[AudioManager.STREAM_MUSIC] ?: 0,
                             max = 15,
-                            dnd = false,
+                            dnd = previewDnd,
                             expanded = expanded,
                             levels = levels,
                             maxes = maxes,
@@ -502,32 +649,6 @@ private fun HomePage(settings: PanelSettings, serviceEnabled: Boolean, onOpen: (
                 }
                 if (settings.stationEnabled) {
                     Text(stringResource(R.string.preview_hint), style = MaterialTheme.typography.bodySmall)
-                }
-            }
-
-            SettingsGroup {
-                SettingsItem(
-                    glyph = Glyph.ACCESS,
-                    iconColor = if (serviceEnabled) ICON_GREEN else ICON_ORANGE,
-                    title = stringResource(if (serviceEnabled) R.string.service_on else R.string.service_off),
-                    summary = stringResource(
-                        if (serviceEnabled) R.string.service_on_summary else R.string.service_off_summary,
-                    ),
-                ) {
-                    context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-                }
-                ItemDivider()
-                SettingsItem(
-                    glyph = Glyph.PLAY,
-                    iconColor = ICON_BLUE,
-                    title = stringResource(R.string.test_panel),
-                ) {
-                    val s = VolumeAccessibilityService.instance
-                    if (s != null) {
-                        s.showPanel(ignoreRules = true)
-                    } else {
-                        Toast.makeText(context, R.string.enable_service_first, Toast.LENGTH_SHORT).show()
-                    }
                 }
             }
 
@@ -559,10 +680,17 @@ private fun HomePage(settings: PanelSettings, serviceEnabled: Boolean, onOpen: (
 
             SettingsGroup {
                 SettingsItem(
-                    Glyph.PALETTE, ICON_PINK,
-                    stringResource(R.string.item_app_title),
-                    stringResource(R.string.item_app_summary),
-                ) { onOpen(PAGE_APP) }
+                    glyph = Glyph.PLAY,
+                    iconColor = ICON_BLUE,
+                    title = stringResource(R.string.test_panel),
+                ) {
+                    val s = VolumeAccessibilityService.instance
+                    if (s != null) {
+                        s.showPanel(ignoreRules = true)
+                    } else {
+                        Toast.makeText(context, R.string.enable_service_first, Toast.LENGTH_SHORT).show()
+                    }
+                }
             }
         }
     }
@@ -746,13 +874,19 @@ private fun StationPage(
         )
     }
     val maxes = remember { STREAMS.associate { it.stream to 15 } }
-    var expanded by remember { mutableStateOf(true) }
+    var previewDnd by remember { mutableStateOf(false) }
     val actions = remember {
         PanelActions(
             onSeek = { stream, f -> levels[stream] = (f * 15).roundToInt().coerceIn(0, 15) },
             onTouch = { },
-            onToggleStation = { expanded = !expanded },
+            onToggleStation = { },
             onMedia = { },
+            onMuteAll = {
+                val anyOn = STREAMS.any { (levels[it.stream] ?: 0) > 0 }
+                STREAMS.forEach { levels[it.stream] = if (anyOn) 0 else 8 }
+            },
+            onToggleDnd = { previewDnd = !previewDnd },
+            onOpenSettings = { },
         )
     }
 
@@ -763,18 +897,24 @@ private fun StationPage(
                 SwitchRow(stringResource(R.string.station_toggle), settings.stationEnabled) {
                     onChange(settings.copy(stationEnabled = it))
                 }
+                SwitchRow(stringResource(R.string.station_mute_all), settings.stationMuteAll) {
+                    onChange(settings.copy(stationMuteAll = it))
+                }
+                SwitchRow(stringResource(R.string.station_dnd_button), settings.stationDnd) {
+                    onChange(settings.copy(stationDnd = it))
+                }
             }
 
             Section(stringResource(R.string.preview_title)) {
                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    VolumePanel(
+                    PanelOrStation(
                         settings = settings.copy(stationEnabled = true),
                         state = PanelState(
                             stream = AudioManager.STREAM_MUSIC,
                             level = levels[AudioManager.STREAM_MUSIC] ?: 0,
                             max = 15,
-                            dnd = false,
-                            expanded = expanded,
+                            dnd = previewDnd,
+                            expanded = true,
                             levels = levels,
                             maxes = maxes,
                         ),
@@ -822,14 +962,16 @@ private fun AppsPage(settings: PanelSettings, onChange: (PanelSettings) -> Unit,
     val shown = loaded?.filter { query.isBlank() || it.label.contains(query, ignoreCase = true) }
         ?: emptyList()
 
-    PageScaffold(stringResource(R.string.apps_title), onBack) { padding ->
+    PageScaffold(stringResource(R.string.apps_title), onBack, lazy = true) { padding ->
         LazyColumn(
+            state = LocalPageList.current,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                .navigationBarsPadding(),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            item { HeaderSpacer() }
             item {
                 Text(stringResource(R.string.apps_desc), style = MaterialTheme.typography.bodySmall)
             }
@@ -1057,6 +1199,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         setContent { AppRoot() }
     }
 
@@ -1088,16 +1231,23 @@ class MainActivity : ComponentActivity() {
         }
 
         KanadeTheme(settings.themeMode, settings.dynamicColor) {
-            var page by rememberSaveable { mutableStateOf(PAGE_HOME) }
-            BackHandler(enabled = page != PAGE_HOME) { page = PAGE_HOME }
-            val goHome = { page = PAGE_HOME }
+            // The service can ask for a page, for example from the Volume Station's gear.
+            val startPage = this@MainActivity.intent?.getStringExtra(EXTRA_PAGE) ?: PAGE_HOME
+            var page by rememberSaveable { mutableStateOf(startPage) }
+            val parent = when (page) {
+                PAGE_PANEL, PAGE_BEHAVIOR, PAGE_STATION, PAGE_APPS -> PAGE_VOLUME
+                else -> PAGE_HOME
+            }
+            BackHandler(enabled = page != PAGE_HOME) { page = parent }
+            val goBack = { page = parent }
             when (page) {
-                PAGE_PANEL -> PanelPage(settings, onChange, goHome)
-                PAGE_BEHAVIOR -> BehaviorPage(settings, onChange, goHome)
-                PAGE_STATION -> StationPage(settings, dndAccess, onChange, goHome)
-                PAGE_APPS -> AppsPage(settings, onChange, goHome)
-                PAGE_APP -> AppPage(settings, onChange, goHome)
-                else -> HomePage(settings, serviceEnabled) { page = it }
+                PAGE_VOLUME -> VolumeHubPage(settings, { page = it }, goBack)
+                PAGE_PANEL -> PanelPage(settings, onChange, goBack)
+                PAGE_BEHAVIOR -> BehaviorPage(settings, onChange, goBack)
+                PAGE_STATION -> StationPage(settings, dndAccess, onChange, goBack)
+                PAGE_APPS -> AppsPage(settings, onChange, goBack)
+                PAGE_APP -> AppPage(settings, onChange, goBack)
+                else -> HomePage(serviceEnabled) { page = it }
             }
         }
     }
