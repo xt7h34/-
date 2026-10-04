@@ -1,7 +1,12 @@
 package com.rigen.volumeui
 
+import android.app.Application
 import android.content.Context
+import android.content.res.Configuration
 import android.media.AudioManager
+import java.io.PrintWriter
+import java.io.StringWriter
+import java.util.Locale
 
 const val THEME_SYSTEM = 0
 const val THEME_LIGHT = 1
@@ -36,6 +41,10 @@ enum class Glyph(val pathData: String) {
     VOLUME("M3,9v6h4l5,5V4L7,9H3zM16.5,12c0,-1.77 -1.02,-3.29 -2.5,-4.03v8.05c1.48,-0.73 2.5,-2.25 2.5,-4.02zM14,3.23v2.06c2.89,0.86 5,3.54 5,6.71s-2.11,5.85 -5,6.71v2.06c4.01,-0.91 7,-4.49 7,-8.77s-2.99,-7.86 -7,-8.77z"),
     TUNE("M3,17v2h6v-2H3zM3,5v2h10V5H3zM13,21v-2h8v-2h-8v-2h-2v6h2zM7,9v2H3v2h4v2h2V9H7zM21,13v-2H11v2h10zM15,9h2V7h4V5h-4V3h-2v6z"),
     APPS("M4,8h4V4H4v4zm6,12h4v-4h-4v4zm-6,0h4v-4H4v4zm0,-6h4v-4H4v4zm6,0h4v-4h-4v4zm6,-10v4h4V4h-4zm-6,4h4V4h-4v4zm6,6h4v-4h-4v4zm0,6h4v-4h-4v4z"),
+    BACK("M20,11H7.83l5.59,-5.59L12,4l-8,8 8,8 1.41,-1.41L7.83,13H20v-2z"),
+    MORE("M12,8c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM12,10c-1.1,0 -2,0.9 -2,2s0.9,2 2,2 2,-0.9 2,-2 -0.9,-2 -2,-2zM12,16c-1.1,0 -2,0.9 -2,2s0.9,2 2,2 2,-0.9 2,-2 -0.9,-2 -2,-2z"),
+    ACCESS("M12,2c1.1,0 2,0.9 2,2s-0.9,2 -2,2 -2,-0.9 -2,-2 0.9,-2 2,-2zM21,9h-6v13h-2v-6h-2v6H9V9H3V7h18v2z"),
+    WARNING("M1,21h22L12,2 1,21zM13,18h-2v-2h2v2zM13,14h-2v-4h2v4z"),
     PALETTE("M12,3c-4.97,0 -9,4.03 -9,9s4.03,9 9,9c0.83,0 1.5,-0.67 1.5,-1.5 0,-0.39 -0.15,-0.74 -0.39,-1.01 -0.23,-0.26 -0.38,-0.61 -0.38,-0.99 0,-0.83 0.67,-1.5 1.5,-1.5H16c2.76,0 5,-2.24 5,-5 0,-4.42 -4.03,-8 -9,-8zM6.5,12c-0.83,0 -1.5,-0.67 -1.5,-1.5S5.67,9 6.5,9 8,9.67 8,10.5 7.33,12 6.5,12zM9.5,8C8.67,8 8,7.33 8,6.5S8.67,5 9.5,5s1.5,0.67 1.5,1.5S10.33,8 9.5,8zM14.5,8c-0.83,0 -1.5,-0.67 -1.5,-1.5S13.67,5 14.5,5s1.5,0.67 1.5,1.5S15.33,8 14.5,8zM17.5,12c-0.83,0 -1.5,-0.67 -1.5,-1.5S16.67,9 17.5,9s1.5,0.67 1.5,1.5 -0.67,1.5 -1.5,1.5z"),
 }
 
@@ -86,7 +95,9 @@ data class PanelSettings(
     val altPosY: Float = 0.92f,
     // The app itself
     val themeMode: Int = THEME_SYSTEM,
-    val dynamicColor: Boolean = true,
+    val dynamicColor: Boolean = false,
+    /** "" = follow the system, otherwise a language code such as "ar" or "en". */
+    val language: String = "",
 )
 
 /** Single source of truth for saved settings. Used by both the app screens and the service. */
@@ -113,7 +124,8 @@ object Prefs {
     private const val K_ALT_X = "alt_pos_x"
     private const val K_ALT_Y = "alt_pos_y"
     private const val K_THEME = "theme_mode"
-    private const val K_DYNAMIC = "dynamic_color"
+    private const val K_DYNAMIC = "dynamic_color_v2"
+    private const val K_LANG = "language"
 
     private fun sp(context: Context) =
         context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
@@ -158,6 +170,7 @@ object Prefs {
             altPosY = p.getFloat(K_ALT_Y, d.altPosY),
             themeMode = p.getInt(K_THEME, d.themeMode),
             dynamicColor = p.getBoolean(K_DYNAMIC, d.dynamicColor),
+            language = p.getString(K_LANG, "") ?: "",
         )
     }
 
@@ -185,6 +198,63 @@ object Prefs {
             .putFloat(K_ALT_Y, s.altPosY)
             .putInt(K_THEME, s.themeMode)
             .putBoolean(K_DYNAMIC, s.dynamicColor)
+            .putString(K_LANG, s.language)
             .apply()
+    }
+
+    /** Wraps a context so its texts use the language chosen inside the app (if any). */
+    fun localized(base: Context): Context {
+        val lang = base.getSharedPreferences(FILE, Context.MODE_PRIVATE).getString(K_LANG, "") ?: ""
+        if (lang.isEmpty()) return base
+        val locale = Locale(lang)
+        Locale.setDefault(locale)
+        val config = Configuration(base.resources.configuration)
+        config.setLocale(locale)
+        config.setLayoutDirection(locale)
+        return base.createConfigurationContext(config)
+    }
+}
+
+/** Small notes the app keeps about the service, so problems can be found from the phone alone. */
+object Diag {
+    private const val FILE = "kanade_diag"
+    private const val ERRORS = "errors"
+
+    private fun sp(context: Context) =
+        context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+
+    fun mark(context: Context, key: String) {
+        sp(context).edit().putLong(key, System.currentTimeMillis()).commit()
+    }
+
+    fun time(context: Context, key: String): Long = sp(context).getLong(key, 0L)
+
+    fun error(context: Context, where: String, t: Throwable) {
+        val trace = StringWriter().also { t.printStackTrace(PrintWriter(it)) }.toString().take(1800)
+        val entry = "[" + java.text.DateFormat.getDateTimeInstance().format(java.util.Date()) + "] " + where + "\n" + trace
+        val old = sp(context).getString(ERRORS, "") ?: ""
+        sp(context).edit().putString(ERRORS, (entry + "\n\n" + old).take(6000)).commit()
+    }
+
+    fun errors(context: Context): String = sp(context).getString(ERRORS, "") ?: ""
+
+    fun clearErrors(context: Context) {
+        sp(context).edit().remove(ERRORS).commit()
+    }
+}
+
+/** Records any crash, so the app can show it afterwards. */
+class KanadeApp : Application() {
+    override fun onCreate() {
+        super.onCreate()
+        val previous = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            try {
+                Diag.error(this, "CRASH on thread " + thread.name, throwable)
+            } catch (e: Throwable) {
+                // Nothing more we can do here.
+            }
+            previous?.uncaughtException(thread, throwable)
+        }
     }
 }
