@@ -118,7 +118,7 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
     private val handler = Handler(Looper.getMainLooper())
     private val hideRunnable = Runnable { hidePanel() }
     private val removeRunnable = Runnable { removePanel() }
-    private val collapseRunnable = Runnable { updateExpanded(false) }
+    private val collapseRunnable = Runnable { setExpanded(false) }
     private lateinit var windowManager: WindowManager
     private lateinit var controller: VolumeController
 
@@ -173,7 +173,7 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
     private val actions = PanelActions(
         onSeek = { stream, fraction -> seekStream(stream, fraction) },
         onTouch = { down -> onPanelTouch(down) },
-        onToggleStation = { updateExpanded(!expanded) },
+        onToggleStation = { setExpanded(!expanded) },
         onMedia = { keyCode -> sendMedia(keyCode) },
     )
 
@@ -411,7 +411,7 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
     }
 
     /** Opens or closes the Volume Station part of the panel. */
-    private fun updateExpanded(value: Boolean) {
+    private fun setExpanded(value: Boolean) {
         if (expanded == value) return
         expanded = value
         handler.removeCallbacks(collapseRunnable)
@@ -433,7 +433,7 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
     }
 
     private fun onOutsideTouch() {
-        if (expanded) updateExpanded(false)
+        if (expanded) setExpanded(false)
     }
 
     // ───────────── The window ─────────────
@@ -575,6 +575,9 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
                 setContent { PanelHost(vs) }
             }
             val root = PanelRoot(this)
+            // Compose looks for these owners on the window's root view, which is this container.
+            root.setViewTreeLifecycleOwner(this)
+            root.setViewTreeSavedStateRegistryOwner(this)
             root.addView(
                 compose,
                 FrameLayout.LayoutParams(
