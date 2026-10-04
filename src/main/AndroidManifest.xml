@@ -13,6 +13,7 @@
     </queries>
 
     <application
+        android:name=".KanadeApp"
         android:icon="@mipmap/ic_launcher"
         android:label="Kanade System"
         android:supportsRtl="true"
