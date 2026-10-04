@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -36,38 +37,47 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
 
 private val HIGH_VOLUME_RED = Color(0xFFE53935)
+private val ACTIVE_BLUE = Color(0xFF7FA6FF)
 
-/** Everything the panel needs to draw. */
+/** Everything the panel and the Station card need to draw. */
 data class PanelState(
     /** The volume the panel is mainly about (media, or call during a call). */
     val stream: Int,
     val level: Int,
     val max: Int,
+    /** Do Not Disturb is on. */
     val dnd: Boolean,
-    /** True when the Volume Station part is open. */
+    /** True when the Volume Station card is open instead of the panel. */
     val expanded: Boolean = false,
     val levels: Map<Int, Int> = emptyMap(),
     val maxes: Map<Int, Int> = emptyMap(),
     val mediaPlaying: Boolean = false,
 )
 
-/** What the panel can ask for. A null [PanelActions] makes the panel display-only. */
+/** What the panel can ask for. A null [PanelActions] makes it display-only. */
 class PanelActions(
     /** A bar was touched: stream, position 0..1. */
     val onSeek: (Int, Float) -> Unit,
-    /** A finger went down (true) or up (false) on the panel. */
+    /** A finger went down (true) or up (false) on a bar. */
     val onTouch: (Boolean) -> Unit,
+    /** The three dots were tapped. */
     val onToggleStation: () -> Unit,
     /** A media key code (previous / play-pause / next). */
     val onMedia: (Int) -> Unit,
+    val onMuteAll: () -> Unit,
+    val onToggleDnd: () -> Unit,
+    val onOpenSettings: () -> Unit,
 )
 
 private class PanelColors(val fg: Color, val bar: Color)
@@ -86,7 +96,7 @@ fun PathIcon(pathData: String, color: Color, iconSize: Dp, modifier: Modifier = 
     val path = remember(pathData) {
         runCatching { PathParser().parsePathString(pathData).toPath() }.getOrNull()
     }
-    Canvas(modifier.size(iconSize)) {
+    androidx.compose.foundation.Canvas(modifier.size(iconSize)) {
         val p = path ?: return@Canvas
         scale(scale = this.size.minDimension / 24f, pivot = Offset.Zero) {
             drawPath(p, color)
@@ -94,9 +104,24 @@ fun PathIcon(pathData: String, color: Color, iconSize: Dp, modifier: Modifier = 
     }
 }
 
+/** Shows the Volume Station card when it is open, otherwise the panel. */
+@Composable
+fun PanelOrStation(
+    settings: PanelSettings,
+    state: PanelState,
+    modifier: Modifier = Modifier,
+    actions: PanelActions? = null,
+) {
+    if (state.expanded && settings.stationEnabled && actions != null) {
+        StationCard(settings, state, modifier, actions)
+    } else {
+        VolumePanel(settings, state, modifier, actions)
+    }
+}
+
 /**
  * The volume panel. Horizontal or vertical. With the Volume Station on, three dots sit inside
- * it; tapping them opens the other volumes and the media controls inside the same frame.
+ * it; tapping them opens the Station card.
  */
 @Composable
 fun VolumePanel(
@@ -113,9 +138,6 @@ fun VolumePanel(
     }
     val colors = PanelColors(fg, if (settings.barColorArgb == 0) fg else Color(settings.barColorArgb))
     val ctx = PanelCtx(settings, state, colors, actions)
-    val expanded = state.expanded && ctx.dots
-    // The panel grows toward the side of the screen that has more room.
-    val reverse = if (settings.vertical) settings.posX > 0.5f else settings.posY > 0.5f
 
     var frame = modifier
     if (settings.showFrame) {
@@ -124,68 +146,50 @@ fun VolumePanel(
             .background(frameBg)
     }
 
-    if (settings.vertical) {
-        Row(frame) {
-            if (expanded && reverse) ExtraColumns(ctx, true)
-            StreamColumn(
-                ctx, state.stream, glyphForStream(state.stream), state.level, state.max,
-                settings.widthDp, true,
-            )
-            if (expanded && !reverse) ExtraColumns(ctx, false)
-        }
-    } else {
-        Column(frame) {
-            if (expanded && reverse) ExtraRows(ctx, true)
-            StreamRow(
-                ctx, state.stream, glyphForStream(state.stream), state.level, state.max,
-                settings.heightDp, true,
-            )
-            if (expanded && !reverse) ExtraRows(ctx, false)
+    Box(frame) {
+        if (settings.vertical) {
+            StreamColumn(ctx)
+        } else {
+            StreamRow(ctx)
         }
     }
 }
 
-// ───────────────────────────── Rows and columns ─────────────────────────────
+// ───────────────────────────── The panel itself ─────────────────────────────
 
-private fun seekCallback(ctx: PanelCtx, stream: Int, isMain: Boolean): ((Float) -> Unit)? {
+private fun seekCallback(ctx: PanelCtx): ((Float) -> Unit)? {
     val a = ctx.actions ?: return null
-    if (isMain && !ctx.settings.touchEnabled) return null
+    if (!ctx.settings.touchEnabled) return null
+    val stream = ctx.state.stream
     return { f -> a.onSeek(stream, f) }
 }
 
 @Composable
-private fun StreamRow(
-    ctx: PanelCtx,
-    stream: Int,
-    glyph: Glyph,
-    level: Int,
-    max: Int,
-    heightDp: Int,
-    isMain: Boolean,
-) {
+private fun StreamRow(ctx: PanelCtx) {
     val s = ctx.settings
-    val fraction = if (max > 0) (level.toFloat() / max).coerceIn(0f, 1f) else 0f
+    val st = ctx.state
+    val fraction = if (st.max > 0) (st.level.toFloat() / st.max).coerceIn(0f, 1f) else 0f
     val pct = (fraction * 100).roundToInt()
     val iconColor = if (pct >= s.redThresholdPct) HIGH_VOLUME_RED else ctx.colors.fg
-    val iconGlyph = if (level == 0) Glyph.MUTED else glyph
-    val thickness = (heightDp / 6).coerceIn(4, 16)
-    val iconSize = (heightDp - 24).coerceIn(16, 32)
+    val glyph = if (st.level == 0) Glyph.MUTED else glyphForStream(st.stream)
+    val thickness = (s.heightDp / 6).coerceIn(4, 16)
+    val iconSize = (s.heightDp - 24).coerceIn(16, 32)
 
     Row(
         modifier = Modifier
             .width(s.widthDp.dp)
-            .height(heightDp.dp)
+            .height(s.heightDp.dp)
             .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        PathIcon(iconGlyph.pathData, iconColor, iconSize.dp)
+        PathIcon(glyph.pathData, iconColor, iconSize.dp)
         Spacer(Modifier.width(10.dp))
         VolumeBar(
             fraction = fraction,
             vertical = false,
             thickness = thickness,
             barColor = ctx.colors.bar,
-            onSeek = seekCallback(ctx, stream, isMain),
+            onSeek = seekCallback(ctx),
             onTouch = ctx.actions?.onTouch,
             modifier = Modifier
                 .weight(1f)
@@ -200,11 +204,11 @@ private fun StreamRow(
             textAlign = TextAlign.End,
             modifier = Modifier.width(32.dp),
         )
-        if (isMain && ctx.state.dnd && s.showDndIcon) {
+        if (st.dnd && s.showDndIcon) {
             Spacer(Modifier.width(8.dp))
             PathIcon(Glyph.DND.pathData, ctx.colors.fg.copy(alpha = 0.9f), 16.dp)
         }
-        if (isMain && ctx.dots) {
+        if (ctx.dots) {
             Spacer(Modifier.width(4.dp))
             DotsButton(ctx.colors.fg, false) { ctx.actions?.onToggleStation?.invoke() }
         }
@@ -212,26 +216,19 @@ private fun StreamRow(
 }
 
 @Composable
-private fun StreamColumn(
-    ctx: PanelCtx,
-    stream: Int,
-    glyph: Glyph,
-    level: Int,
-    max: Int,
-    widthDp: Int,
-    isMain: Boolean,
-) {
+private fun StreamColumn(ctx: PanelCtx) {
     val s = ctx.settings
-    val fraction = if (max > 0) (level.toFloat() / max).coerceIn(0f, 1f) else 0f
+    val st = ctx.state
+    val fraction = if (st.max > 0) (st.level.toFloat() / st.max).coerceIn(0f, 1f) else 0f
     val pct = (fraction * 100).roundToInt()
     val iconColor = if (pct >= s.redThresholdPct) HIGH_VOLUME_RED else ctx.colors.fg
-    val iconGlyph = if (level == 0) Glyph.MUTED else glyph
-    val thickness = (widthDp / 6).coerceIn(4, 16)
-    val iconSize = (widthDp - 24).coerceIn(16, 32)
+    val glyph = if (st.level == 0) Glyph.MUTED else glyphForStream(st.stream)
+    val thickness = (s.widthDp / 6).coerceIn(4, 16)
+    val iconSize = (s.widthDp - 24).coerceIn(16, 32)
 
     Column(
         modifier = Modifier
-            .width(widthDp.dp)
+            .width(s.widthDp.dp)
             .height(s.heightDp.dp)
             .padding(horizontal = 4.dp, vertical = 14.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -239,7 +236,7 @@ private fun StreamColumn(
         Text(
             text = "$pct",
             color = ctx.colors.fg,
-            fontSize = if (widthDp < 48) 11.sp else 14.sp,
+            fontSize = if (s.widthDp < 48) 11.sp else 14.sp,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth(),
@@ -250,68 +247,206 @@ private fun StreamColumn(
             vertical = true,
             thickness = thickness,
             barColor = ctx.colors.bar,
-            onSeek = seekCallback(ctx, stream, isMain),
+            onSeek = seekCallback(ctx),
             onTouch = ctx.actions?.onTouch,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(),
         )
         Spacer(Modifier.height(8.dp))
-        PathIcon(iconGlyph.pathData, iconColor, iconSize.dp)
-        if (isMain && ctx.state.dnd && s.showDndIcon) {
+        PathIcon(glyph.pathData, iconColor, iconSize.dp)
+        if (st.dnd && s.showDndIcon) {
             Spacer(Modifier.height(6.dp))
             PathIcon(Glyph.DND.pathData, ctx.colors.fg.copy(alpha = 0.9f), 14.dp)
         }
-        if (isMain && ctx.dots) {
+        if (ctx.dots) {
             Spacer(Modifier.height(2.dp))
             DotsButton(ctx.colors.fg, true) { ctx.actions?.onToggleStation?.invoke() }
         }
     }
 }
 
-/** The other volumes and the media row, stacked under (or above) the main row. */
+// ───────────────────────────── The Volume Station card ─────────────────────────────
+
+/**
+ * The Volume Station: a card for the middle of the screen. A title with a gear (top right) and
+ * the optional mute-all / Do Not Disturb buttons (top left), then one framed bar per volume, then
+ * the media buttons.
+ */
 @Composable
-private fun ExtraRows(ctx: PanelCtx, reverse: Boolean) {
-    val rowH = ctx.settings.heightDp.coerceAtMost(EXTRA_ROW_MAX_H_DP)
-    val others = STREAMS.filter { it.stream != ctx.state.stream }
-    if (reverse) {
-        MediaRow(ctx)
-        Spacer(Modifier.height(PANEL_GAP_DP.dp))
-    }
-    others.forEach { info ->
-        if (!reverse) Spacer(Modifier.height(PANEL_GAP_DP.dp))
-        StreamRow(
-            ctx, info.stream, info.glyph,
-            ctx.state.levels[info.stream] ?: 0, ctx.state.maxes[info.stream] ?: 1,
-            rowH, false,
-        )
-        if (reverse) Spacer(Modifier.height(PANEL_GAP_DP.dp))
-    }
-    if (!reverse) {
-        Spacer(Modifier.height(PANEL_GAP_DP.dp))
-        MediaRow(ctx)
+fun StationCard(
+    settings: PanelSettings,
+    state: PanelState,
+    modifier: Modifier = Modifier,
+    actions: PanelActions? = null,
+) {
+    val frameBg = Color(settings.colorArgb)
+    val fg = if (frameBg.luminance() > 0.5f) Color.Black else Color.White
+    val barColor = if (settings.barColorArgb == 0) fg else Color(settings.barColorArgb)
+    val shape = RoundedCornerShape(settings.cornerRadiusDp.coerceAtLeast(24).dp)
+    val inner = fg.copy(alpha = 0.09f)
+    val allMuted = STREAMS.all { (state.levels[it.stream] ?: 0) == 0 }
+
+    Column(
+        modifier = modifier
+            .width(STATION_W_DP.dp)
+            .clip(shape)
+            .background(frameBg)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        // Left and right here mean the real screen sides, whatever the language.
+        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.Start,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (settings.stationMuteAll) {
+                        TapIcon((if (allMuted) Glyph.MUTED else Glyph.VOLUME).pathData, fg, 44.dp, 24.dp) {
+                            actions?.onMuteAll?.invoke()
+                        }
+                    }
+                    if (settings.stationDnd) {
+                        TapIcon(Glyph.DND.pathData, if (state.dnd) ACTIVE_BLUE else fg, 44.dp, 24.dp) {
+                            actions?.onToggleDnd?.invoke()
+                        }
+                    }
+                }
+                Text(
+                    text = stringResource(R.string.section_station),
+                    color = fg,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+                Row(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TapIcon(Glyph.SETTINGS.pathData, fg, 44.dp, 24.dp) {
+                        actions?.onOpenSettings?.invoke()
+                    }
+                }
+            }
+        }
+
+        STREAMS.forEach { info ->
+            val level = state.levels[info.stream] ?: 0
+            val max = state.maxes[info.stream] ?: 1
+            val seek: ((Float) -> Unit)? = if (actions != null) {
+                { f -> actions.onSeek(info.stream, f) }
+            } else {
+                null
+            }
+            StationVolumeFrame(
+                info = info,
+                level = level,
+                max = max,
+                fg = fg,
+                barColor = barColor,
+                inner = inner,
+                threshold = settings.redThresholdPct,
+                onSeek = seek,
+                onTouch = actions?.onTouch,
+            )
+        }
+
+        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(inner),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TapIcon(Glyph.PREVIOUS.pathData, fg, 44.dp, 24.dp) {
+                    actions?.onMedia?.invoke(KeyEvent.KEYCODE_MEDIA_PREVIOUS)
+                }
+                TapIcon(
+                    (if (state.mediaPlaying) Glyph.PAUSE else Glyph.PLAY).pathData,
+                    fg, 44.dp, 28.dp,
+                ) {
+                    actions?.onMedia?.invoke(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
+                }
+                TapIcon(Glyph.NEXT.pathData, fg, 44.dp, 24.dp) {
+                    actions?.onMedia?.invoke(KeyEvent.KEYCODE_MEDIA_NEXT)
+                }
+            }
+        }
     }
 }
 
-/** Vertical panels open sideways: the other volumes become more columns. */
+/** One volume in its own rounded frame: icon, name, bar and percent. */
 @Composable
-private fun ExtraColumns(ctx: PanelCtx, reverse: Boolean) {
-    val colW = ctx.settings.widthDp.coerceAtMost(EXTRA_COL_MAX_W_DP)
-    val others = STREAMS.filter { it.stream != ctx.state.stream }
-    if (reverse) MediaColumn(ctx, colW)
-    others.forEach { info ->
-        StreamColumn(
-            ctx, info.stream, info.glyph,
-            ctx.state.levels[info.stream] ?: 0, ctx.state.maxes[info.stream] ?: 1,
-            colW, false,
+private fun StationVolumeFrame(
+    info: StreamInfo,
+    level: Int,
+    max: Int,
+    fg: Color,
+    barColor: Color,
+    inner: Color,
+    threshold: Int,
+    onSeek: ((Float) -> Unit)?,
+    onTouch: ((Boolean) -> Unit)?,
+) {
+    val fraction = if (max > 0) (level.toFloat() / max).coerceIn(0f, 1f) else 0f
+    val pct = (fraction * 100).roundToInt()
+    val iconColor = if (pct >= threshold) HIGH_VOLUME_RED else fg
+    val glyph = if (level == 0) Glyph.MUTED else info.glyph
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(66.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(inner)
+            .padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        PathIcon(glyph.pathData, iconColor, 26.dp)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = stringResource(info.labelRes),
+                color = fg.copy(alpha = 0.75f),
+                fontSize = 12.sp,
+            )
+            VolumeBar(
+                fraction = fraction,
+                vertical = false,
+                thickness = 8,
+                barColor = barColor,
+                onSeek = onSeek,
+                onTouch = onTouch,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(30.dp),
+            )
+        }
+        Spacer(Modifier.width(10.dp))
+        Text(
+            text = "$pct",
+            color = fg,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.End,
+            modifier = Modifier.width(36.dp),
         )
     }
-    if (!reverse) MediaColumn(ctx, colW)
 }
 
 // ───────────────────────────── Parts ─────────────────────────────
 
-/** The bar. The whole cell around it is the touch target. */
+/** The bar. The whole cell around it is the touch target. It always fills from the left or the bottom. */
 @Composable
 private fun VolumeBar(
     fraction: Float,
@@ -356,36 +491,39 @@ private fun VolumeBar(
         },
         contentAlignment = Alignment.Center,
     ) {
-        if (vertical) {
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(thickness.dp)
-                    .clip(round)
-                    .background(track),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .fillMaxHeight(animated)
-                        .background(barColor),
-                )
-            }
-        } else {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(thickness.dp)
-                    .clip(round)
-                    .background(track),
-            ) {
+        // Keep the bar left-to-right in every language, so touch and drawing agree.
+        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+            if (vertical) {
                 Box(
                     modifier = Modifier
                         .fillMaxHeight()
-                        .fillMaxWidth(animated)
-                        .background(barColor),
-                )
+                        .width(thickness.dp)
+                        .clip(round)
+                        .background(track),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .fillMaxHeight(animated)
+                            .background(barColor),
+                    )
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(thickness.dp)
+                        .clip(round)
+                        .background(track),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(animated)
+                            .background(barColor),
+                    )
+                }
             }
         }
     }
@@ -426,49 +564,5 @@ private fun DotsButton(color: Color, panelVertical: Boolean, onTap: () -> Unit) 
                 drawCircle(color, r, center)
             }
         }
-    }
-}
-
-@Composable
-private fun MediaButtons(ctx: PanelCtx, button: Dp) {
-    val a = ctx.actions
-    val fg = ctx.colors.fg
-    val playGlyph = if (ctx.state.mediaPlaying) Glyph.PAUSE else Glyph.PLAY
-    TapIcon(Glyph.PREVIOUS.pathData, fg, button, 22.dp) {
-        a?.onMedia?.invoke(KeyEvent.KEYCODE_MEDIA_PREVIOUS)
-    }
-    TapIcon(playGlyph.pathData, fg, button, 26.dp) {
-        a?.onMedia?.invoke(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
-    }
-    TapIcon(Glyph.NEXT.pathData, fg, button, 22.dp) {
-        a?.onMedia?.invoke(KeyEvent.KEYCODE_MEDIA_NEXT)
-    }
-}
-
-@Composable
-private fun MediaRow(ctx: PanelCtx) {
-    Row(
-        modifier = Modifier
-            .width(ctx.settings.widthDp.dp)
-            .height(PANEL_MEDIA_H_DP.dp)
-            .padding(horizontal = 14.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        MediaButtons(ctx, 40.dp)
-    }
-}
-
-@Composable
-private fun MediaColumn(ctx: PanelCtx, widthDp: Int) {
-    Column(
-        modifier = Modifier
-            .width(widthDp.dp)
-            .height(ctx.settings.heightDp.dp)
-            .padding(vertical = 14.dp),
-        verticalArrangement = Arrangement.SpaceEvenly,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        MediaButtons(ctx, widthDp.coerceAtMost(40).dp)
     }
 }
