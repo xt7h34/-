@@ -42,7 +42,7 @@
     <string name="limits_hint">The volume cannot go above this level from the panel or the keys.</string>
     <string name="limit_label">%1$s: max %2$d%%</string>
     <string name="section_station">Volume Station</string>
-    <string name="station_desc">Three dots inside the panel. Tap them to open every volume and the media controls.</string>
+    <string name="station_desc">The three dots inside the panel open the Volume Station: a card in the middle of the screen with every volume and the media buttons.</string>
     <string name="station_toggle">Enable Volume Station</string>
     <string name="dnd_perm_text">Ring and notification volumes need Do Not Disturb access.</string>
     <string name="dnd_perm_button">Grant Do Not Disturb access</string>
@@ -99,5 +99,11 @@
     <string name="diag_copy">Copy</string>
     <string name="diag_clear">Clear</string>
     <string name="diag_copied">Copied</string>
+    <string name="item_volume_title">Volume Panel</string>
+    <string name="item_volume_summary">Panel, Volume Station, rules and more</string>
+    <string name="clock_title">Kanade Clock</string>
+    <string name="clock_summary">Coming soon with the Kanade ecosystem</string>
+    <string name="station_mute_all">Show the mute-all button</string>
+    <string name="station_dnd_button">Show the Do Not Disturb button</string>
     <color name="ic_launcher_background">#F4F1FF</color>
 </resources>
