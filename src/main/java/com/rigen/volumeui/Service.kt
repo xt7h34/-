@@ -3,6 +3,7 @@ package com.rigen.volumeui
 import android.accessibilityservice.AccessibilityService
 import android.app.NotificationManager
 import android.content.Context
+import android.content.Intent
 import android.graphics.PixelFormat
 import android.media.AudioManager
 import android.os.Build
@@ -147,6 +148,7 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
     private var volumeBeforePress = 0
     private var wasRepeating = false
     private val preMuteVolume = mutableMapOf<Int, Int>()
+    private val preMuteAll = mutableMapOf<Int, Int>()
     private var heldCode = 0
     private var heldDirection = 0 // +1 up, -1 down, 0 none
     private var heldSince = 0L
@@ -175,6 +177,9 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
         onTouch = { down -> onPanelTouch(down) },
         onToggleStation = { changeExpanded(!expanded) },
         onMedia = { keyCode -> sendMedia(keyCode) },
+        onMuteAll = { muteAll() },
+        onToggleDnd = { toggleDnd() },
+        onOpenSettings = { openSettings() },
     )
 
     override fun onCreate() {
@@ -384,7 +389,7 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
             stationLevels[stream] = after
         } catch (e: SecurityException) {
             // Ring and notification volumes can need "Do Not Disturb access".
-            Toast.makeText(this, Prefs.localized(this).getString(R.string.toast_dnd_needed), Toast.LENGTH_SHORT).show()
+            toastDndNeeded()
         } catch (e: Exception) {
             logError("Could not set volume", e)
         }
@@ -396,6 +401,77 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
         haptic()
         if (expanded) resetIdle()
         handler.postDelayed({ mediaPlaying = controller.isMusicActive() }, 400L)
+    }
+
+    /** Mutes every volume, or brings them back to what they were. */
+    private fun muteAll() {
+        try {
+            val limits = settings.volumeLimits
+            val anyOn = STREAMS.any { controller.level(it.stream) > 0 }
+            STREAMS.forEach { info ->
+                try {
+                    if (anyOn) {
+                        val now = controller.level(info.stream)
+                        if (now > 0) {
+                            preMuteAll[info.stream] = now
+                            controller.setLevel(info.stream, 0, limits)
+                        }
+                    } else {
+                        val before = preMuteAll[info.stream]
+                        if (before != null) controller.setLevel(info.stream, before, limits)
+                    }
+                } catch (e: SecurityException) {
+                    // Ring and notification volumes can need "Do Not Disturb access".
+                    toastDndNeeded()
+                }
+            }
+            if (!anyOn) preMuteAll.clear()
+            refreshStation()
+            level = controller.level(currentStream)
+            haptic()
+            resetIdle()
+        } catch (e: Throwable) {
+            logError("muteAll", e)
+        }
+    }
+
+    /** Turns Do Not Disturb on or off. Needs the "Do Not Disturb access" permission. */
+    private fun toggleDnd() {
+        try {
+            val nm = getSystemService(NotificationManager::class.java) ?: return
+            if (!nm.isNotificationPolicyAccessGranted) {
+                toastDndNeeded()
+                return
+            }
+            val target = if (isDndOn()) {
+                NotificationManager.INTERRUPTION_FILTER_ALL
+            } else {
+                NotificationManager.INTERRUPTION_FILTER_PRIORITY
+            }
+            nm.setInterruptionFilter(target)
+            handler.postDelayed({ dnd = isDndOn() }, 300L)
+            haptic()
+            resetIdle()
+        } catch (e: Throwable) {
+            logError("toggleDnd", e)
+        }
+    }
+
+    /** The gear in the Station card: opens the Volume Panel settings in the app. */
+    private fun openSettings() {
+        try {
+            val intent = Intent(this, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                .putExtra(EXTRA_PAGE, PAGE_VOLUME)
+            startActivity(intent)
+            changeExpanded(false)
+        } catch (e: Throwable) {
+            logError("openSettings", e)
+        }
+    }
+
+    private fun toastDndNeeded() {
+        Toast.makeText(this, Prefs.localized(this).getString(R.string.toast_dnd_needed), Toast.LENGTH_SHORT).show()
     }
 
     /** Keeps the panel on screen while a finger is on it. */
@@ -451,41 +527,11 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
         return dm.widthPixels to dm.heightPixels
     }
 
-    /** Size of the window in pixels, closed or open (it includes 12dp of room around the panel). */
-    private fun panelSizePx(open: Boolean): Pair<Int, Int> {
-        val s = settings
-        val pad = 24
-        if (!s.vertical) {
-            val rowH = s.heightDp.coerceAtMost(EXTRA_ROW_MAX_H_DP)
-            val others = STREAMS.size - 1
-            val extra = if (open) others * (rowH + PANEL_GAP_DP) + PANEL_MEDIA_H_DP + PANEL_GAP_DP else 0
-            return dp(s.widthDp + pad) to dp(s.heightDp + extra + pad)
-        }
-        val colW = s.widthDp.coerceAtMost(EXTRA_COL_MAX_W_DP)
-        val extra = if (open) (STREAMS.size - 1) * colW + colW else 0
-        return dp(s.widthDp + extra + pad) to dp(s.heightDp + pad)
-    }
+    /** Size of the panel window in pixels (it includes 12dp of room around the panel). */
+    private fun panelSizePx(): Pair<Int, Int> =
+        dp(settings.widthDp + 24) to dp(settings.heightDp + 24)
 
     private fun buildLayoutParams(): WindowManager.LayoutParams {
-        val (screenW, screenH) = screenSizePx()
-        val (w0, h0) = panelSizePx(false)
-        val (w1, h1) = panelSizePx(expanded)
-        // posX/posY are the center of the closed panel; keep it inside the screen.
-        val x0 = (settings.posX * screenW - w0 / 2f).toInt().coerceIn(0, (screenW - w0).coerceAtLeast(0))
-        val y0 = (settings.posY * screenH - h0 / 2f).toInt().coerceIn(0, (screenH - h0).coerceAtLeast(0))
-        var px = x0
-        var py = y0
-        if (expanded) {
-            // Open toward the side with more room, keeping the main row where it was.
-            if (settings.vertical) {
-                px = if (settings.posX > 0.5f) x0 + w0 - w1 else x0
-                px = px.coerceIn(0, (screenW - w1).coerceAtLeast(0))
-            } else {
-                py = if (settings.posY > 0.5f) y0 + h0 - h1 else y0
-                py = py.coerceIn(0, (screenH - h1).coerceAtLeast(0))
-            }
-        }
-
         var flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
             WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
             WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
@@ -494,18 +540,29 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
             flags = flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
         }
 
-        return WindowManager.LayoutParams(
+        val lp = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
             // Needs no "draw over other apps" permission, unlike TYPE_APPLICATION_OVERLAY.
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             flags,
             PixelFormat.TRANSLUCENT,
-        ).apply {
-            gravity = Gravity.TOP or Gravity.START
-            this.x = px
-            this.y = py
+        )
+        if (expanded) {
+            // The Volume Station card sits in the middle of the screen.
+            lp.gravity = Gravity.CENTER
+            lp.x = 0
+            lp.y = 0
+            return lp
         }
+
+        val (screenW, screenH) = screenSizePx()
+        val (w0, h0) = panelSizePx()
+        // posX/posY are the center of the panel; keep it inside the screen.
+        lp.gravity = Gravity.TOP or Gravity.START
+        lp.x = (settings.posX * screenW - w0 / 2f).toInt().coerceIn(0, (screenW - w0).coerceAtLeast(0))
+        lp.y = (settings.posY * screenH - h0 / 2f).toInt().coerceIn(0, (screenH - h0).coerceAtLeast(0))
+        return lp
     }
 
     private fun updateLayout() {
@@ -548,7 +605,7 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
             enter = fadeIn(tween(200)) + scaleIn(tween(200), initialScale = 0.85f) + slideIn,
             exit = fadeOut(tween(160)) + scaleOut(tween(160), targetScale = 0.9f) + slideOut,
         ) {
-            VolumePanel(
+            PanelOrStation(
                 settings = settings,
                 state = PanelState(
                     stream = currentStream,
