@@ -42,7 +42,7 @@
     <string name="limits_hint">الصوت مش هيعدّي الحد ده من اللوحة أو الأزرار.</string>
     <string name="limit_label">%1$s: الحد الأقصى %2$d%%</string>
     <string name="section_station">Volume Station</string>
-    <string name="station_desc">3 نقاط جوه اللوحة، تضغط عليها فتفتح كل الأصوات وأزرار الميديا.</string>
+    <string name="station_desc">النقاط التلات جوه اللوحة بتفتح Volume Station: كارت في نص الشاشة فيه كل الأصوات وأزرار الميديا.</string>
     <string name="station_toggle">تفعيل Volume Station</string>
     <string name="dnd_perm_text">الرنين والإشعارات محتاجين صلاحية «الوصول لعدم الإزعاج».</string>
     <string name="dnd_perm_button">امنح صلاحية عدم الإزعاج</string>
@@ -99,4 +99,10 @@
     <string name="diag_copy">نسخ</string>
     <string name="diag_clear">مسح</string>
     <string name="diag_copied">اتنسخ</string>
+    <string name="item_volume_title">Volume Panel</string>
+    <string name="item_volume_summary">اللوحة والـStation والقواعد وغيرها</string>
+    <string name="clock_title">Kanade Clock</string>
+    <string name="clock_summary">قريبًا مع منظومة Kanade</string>
+    <string name="station_mute_all">إظهار زرار كتم الكل</string>
+    <string name="station_dnd_button">إظهار زرار عدم الإزعاج</string>
 </resources>
