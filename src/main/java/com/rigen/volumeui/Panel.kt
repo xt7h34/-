@@ -9,6 +9,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -78,9 +79,11 @@ class PanelActions(
     val onMuteAll: () -> Unit,
     val onToggleDnd: () -> Unit,
     val onOpenSettings: () -> Unit,
+    /** The speaker button of the capsule style: mute or unmute the main volume. */
+    val onToggleMute: () -> Unit,
 )
 
-private class PanelColors(val fg: Color, val bar: Color)
+private class PanelColors(val fg: Color, val bar: Color, val frame: Color)
 
 private class PanelCtx(
     val settings: PanelSettings,
@@ -136,21 +139,26 @@ fun VolumePanel(
         frameBg.luminance() > 0.5f -> Color.Black
         else -> Color.White
     }
-    val colors = PanelColors(fg, if (settings.barColorArgb == 0) fg else Color(settings.barColorArgb))
+    val colors = PanelColors(fg, if (settings.barColorArgb == 0) fg else Color(settings.barColorArgb), frameBg)
     val ctx = PanelCtx(settings, state, colors, actions)
 
-    var frame = modifier
-    if (settings.showFrame) {
-        frame = frame
-            .clip(RoundedCornerShape(settings.cornerRadiusDp.dp))
-            .background(frameBg)
-    }
-
-    Box(frame) {
-        if (settings.vertical) {
-            StreamColumn(ctx)
-        } else {
-            StreamRow(ctx)
+    when (settings.panelStyle) {
+        STYLE_CAPSULE -> CapsulePanel(ctx, modifier)
+        STYLE_BAR -> BarPanel(ctx, modifier)
+        else -> {
+            var frame = modifier
+            if (settings.showFrame) {
+                frame = frame
+                    .clip(RoundedCornerShape(settings.cornerRadiusDp.dp))
+                    .background(frameBg)
+            }
+            Box(frame) {
+                if (settings.vertical) {
+                    StreamColumn(ctx)
+                } else {
+                    StreamRow(ctx)
+                }
+            }
         }
     }
 }
@@ -446,7 +454,46 @@ private fun StationVolumeFrame(
 
 // ───────────────────────────── Parts ─────────────────────────────
 
-/** The bar. The whole cell around it is the touch target. It always fills from the left or the bottom. */
+/**
+ * Touch handling for a bar: pressing or dragging reports the position (0..1). Horizontal bars
+ * grow from the left and vertical bars from the bottom.
+ */
+@Composable
+private fun Modifier.seekGestures(
+    vertical: Boolean,
+    onSeek: ((Float) -> Unit)?,
+    onTouch: ((Boolean) -> Unit)?,
+): Modifier {
+    val seekCb by rememberUpdatedState(onSeek)
+    val touchCb by rememberUpdatedState(onTouch)
+    return this.pointerInput(vertical) {
+        awaitEachGesture {
+            val down = awaitFirstDown()
+            val seek = seekCb ?: return@awaitEachGesture
+            val length = (if (vertical) size.height else size.width).toFloat()
+            if (length <= 0f) return@awaitEachGesture
+            fun fractionAt(p: Float): Float {
+                val f = (p / length).coerceIn(0f, 1f)
+                return if (vertical) 1f - f else f
+            }
+            touchCb?.invoke(true)
+            seek(fractionAt(if (vertical) down.position.y else down.position.x))
+            down.consume()
+            do {
+                val event = awaitPointerEvent()
+                event.changes.forEach { c ->
+                    if (c.positionChanged()) {
+                        seek(fractionAt(if (vertical) c.position.y else c.position.x))
+                        c.consume()
+                    }
+                }
+            } while (event.changes.any { it.pressed })
+            touchCb?.invoke(false)
+        }
+    }
+}
+
+/** The thin bar. The whole cell around it is the touch target. It always fills from the left or the bottom. */
 @Composable
 private fun VolumeBar(
     fraction: Float,
@@ -458,37 +505,11 @@ private fun VolumeBar(
     modifier: Modifier,
 ) {
     val animated by animateFloatAsState(fraction, tween(120), label = "bar")
-    val seekCb by rememberUpdatedState(onSeek)
-    val touchCb by rememberUpdatedState(onTouch)
     val track = barColor.copy(alpha = 0.25f)
     val round = RoundedCornerShape((thickness / 2).dp)
 
     Box(
-        modifier = modifier.pointerInput(vertical) {
-            awaitEachGesture {
-                val down = awaitFirstDown()
-                val seek = seekCb ?: return@awaitEachGesture
-                val length = (if (vertical) size.height else size.width).toFloat()
-                if (length <= 0f) return@awaitEachGesture
-                fun fractionAt(p: Float): Float {
-                    val f = (p / length).coerceIn(0f, 1f)
-                    return if (vertical) 1f - f else f
-                }
-                touchCb?.invoke(true)
-                seek(fractionAt(if (vertical) down.position.y else down.position.x))
-                down.consume()
-                do {
-                    val event = awaitPointerEvent()
-                    event.changes.forEach { c ->
-                        if (c.positionChanged()) {
-                            seek(fractionAt(if (vertical) c.position.y else c.position.x))
-                            c.consume()
-                        }
-                    }
-                } while (event.changes.any { it.pressed })
-                touchCb?.invoke(false)
-            }
-        },
+        modifier = modifier.seekGestures(vertical, onSeek, onTouch),
         contentAlignment = Alignment.Center,
     ) {
         // Keep the bar left-to-right in every language, so touch and drawing agree.
@@ -527,6 +548,244 @@ private fun VolumeBar(
             }
         }
     }
+}
+
+/** A thick bar: the whole cell is the track and the fill grows inside it. */
+@Composable
+private fun FatBar(
+    fraction: Float,
+    vertical: Boolean,
+    track: Color,
+    accent: Color,
+    cornerDp: Int,
+    onSeek: ((Float) -> Unit)?,
+    onTouch: ((Boolean) -> Unit)?,
+    modifier: Modifier,
+    insideFill: (@Composable () -> Unit)? = null,
+    overlay: (@Composable BoxScope.() -> Unit)? = null,
+) {
+    val animated by animateFloatAsState(fraction, tween(120), label = "fat")
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(cornerDp.dp))
+            .background(track)
+            .seekGestures(vertical, onSeek, onTouch),
+    ) {
+        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+            if (vertical) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .fillMaxHeight(animated)
+                        .background(accent),
+                    contentAlignment = Alignment.TopCenter,
+                ) {
+                    if (insideFill != null) {
+                        Box(Modifier.padding(top = 12.dp)) { insideFill() }
+                    }
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .fillMaxHeight()
+                        .fillMaxWidth(animated)
+                        .background(accent),
+                    contentAlignment = Alignment.CenterEnd,
+                ) {
+                    if (insideFill != null) {
+                        Box(Modifier.padding(end = 12.dp)) { insideFill() }
+                    }
+                }
+            }
+        }
+        if (overlay != null) overlay()
+    }
+}
+
+/** A round button with a filled background and an icon. */
+@Composable
+private fun CircleButton(
+    bg: Color,
+    boxSize: Dp,
+    pathData: String,
+    iconColor: Color,
+    iconSize: Dp,
+    onTap: () -> Unit,
+) {
+    val tap by rememberUpdatedState(onTap)
+    Box(
+        modifier = Modifier
+            .size(boxSize)
+            .clip(CircleShape)
+            .background(bg)
+            .pointerInput(Unit) { detectTapGestures(onTap = { tap() }) },
+        contentAlignment = Alignment.Center,
+    ) {
+        PathIcon(pathData, iconColor, iconSize)
+    }
+}
+
+// ───────────────────────────── Other panel styles ─────────────────────────────
+
+/**
+ * The capsule: a pill with a speaker button, a thick slider with the volume's icon in the fill,
+ * and the three dots. Vertical or horizontal.
+ */
+@Composable
+private fun CapsulePanel(ctx: PanelCtx, modifier: Modifier) {
+    val s = ctx.settings
+    val st = ctx.state
+    val c = ctx.colors
+    val fraction = if (st.max > 0) (st.level.toFloat() / st.max).coerceIn(0f, 1f) else 0f
+    val pct = (fraction * 100).roundToInt()
+    val accent = c.bar
+    val onAccent = if (accent.luminance() > 0.5f) Color.Black else Color.White
+    val track = c.fg.copy(alpha = 0.12f)
+    val iconColor = if (pct >= s.redThresholdPct) HIGH_VOLUME_RED else onAccent
+    val glyph = if (st.level == 0) Glyph.MUTED else glyphForStream(st.stream)
+    val topGlyph = if (st.level == 0) Glyph.MUTED else Glyph.VOLUME
+    val toggleMute: () -> Unit = { ctx.actions?.onToggleMute?.invoke() }
+
+    var pill = modifier
+        .width(s.widthDp.dp)
+        .height(s.heightDp.dp)
+    if (s.showFrame) {
+        pill = pill
+            .clip(RoundedCornerShape(50))
+            .background(c.frame)
+    }
+
+    if (s.vertical) {
+        val button = (s.widthDp - 20).coerceIn(24, 56)
+        val corner = (button / 2).coerceIn(8, 28)
+        Column(
+            modifier = pill.padding(10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            CircleButton(accent, button.dp, topGlyph.pathData, onAccent, (button / 2).dp, toggleMute)
+            if (st.dnd && s.showDndIcon) {
+                Spacer(Modifier.height(6.dp))
+                PathIcon(Glyph.DND.pathData, c.fg.copy(alpha = 0.9f), 14.dp)
+            }
+            Spacer(Modifier.height(10.dp))
+            FatBar(
+                fraction = fraction,
+                vertical = true,
+                track = track,
+                accent = accent,
+                cornerDp = corner,
+                onSeek = seekCallback(ctx),
+                onTouch = ctx.actions?.onTouch,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                insideFill = { PathIcon(glyph.pathData, iconColor, 22.dp) },
+            )
+            if (ctx.dots) {
+                Spacer(Modifier.height(6.dp))
+                DotsButton(c.fg, true) { ctx.actions?.onToggleStation?.invoke() }
+            }
+        }
+    } else {
+        val button = (s.heightDp - 16).coerceIn(24, 56)
+        val corner = (button / 2).coerceIn(8, 28)
+        Row(
+            modifier = pill.padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CircleButton(accent, button.dp, topGlyph.pathData, onAccent, (button / 2).dp, toggleMute)
+            if (st.dnd && s.showDndIcon) {
+                Spacer(Modifier.width(6.dp))
+                PathIcon(Glyph.DND.pathData, c.fg.copy(alpha = 0.9f), 14.dp)
+            }
+            Spacer(Modifier.width(10.dp))
+            FatBar(
+                fraction = fraction,
+                vertical = false,
+                track = track,
+                accent = accent,
+                cornerDp = corner,
+                onSeek = seekCallback(ctx),
+                onTouch = ctx.actions?.onTouch,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+                insideFill = { PathIcon(glyph.pathData, iconColor, 22.dp) },
+            )
+            if (ctx.dots) {
+                Spacer(Modifier.width(6.dp))
+                DotsButton(c.fg, false) { ctx.actions?.onToggleStation?.invoke() }
+            }
+        }
+    }
+}
+
+/** The plain bar: one rounded bar that fills with color, with the icon inside. */
+@Composable
+private fun BarPanel(ctx: PanelCtx, modifier: Modifier) {
+    val s = ctx.settings
+    val st = ctx.state
+    val c = ctx.colors
+    val fraction = if (st.max > 0) (st.level.toFloat() / st.max).coerceIn(0f, 1f) else 0f
+    val pct = (fraction * 100).roundToInt()
+    val accent = c.bar
+    val onAccent = if (accent.luminance() > 0.5f) Color.Black else Color.White
+    val trackColor = if (s.showFrame) c.frame else c.fg.copy(alpha = 0.25f)
+    val onTrack = if (trackColor.luminance() > 0.5f) Color.Black else Color.White
+    val glyph = if (st.level == 0) Glyph.MUTED else glyphForStream(st.stream)
+    val corner = minOf(s.widthDp, s.heightDp) / 2
+
+    FatBar(
+        fraction = fraction,
+        vertical = s.vertical,
+        track = trackColor,
+        accent = accent,
+        cornerDp = corner,
+        onSeek = seekCallback(ctx),
+        onTouch = ctx.actions?.onTouch,
+        modifier = modifier
+            .width(s.widthDp.dp)
+            .height(s.heightDp.dp),
+        overlay = {
+            val tint = if (pct >= s.redThresholdPct) {
+                HIGH_VOLUME_RED
+            } else if (fraction > 0.12f) {
+                onAccent
+            } else {
+                onTrack
+            }
+            val dotsTint = if (fraction > 0.9f) onAccent else onTrack
+            if (s.vertical) {
+                Box(
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 16.dp),
+                ) { PathIcon(glyph.pathData, tint, 26.dp) }
+                if (ctx.dots) {
+                    Box(
+                        Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = 6.dp),
+                    ) { DotsButton(dotsTint, true) { ctx.actions?.onToggleStation?.invoke() } }
+                }
+            } else {
+                Box(
+                    Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(start = 16.dp),
+                ) { PathIcon(glyph.pathData, tint, 26.dp) }
+                if (ctx.dots) {
+                    Box(
+                        Modifier
+                            .align(Alignment.CenterEnd)
+                            .padding(end = 6.dp),
+                    ) { DotsButton(dotsTint, false) { ctx.actions?.onToggleStation?.invoke() } }
+                }
+            }
+        },
+    )
 }
 
 /** A round tap target with an icon. */
