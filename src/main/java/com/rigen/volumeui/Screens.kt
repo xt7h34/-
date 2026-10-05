@@ -8,7 +8,9 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.media.AudioManager
+import android.net.Uri
 import android.os.Build
+import android.os.PowerManager
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.Toast
@@ -16,7 +18,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -24,6 +29,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,6 +41,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -51,6 +58,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AssistChip
@@ -92,17 +100,26 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
@@ -175,6 +192,7 @@ fun KanadeTheme(themeMode: Int, dynamicColor: Boolean, content: @Composable () -
 private val SWATCHES = listOf(
     0xFF1E1E1E, 0xFF000000, 0xFFFFFFFF, 0xFF1565C0,
     0xFF2E7D32, 0xFFC62828, 0xFF6A1B9A, 0xFFEF6C00,
+    0xFF4F5BA5, 0xFF3A9DB5, 0xFF43B85A, 0xFFE0558A,
 ).map { it.toInt() }
 
 private val ICON_BLUE = Color(0xFF3D7BF5)
@@ -412,7 +430,67 @@ private fun LabeledSlider(
 private fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(label, Modifier.weight(1f))
-        Switch(checked = checked, onCheckedChange = onChange)
+        KanadeSwitch(checked, onChange)
+    }
+}
+
+/** A glassy pill switch: a green track and a wide, shiny knob. */
+@Composable
+private fun KanadeSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    val trackW = 62.dp
+    val trackH = 34.dp
+    val knobW = 40.dp
+    val knobH = 30.dp
+    val margin = 2.dp
+    val offset by animateDpAsState(if (checked) trackW - knobW - margin else margin, label = "knob")
+    val trackTop by animateColorAsState(if (checked) Color(0xFF5BC76F) else Color(0xFF8D8F99), label = "trackTop")
+    val trackBottom by animateColorAsState(if (checked) Color(0xFF3AAE55) else Color(0xFF6F717B), label = "trackBottom")
+    val interaction = remember { MutableInteractionSource() }
+    val knobTop = if (checked) Color(0xFF93E3A6) else Color(0xFFD2D4DB)
+    val knobBottom = if (checked) Color(0xFF62CC7B) else Color(0xFFA9ABB4)
+
+    Box(
+        modifier = Modifier
+            .size(trackW, trackH)
+            .clip(RoundedCornerShape(trackH / 2))
+            .background(Brush.verticalGradient(listOf(trackTop, trackBottom)))
+            .clickable(interactionSource = interaction, indication = null, role = Role.Switch) {
+                onCheckedChange(!checked)
+            },
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Box(
+            modifier = Modifier
+                .offset(x = offset)
+                .size(knobW, knobH)
+                .clip(RoundedCornerShape(knobH / 2))
+                .background(Brush.verticalGradient(listOf(knobTop, knobBottom)))
+                .border(1.5.dp, Color.White.copy(alpha = 0.55f), RoundedCornerShape(knobH / 2)),
+        ) {
+            if (checked) {
+                // The white "C" shine inside the knob.
+                Canvas(Modifier.fillMaxSize()) {
+                    val w = size.width
+                    val h = size.height
+                    val top = h * 0.24f
+                    val bottom = h * 0.76f
+                    val r = (bottom - top) / 2f
+                    val rightX = w * 0.80f
+                    val leftX = w * 0.28f
+                    val shine = Path().apply {
+                        moveTo(leftX, top)
+                        lineTo(rightX - r, top)
+                        arcTo(Rect(rightX - 2 * r, top, rightX, bottom), -90f, 180f, false)
+                        lineTo(leftX, bottom)
+                    }
+                    drawPath(
+                        shine,
+                        Color.White.copy(alpha = 0.92f),
+                        style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round),
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -551,46 +629,267 @@ private fun AccountCard() {
 @Composable
 private fun HomePage(serviceEnabled: Boolean, onOpen: (String) -> Unit) {
     val context = LocalContext.current
+    val power = context.getSystemService(PowerManager::class.java)
+    val unrestricted = power?.isIgnoringBatteryOptimizations(context.packageName) ?: false
 
     PageScaffold(stringResource(R.string.app_title), null) { padding ->
-        PageColumn(padding) {
-            AccountCard()
+        Box(Modifier.fillMaxSize()) {
+            PageColumn(padding) {
+                AccountCard()
 
-            SettingsGroup {
-                SettingsItem(
-                    glyph = Glyph.ACCESS,
-                    iconColor = if (serviceEnabled) ICON_GREEN else ICON_ORANGE,
-                    title = stringResource(if (serviceEnabled) R.string.service_on else R.string.service_off),
-                    summary = stringResource(
-                        if (serviceEnabled) R.string.service_on_summary else R.string.service_off_summary,
-                    ),
-                ) {
-                    context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                SettingsGroup {
+                    SettingsItem(
+                        glyph = Glyph.ACCESS,
+                        iconColor = if (serviceEnabled) ICON_GREEN else ICON_ORANGE,
+                        title = stringResource(if (serviceEnabled) R.string.service_on else R.string.service_off),
+                        summary = stringResource(
+                            if (serviceEnabled) R.string.service_on_summary else R.string.service_off_summary,
+                        ),
+                    ) {
+                        context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                    }
+                    ItemDivider()
+                    SettingsItem(
+                        glyph = Glyph.BATTERY,
+                        iconColor = if (unrestricted) ICON_GREEN else ICON_ORANGE,
+                        title = stringResource(R.string.keepalive_title),
+                        summary = stringResource(
+                            if (unrestricted) R.string.keepalive_summary_on else R.string.keepalive_summary_off,
+                        ),
+                    ) { onOpen(PAGE_KEEPALIVE) }
+                }
+
+                SettingsGroup {
+                    SettingsItem(
+                        Glyph.VOLUME, ICON_BLUE,
+                        stringResource(R.string.item_volume_title),
+                        stringResource(R.string.item_volume_summary),
+                    ) { onOpen(PAGE_VOLUME) }
+                    ItemDivider()
+                    // Not available yet: it arrives with the Kanade ecosystem.
+                    SettingsItem(
+                        Glyph.CLOCK, ICON_PURPLE,
+                        stringResource(R.string.clock_title),
+                        stringResource(R.string.clock_summary),
+                        enabled = false,
+                    )
+                }
+
+                SettingsGroup {
+                    SettingsItem(
+                        Glyph.PALETTE, ICON_PINK,
+                        stringResource(R.string.item_app_title),
+                        stringResource(R.string.item_app_summary),
+                    ) { onOpen(PAGE_APP) }
+                }
+
+                // Room for the floating search bar.
+                Spacer(Modifier.height(72.dp))
+            }
+            SettingsSearch(onOpen, Modifier.align(Alignment.BottomCenter))
+        }
+    }
+}
+
+private class SearchEntry(val title: String, val where: String, val page: String)
+
+/** Every setting people may look for, and the page it lives on. */
+@Composable
+private fun searchIndex(): List<SearchEntry> {
+    val panelPage = stringResource(R.string.item_panel_title)
+    val behaviorPage = stringResource(R.string.item_behavior_title)
+    val stationPage = stringResource(R.string.section_station)
+    val appsPage = stringResource(R.string.apps_title)
+    val appPage = stringResource(R.string.item_app_title)
+    val keepPage = stringResource(R.string.keepalive_title)
+    return listOf(
+        SearchEntry(stringResource(R.string.item_volume_title), stringResource(R.string.app_title), PAGE_VOLUME),
+        SearchEntry(stringResource(R.string.panel_style), panelPage, PAGE_PANEL),
+        SearchEntry(stringResource(R.string.vertical_panel), panelPage, PAGE_PANEL),
+        SearchEntry(stringResource(R.string.show_frame), panelPage, PAGE_PANEL),
+        SearchEntry(stringResource(R.string.show_dnd_icon), panelPage, PAGE_PANEL),
+        SearchEntry(stringResource(R.string.label_corner_radius), panelPage, PAGE_PANEL),
+        SearchEntry(stringResource(R.string.label_panel_width), panelPage, PAGE_PANEL),
+        SearchEntry(stringResource(R.string.label_panel_height), panelPage, PAGE_PANEL),
+        SearchEntry(stringResource(R.string.label_red_threshold), panelPage, PAGE_PANEL),
+        SearchEntry(stringResource(R.string.panel_color), panelPage, PAGE_PANEL),
+        SearchEntry(stringResource(R.string.bar_color), panelPage, PAGE_PANEL),
+        SearchEntry(stringResource(R.string.section_position), panelPage, PAGE_PANEL),
+        SearchEntry(stringResource(R.string.touch_control), behaviorPage, PAGE_BEHAVIOR),
+        SearchEntry(stringResource(R.string.haptics), behaviorPage, PAGE_BEHAVIOR),
+        SearchEntry(stringResource(R.string.label_hide_delay), behaviorPage, PAGE_BEHAVIOR),
+        SearchEntry(stringResource(R.string.double_press_title), behaviorPage, PAGE_BEHAVIOR),
+        SearchEntry(stringResource(R.string.section_limits), behaviorPage, PAGE_BEHAVIOR),
+        SearchEntry(stringResource(R.string.section_station), stationPage, PAGE_STATION),
+        SearchEntry(stringResource(R.string.station_toggle), stationPage, PAGE_STATION),
+        SearchEntry(stringResource(R.string.station_mute_all), stationPage, PAGE_STATION),
+        SearchEntry(stringResource(R.string.station_dnd_button), stationPage, PAGE_STATION),
+        SearchEntry(stringResource(R.string.apps_title), appsPage, PAGE_APPS),
+        SearchEntry(stringResource(R.string.alt_position_title), appsPage, PAGE_APPS),
+        SearchEntry(stringResource(R.string.section_theme), appPage, PAGE_APP),
+        SearchEntry(stringResource(R.string.dynamic_color), appPage, PAGE_APP),
+        SearchEntry(stringResource(R.string.section_language), appPage, PAGE_APP),
+        SearchEntry(stringResource(R.string.section_diag), appPage, PAGE_APP),
+        SearchEntry(stringResource(R.string.keepalive_title), keepPage, PAGE_KEEPALIVE),
+    )
+}
+
+/** The floating search bar: a purple pill with a glass magnifier, and the results above it. */
+@Composable
+private fun SettingsSearch(onOpen: (String) -> Unit, modifier: Modifier = Modifier) {
+    var query by remember { mutableStateOf("") }
+    val focus = LocalFocusManager.current
+    val index = searchIndex()
+    val q = query.trim()
+    val results = if (q.isEmpty()) {
+        emptyList()
+    } else {
+        index.filter { it.title.contains(q, ignoreCase = true) || it.where.contains(q, ignoreCase = true) }.take(6)
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .imePadding()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        if (q.isNotEmpty()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+            ) {
+                if (results.isEmpty()) {
+                    Text(
+                        stringResource(R.string.search_empty),
+                        modifier = Modifier.padding(16.dp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    results.forEachIndexed { i, r ->
+                        if (i > 0) ItemDivider()
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    query = ""
+                                    focus.clearFocus()
+                                    onOpen(r.page)
+                                }
+                                .padding(horizontal = 20.dp, vertical = 12.dp),
+                        ) {
+                            Text(r.title, style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                r.where,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                 }
             }
+        }
 
-            SettingsGroup {
-                SettingsItem(
-                    Glyph.VOLUME, ICON_BLUE,
-                    stringResource(R.string.item_volume_title),
-                    stringResource(R.string.item_volume_summary),
-                ) { onOpen(PAGE_VOLUME) }
-                ItemDivider()
-                // Not available yet: it arrives with the Kanade ecosystem.
-                SettingsItem(
-                    Glyph.CLOCK, ICON_PURPLE,
-                    stringResource(R.string.clock_title),
-                    stringResource(R.string.clock_summary),
-                    enabled = false,
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+        ) {
+            // The purple pill, starting under the glass circle.
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(start = 28.dp)
+                    .clip(RoundedCornerShape(28.dp))
+                    .background(Brush.horizontalGradient(listOf(Color(0xFF5A1FD6), Color(0xFF8A2BFA))))
+                    .padding(start = 40.dp, end = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                BasicTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    singleLine = true,
+                    textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
+                    cursorBrush = SolidColor(Color.White),
+                    modifier = Modifier.weight(1f),
+                    decorationBox = { inner ->
+                        Box(contentAlignment = Alignment.CenterStart) {
+                            if (query.isEmpty()) {
+                                Text(
+                                    stringResource(R.string.search_hint),
+                                    color = Color.White.copy(alpha = 0.85f),
+                                    fontSize = 16.sp,
+                                )
+                            }
+                            inner()
+                        }
+                    },
+                )
+                if (query.isNotEmpty()) {
+                    IconButton(onClick = {
+                        query = ""
+                        focus.clearFocus()
+                    }) {
+                        PathIcon(Glyph.CLOSE.pathData, Color.White, 20.dp)
+                    }
+                }
+            }
+            // The glass circle with the magnifier.
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .align(Alignment.CenterStart)
+                    .clip(CircleShape)
+                    .background(Brush.radialGradient(listOf(Color(0xFFD9C2FF), Color(0xFFB287F7))))
+                    .border(1.5.dp, Color.White.copy(alpha = 0.7f), CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                PathIcon(Glyph.SEARCH.pathData, Color.White, 26.dp)
+            }
+        }
+    }
+}
+
+/** How to stop the system from putting the service to sleep. */
+@Composable
+private fun KeepAlivePage(onBack: () -> Unit) {
+    val context = LocalContext.current
+    val power = context.getSystemService(PowerManager::class.java)
+    val unrestricted = power?.isIgnoringBatteryOptimizations(context.packageName) ?: false
+
+    fun open(intent: Intent) {
+        try {
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            Toast.makeText(context, R.string.keepalive_open_failed, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    PageScaffold(stringResource(R.string.keepalive_title), onBack) { padding ->
+        PageColumn(padding) {
+            Section(stringResource(R.string.keepalive_title)) {
+                Text(stringResource(R.string.keepalive_why), style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    stringResource(if (unrestricted) R.string.keepalive_status_on else R.string.keepalive_status_off),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary,
                 )
             }
-
-            SettingsGroup {
-                SettingsItem(
-                    Glyph.PALETTE, ICON_PINK,
-                    stringResource(R.string.item_app_title),
-                    stringResource(R.string.item_app_summary),
-                ) { onOpen(PAGE_APP) }
+            Section(stringResource(R.string.keepalive_steps_title)) {
+                Text(stringResource(R.string.keepalive_steps), style = MaterialTheme.typography.bodyMedium)
+                Button(onClick = {
+                    open(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                }) { Text(stringResource(R.string.keepalive_open_battery)) }
+                OutlinedButton(onClick = {
+                    open(
+                        Intent(
+                            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.parse("package:" + context.packageName),
+                        ),
+                    )
+                }) { Text(stringResource(R.string.keepalive_open_app)) }
             }
         }
     }
@@ -626,6 +925,10 @@ private fun VolumeHubPage(settings: PanelSettings, onOpen: (String) -> Unit, onB
             onToggleDnd = { previewDnd = !previewDnd },
             // In the preview the gear just closes the card.
             onOpenSettings = { expanded = false },
+            onToggleMute = {
+                val now = levels[AudioManager.STREAM_MUSIC] ?: 0
+                levels[AudioManager.STREAM_MUSIC] = if (now > 0) 0 else 8
+            },
         )
     }
 
@@ -701,6 +1004,15 @@ private fun PanelPage(settings: PanelSettings, onChange: (PanelSettings) -> Unit
     var previewLevel by remember { mutableIntStateOf(13) }
     var previewDnd by remember { mutableStateOf(false) }
 
+    // The capsule and the bar are tall shapes, so choosing one turns the panel vertical.
+    fun setStyle(style: Int) {
+        var next = settings.copy(panelStyle = style)
+        if (style != STYLE_CLASSIC && !settings.vertical) {
+            next = next.copy(vertical = true, widthDp = 64, heightDp = 260)
+        }
+        onChange(next)
+    }
+
     PageScaffold(stringResource(R.string.item_panel_title), onBack) { padding ->
         PageColumn(padding) {
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -723,6 +1035,28 @@ private fun PanelPage(settings: PanelSettings, onChange: (PanelSettings) -> Unit
             }
 
             Section(stringResource(R.string.section_look)) {
+                Text(stringResource(R.string.panel_style))
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    FilterChip(
+                        selected = settings.panelStyle == STYLE_CLASSIC,
+                        onClick = { setStyle(STYLE_CLASSIC) },
+                        label = { Text(stringResource(R.string.style_classic)) },
+                    )
+                    FilterChip(
+                        selected = settings.panelStyle == STYLE_CAPSULE,
+                        onClick = { setStyle(STYLE_CAPSULE) },
+                        label = { Text(stringResource(R.string.style_capsule)) },
+                    )
+                    FilterChip(
+                        selected = settings.panelStyle == STYLE_BAR,
+                        onClick = { setStyle(STYLE_BAR) },
+                        label = { Text(stringResource(R.string.style_bar)) },
+                    )
+                }
+                Text(stringResource(R.string.style_hint), style = MaterialTheme.typography.bodySmall)
                 SwitchRow(stringResource(R.string.vertical_panel), settings.vertical) {
                     // Rotate the panel: swap its width and height.
                     onChange(settings.copy(vertical = it, widthDp = settings.heightDp, heightDp = settings.widthDp))
@@ -887,6 +1221,7 @@ private fun StationPage(
             },
             onToggleDnd = { previewDnd = !previewDnd },
             onOpenSettings = { },
+            onToggleMute = { },
         )
     }
 
@@ -1247,6 +1582,7 @@ class MainActivity : ComponentActivity() {
                 PAGE_STATION -> StationPage(settings, dndAccess, onChange, goBack)
                 PAGE_APPS -> AppsPage(settings, onChange, goBack)
                 PAGE_APP -> AppPage(settings, onChange, goBack)
+                PAGE_KEEPALIVE -> KeepAlivePage(goBack)
                 else -> HomePage(serviceEnabled) { page = it }
             }
         }
