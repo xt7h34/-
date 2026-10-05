@@ -180,6 +180,7 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
         onMuteAll = { muteAll() },
         onToggleDnd = { toggleDnd() },
         onOpenSettings = { openSettings() },
+        onToggleMute = { toggleMuteCurrent() },
     )
 
     override fun onCreate() {
@@ -401,6 +402,27 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
         haptic()
         if (expanded) resetIdle()
         handler.postDelayed({ mediaPlaying = controller.isMusicActive() }, 400L)
+    }
+
+    /** The capsule's speaker button: mute the main volume, or bring it back. */
+    private fun toggleMuteCurrent() {
+        try {
+            val stream = currentStream
+            val limits = settings.volumeLimits
+            val now = controller.level(stream)
+            if (now > 0) {
+                preMuteVolume[stream] = now
+                controller.setLevel(stream, 0, limits)
+            } else {
+                val back = preMuteVolume[stream] ?: (controller.max(stream) / 2)
+                controller.setLevel(stream, back.coerceAtLeast(1), limits)
+            }
+            level = controller.level(stream)
+            haptic()
+            onPanelTouch(false) // keep the panel on screen a little longer
+        } catch (e: Throwable) {
+            logError("toggleMuteCurrent", e)
+        }
     }
 
     /** Mutes every volume, or brings them back to what they were. */
