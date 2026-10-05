@@ -105,4 +105,27 @@
     <string name="clock_summary">قريبًا مع منظومة Kanade</string>
     <string name="station_mute_all">إظهار زرار كتم الكل</string>
     <string name="station_dnd_button">إظهار زرار عدم الإزعاج</string>
+    <string name="panel_style">شكل اللوحة (الستايل)</string>
+    <string name="style_classic">كلاسيك</string>
+    <string name="style_capsule">كبسولة</string>
+    <string name="style_bar">شريط</string>
+    <string name="style_hint">الكبسولة والشريط أشكال طويلة، فاللوحة بتتحول لرأسية لما تختارهم.</string>
+    <string name="search_hint">ابحث في الإعدادات</string>
+    <string name="search_empty">مفيش إعدادات مطابقة</string>
+    <string name="label_corner_radius">استدارة الحواف</string>
+    <string name="label_panel_width">عرض اللوحة</string>
+    <string name="label_panel_height">طول اللوحة</string>
+    <string name="label_red_threshold">مستوى احمرار الأيقونة</string>
+    <string name="label_hide_delay">تأخير الاختفاء</string>
+    <string name="keepalive_title">خلّي الخدمة شغالة</string>
+    <string name="keepalive_summary_on">تحسين البطارية مقفول للتطبيق</string>
+    <string name="keepalive_summary_off">اضغط للخطوات عشان النظام ميوقفهاش</string>
+    <string name="keepalive_why">بعض الجوالات، وسامسونج منهم، بتوقف التطبيقات اللي شغالة في الخلفية لتوفير البطارية. ولما ده يحصل لوحة الصوت بتقف لحد ما تشغّل الخدمة تاني.</string>
+    <string name="keepalive_status_on">تحسين البطارية مقفول للتطبيق ✅</string>
+    <string name="keepalive_status_off">النظام ممكن يوقف الخدمة في الخلفية ⚠️</string>
+    <string name="keepalive_steps_title">اعمل إيه</string>
+    <string name="keepalive_steps">1. اضغط الزرار الأول واضبط Kanade System على \"عدم التحسين\" (أو \"بدون قيود\").\n2. في سامسونج: الإعدادات > البطارية > حدود الاستخدام في الخلفية > التطبيقات التي لا تنام أبدًا > ضيف Kanade System.\n3. في شاشة التطبيقات الأخيرة، اضغط أيقونة التطبيق واختار \"إبقاء مفتوحًا\".</string>
+    <string name="keepalive_open_battery">افتح تحسين البطارية</string>
+    <string name="keepalive_open_app">افتح معلومات التطبيق</string>
+    <string name="keepalive_open_failed">مقدرتش أفتح الشاشة دي على الجوال ده</string>
 </resources>
