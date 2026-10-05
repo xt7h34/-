@@ -27,6 +27,12 @@ const val PAGE_BEHAVIOR = "behavior"
 const val PAGE_STATION = "station"
 const val PAGE_APPS = "apps"
 const val PAGE_APP = "app"
+const val PAGE_KEEPALIVE = "keepalive"
+
+// Looks of the volume panel.
+const val STYLE_CLASSIC = 0
+const val STYLE_CAPSULE = 1
+const val STYLE_BAR = 2
 
 val DEFAULT_LIMITS: List<Int> = listOf(100, 100, 100, 100, 100)
 
@@ -53,6 +59,9 @@ enum class Glyph(val pathData: String) {
     WARNING("M1,21h22L12,2 1,21zM13,18h-2v-2h2v2zM13,14h-2v-4h2v4z"),
     SETTINGS("M19.14,12.94c0.04,-0.3 0.06,-0.61 0.06,-0.94 0,-0.32 -0.02,-0.64 -0.07,-0.94l2.03,-1.58c0.18,-0.14 0.23,-0.41 0.12,-0.61l-1.92,-3.32c-0.12,-0.22 -0.37,-0.29 -0.59,-0.22l-2.39,0.96c-0.5,-0.38 -1.03,-0.7 -1.62,-0.94l-0.36,-2.54c-0.04,-0.24 -0.24,-0.41 -0.48,-0.41h-3.84c-0.24,0 -0.43,0.17 -0.47,0.41l-0.36,2.54c-0.59,0.24 -1.13,0.57 -1.62,0.94l-2.39,-0.96c-0.22,-0.08 -0.47,0 -0.59,0.22L2.74,8.87c-0.12,0.21 -0.08,0.47 0.12,0.61l2.03,1.58c-0.05,0.3 -0.09,0.63 -0.09,0.94s0.02,0.64 0.07,0.94l-2.03,1.58c-0.18,0.14 -0.23,0.41 -0.12,0.61l1.92,3.32c0.12,0.22 0.37,0.29 0.59,0.22l2.39,-0.96c0.5,0.38 1.03,0.7 1.62,0.94l0.36,2.54c0.05,0.24 0.24,0.41 0.48,0.41h3.84c0.24,0 0.44,-0.17 0.47,-0.41l0.36,-2.54c0.59,-0.24 1.13,-0.56 1.62,-0.94l2.39,0.96c0.22,0.08 0.47,0 0.59,-0.22l1.92,-3.32c0.12,-0.22 0.07,-0.47 -0.12,-0.61l-2.01,-1.58zM12,15.6c-1.98,0 -3.6,-1.62 -3.6,-3.6s1.62,-3.6 3.6,-3.6 3.6,1.62 3.6,3.6 -1.62,3.6 -3.6,3.6z"),
     CLOCK("M11.99,2C6.47,2 2,6.48 2,12s4.47,10 9.99,10C17.52,22 22,17.52 22,12S17.52,2 11.99,2zM12,20c-4.42,0 -8,-3.58 -8,-8s3.58,-8 8,-8 8,3.58 8,8 -3.58,8 -8,8zM12.5,7H11v6l5.25,3.15 0.75,-1.23 -4.5,-2.67z"),
+    SEARCH("M15.5,14h-0.79l-0.28,-0.27C15.41,12.59 16,11.11 16,9.5 16,5.91 13.09,3 9.5,3S3,5.91 3,9.5 5.91,16 9.5,16c1.61,0 3.09,-0.59 4.23,-1.57l0.27,0.28v0.79l5,4.99L20.49,19l-4.99,-5zM9.5,14C7.01,14 5,11.99 5,9.5S7.01,5 9.5,5 14,7.01 14,9.5 11.99,14 9.5,14z"),
+    CLOSE("M19,6.41L17.59,5 12,10.59 6.41,5 5,6.41 10.59,12 5,17.59 6.41,19 12,13.41 17.59,19 19,17.59 13.41,12z"),
+    BATTERY("M15.67,4H14V2h-4v2H8.33C7.6,4 7,4.6 7,5.33v15.33C7,21.4 7.6,22 8.33,22h7.33c0.74,0 1.34,-0.6 1.34,-1.33V5.33C17,4.6 16.4,4 15.67,4z"),
     PALETTE("M12,3c-4.97,0 -9,4.03 -9,9s4.03,9 9,9c0.83,0 1.5,-0.67 1.5,-1.5 0,-0.39 -0.15,-0.74 -0.39,-1.01 -0.23,-0.26 -0.38,-0.61 -0.38,-0.99 0,-0.83 0.67,-1.5 1.5,-1.5H16c2.76,0 5,-2.24 5,-5 0,-4.42 -4.03,-8 -9,-8zM6.5,12c-0.83,0 -1.5,-0.67 -1.5,-1.5S5.67,9 6.5,9 8,9.67 8,10.5 7.33,12 6.5,12zM9.5,8C8.67,8 8,7.33 8,6.5S8.67,5 9.5,5s1.5,0.67 1.5,1.5S10.33,8 9.5,8zM14.5,8c-0.83,0 -1.5,-0.67 -1.5,-1.5S13.67,5 14.5,5s1.5,0.67 1.5,1.5S15.33,8 14.5,8zM17.5,12c-0.83,0 -1.5,-0.67 -1.5,-1.5S16.67,9 17.5,9s1.5,0.67 1.5,1.5 -0.67,1.5 -1.5,1.5z"),
 }
 
@@ -80,6 +89,8 @@ data class PanelSettings(
     val widthDp: Int = 260,
     val heightDp: Int = 56,
     val vertical: Boolean = false,
+    /** STYLE_CLASSIC, STYLE_CAPSULE or STYLE_BAR. */
+    val panelStyle: Int = STYLE_CLASSIC,
     val showFrame: Boolean = true,
     val showDndIcon: Boolean = true,
     val redThresholdPct: Int = 85,
@@ -120,6 +131,7 @@ object Prefs {
     private const val K_WIDTH = "width_dp"
     private const val K_HEIGHT = "height_dp"
     private const val K_VERTICAL = "vertical"
+    private const val K_STYLE = "panel_style"
     private const val K_FRAME = "show_frame"
     private const val K_DELAY = "hide_delay_ms"
     private const val K_RED = "red_threshold_pct"
@@ -167,6 +179,7 @@ object Prefs {
             widthDp = p.getInt(K_WIDTH, d.widthDp),
             heightDp = p.getInt(K_HEIGHT, d.heightDp),
             vertical = p.getBoolean(K_VERTICAL, d.vertical),
+            panelStyle = p.getInt(K_STYLE, d.panelStyle),
             showFrame = p.getBoolean(K_FRAME, d.showFrame),
             showDndIcon = p.getBoolean(K_DND, d.showDndIcon),
             redThresholdPct = p.getInt(K_RED, d.redThresholdPct),
@@ -197,6 +210,7 @@ object Prefs {
             .putInt(K_WIDTH, s.widthDp)
             .putInt(K_HEIGHT, s.heightDp)
             .putBoolean(K_VERTICAL, s.vertical)
+            .putInt(K_STYLE, s.panelStyle)
             .putBoolean(K_FRAME, s.showFrame)
             .putBoolean(K_DND, s.showDndIcon)
             .putInt(K_RED, s.redThresholdPct)
