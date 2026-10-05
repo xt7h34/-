@@ -98,8 +98,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -434,61 +438,107 @@ private fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Un
     }
 }
 
-/** A glassy pill switch: a green track and a wide, shiny knob. */
+/**
+ * A glass switch: a green track, and a wide translucent knob with a bright rim, a soft shine,
+ * a white "C" highlight and a glowing shadow.
+ */
 @Composable
 private fun KanadeSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    val trackW = 62.dp
-    val trackH = 34.dp
-    val knobW = 40.dp
-    val knobH = 30.dp
-    val margin = 2.dp
+    val trackW = 66.dp
+    val trackH = 38.dp
+    val knobW = 46.dp
+    val knobH = 36.dp
+    val margin = 1.dp
     val offset by animateDpAsState(if (checked) trackW - knobW - margin else margin, label = "knob")
-    val trackTop by animateColorAsState(if (checked) Color(0xFF5BC76F) else Color(0xFF8D8F99), label = "trackTop")
-    val trackBottom by animateColorAsState(if (checked) Color(0xFF3AAE55) else Color(0xFF6F717B), label = "trackBottom")
+    val trackTop by animateColorAsState(if (checked) Color(0xFF6FD083) else Color(0xFFB4B7C2), label = "trackTop")
+    val trackBottom by animateColorAsState(if (checked) Color(0xFF47B761) else Color(0xFF8E919D), label = "trackBottom")
+    val knobTop by animateColorAsState(if (checked) Color(0xE69BE8AE) else Color(0xE6F2F3F7), label = "knobTop")
+    val knobBottom by animateColorAsState(if (checked) Color(0xE657C971) else Color(0xE6C9CBD3), label = "knobBottom")
+    val glow = if (checked) Color(0xFF3FAE59) else Color(0xFF7C7F8B)
     val interaction = remember { MutableInteractionSource() }
-    val knobTop = if (checked) Color(0xFF93E3A6) else Color(0xFFD2D4DB)
-    val knobBottom = if (checked) Color(0xFF62CC7B) else Color(0xFFA9ABB4)
+    val trackShape = RoundedCornerShape(trackH / 2)
+    val knobShape = RoundedCornerShape(knobH / 2)
 
     Box(
         modifier = Modifier
             .size(trackW, trackH)
-            .clip(RoundedCornerShape(trackH / 2))
-            .background(Brush.verticalGradient(listOf(trackTop, trackBottom)))
             .clickable(interactionSource = interaction, indication = null, role = Role.Switch) {
                 onCheckedChange(!checked)
             },
         contentAlignment = Alignment.CenterStart,
     ) {
+        // The track, with a soft shine along its top edge.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(trackShape)
+                .background(Brush.verticalGradient(listOf(trackTop, trackBottom)))
+                .drawBehind {
+                    drawRect(
+                        Brush.verticalGradient(
+                            listOf(Color.White.copy(alpha = 0.30f), Color.Transparent),
+                            endY = size.height * 0.5f,
+                        ),
+                    )
+                },
+        )
+        // The knob sits on top and casts a soft glow.
         Box(
             modifier = Modifier
                 .offset(x = offset)
                 .size(knobW, knobH)
-                .clip(RoundedCornerShape(knobH / 2))
+                .shadow(8.dp, knobShape, ambientColor = glow, spotColor = glow)
+                .clip(knobShape)
                 .background(Brush.verticalGradient(listOf(knobTop, knobBottom)))
-                .border(1.5.dp, Color.White.copy(alpha = 0.55f), RoundedCornerShape(knobH / 2)),
+                .border(
+                    width = 2.dp,
+                    brush = Brush.linearGradient(
+                        listOf(
+                            Color.White.copy(alpha = 0.95f),
+                            Color.White.copy(alpha = 0.20f),
+                            Color.White.copy(alpha = 0.80f),
+                        ),
+                    ),
+                    shape = knobShape,
+                ),
         ) {
-            if (checked) {
-                // The white "C" shine inside the knob.
-                Canvas(Modifier.fillMaxSize()) {
-                    val w = size.width
-                    val h = size.height
-                    val top = h * 0.24f
-                    val bottom = h * 0.76f
-                    val r = (bottom - top) / 2f
-                    val rightX = w * 0.80f
-                    val leftX = w * 0.28f
-                    val shine = Path().apply {
-                        moveTo(leftX, top)
-                        lineTo(rightX - r, top)
-                        arcTo(Rect(rightX - 2 * r, top, rightX, bottom), -90f, 180f, false)
-                        lineTo(leftX, bottom)
+            Canvas(Modifier.fillMaxSize()) {
+                val w = size.width
+                val h = size.height
+                val shineCenter = Offset(w * 0.30f, h * 0.25f)
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        listOf(Color.White.copy(alpha = 0.45f), Color.Transparent),
+                        center = shineCenter,
+                        radius = h * 0.7f,
+                    ),
+                    radius = h * 0.7f,
+                    center = shineCenter,
+                )
+                // The white "C": open toward the side the knob came from.
+                val top = h * 0.22f
+                val bottom = h * 0.78f
+                val r = (bottom - top) / 2f
+                val left = w * 0.26f
+                val right = w * 0.86f
+                val shine = Path().apply {
+                    if (checked) {
+                        moveTo(left, top)
+                        lineTo(right - r, top)
+                        arcTo(Rect(right - 2 * r, top, right, bottom), -90f, 180f, false)
+                        lineTo(left, bottom)
+                    } else {
+                        moveTo(w - left, top)
+                        lineTo(w - right + r, top)
+                        arcTo(Rect(w - right, top, w - right + 2 * r, bottom), -90f, -180f, false)
+                        lineTo(w - left, bottom)
                     }
-                    drawPath(
-                        shine,
-                        Color.White.copy(alpha = 0.92f),
-                        style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round),
-                    )
                 }
+                drawPath(
+                    shine,
+                    Color.White.copy(alpha = 0.95f),
+                    style = Stroke(width = 3.5.dp.toPx(), cap = StrokeCap.Round),
+                )
             }
         }
     }
@@ -734,10 +784,14 @@ private fun searchIndex(): List<SearchEntry> {
     )
 }
 
-/** The floating search bar: a purple pill with a glass magnifier, and the results above it. */
+/**
+ * The floating search bar: a compact, translucent purple pill with a glass magnifier circle.
+ * It is see-through, so it takes on the colors behind it, and it grows a little while typing.
+ */
 @Composable
 private fun SettingsSearch(onOpen: (String) -> Unit, modifier: Modifier = Modifier) {
     var query by remember { mutableStateOf("") }
+    var focused by remember { mutableStateOf(false) }
     val focus = LocalFocusManager.current
     val index = searchIndex()
     val q = query.trim()
@@ -746,6 +800,9 @@ private fun SettingsSearch(onOpen: (String) -> Unit, modifier: Modifier = Modifi
     } else {
         index.filter { it.title.contains(q, ignoreCase = true) || it.where.contains(q, ignoreCase = true) }.take(6)
     }
+    val active = focused || query.isNotEmpty()
+    val pillWidth by animateDpAsState(if (active) 320.dp else 236.dp, label = "searchWidth")
+    val pillShape = RoundedCornerShape(27.dp)
 
     Column(
         modifier = modifier
@@ -753,11 +810,12 @@ private fun SettingsSearch(onOpen: (String) -> Unit, modifier: Modifier = Modifi
             .navigationBarsPadding()
             .imePadding()
             .padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         if (q.isNotEmpty()) {
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.width(320.dp),
                 shape = RoundedCornerShape(24.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
             ) {
@@ -794,17 +852,32 @@ private fun SettingsSearch(onOpen: (String) -> Unit, modifier: Modifier = Modifi
 
         Box(
             Modifier
-                .fillMaxWidth()
-                .height(56.dp),
+                .width(pillWidth)
+                .height(54.dp),
         ) {
-            // The purple pill, starting under the glass circle.
+            // The translucent purple pill. It starts under the glass circle.
             Row(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(start = 28.dp)
-                    .clip(RoundedCornerShape(28.dp))
-                    .background(Brush.horizontalGradient(listOf(Color(0xFF5A1FD6), Color(0xFF8A2BFA))))
-                    .padding(start = 40.dp, end = 8.dp),
+                    .padding(start = 27.dp)
+                    .clip(pillShape)
+                    .background(Brush.horizontalGradient(listOf(Color(0xCC5A1FD6), Color(0xCC8A2BFA))))
+                    .drawBehind {
+                        drawRect(
+                            Brush.verticalGradient(
+                                listOf(Color.White.copy(alpha = 0.22f), Color.Transparent),
+                                endY = size.height * 0.55f,
+                            ),
+                        )
+                    }
+                    .border(
+                        width = 1.dp,
+                        brush = Brush.verticalGradient(
+                            listOf(Color.White.copy(alpha = 0.50f), Color.White.copy(alpha = 0.06f)),
+                        ),
+                        shape = pillShape,
+                    )
+                    .padding(start = 36.dp, end = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 BasicTextField(
@@ -813,13 +886,15 @@ private fun SettingsSearch(onOpen: (String) -> Unit, modifier: Modifier = Modifi
                     singleLine = true,
                     textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
                     cursorBrush = SolidColor(Color.White),
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .onFocusChanged { focused = it.isFocused },
                     decorationBox = { inner ->
                         Box(contentAlignment = Alignment.CenterStart) {
                             if (query.isEmpty()) {
                                 Text(
                                     stringResource(R.string.search_hint),
-                                    color = Color.White.copy(alpha = 0.85f),
+                                    color = Color.White.copy(alpha = 0.9f),
                                     fontSize = 16.sp,
                                 )
                             }
@@ -836,14 +911,38 @@ private fun SettingsSearch(onOpen: (String) -> Unit, modifier: Modifier = Modifi
                     }
                 }
             }
-            // The glass circle with the magnifier.
+            // The glass circle: frosted, with a bright rim and a soft glow.
             Box(
                 modifier = Modifier
-                    .size(56.dp)
+                    .size(54.dp)
                     .align(Alignment.CenterStart)
+                    .shadow(
+                        10.dp,
+                        CircleShape,
+                        ambientColor = Color(0xFF5A1FD6),
+                        spotColor = Color(0xFF5A1FD6),
+                    )
                     .clip(CircleShape)
-                    .background(Brush.radialGradient(listOf(Color(0xFFD9C2FF), Color(0xFFB287F7))))
-                    .border(1.5.dp, Color.White.copy(alpha = 0.7f), CircleShape),
+                    .background(Brush.radialGradient(listOf(Color(0xB3C9AAFF), Color(0x80A875F5))))
+                    .drawBehind {
+                        drawRect(
+                            Brush.verticalGradient(
+                                listOf(Color.White.copy(alpha = 0.35f), Color.Transparent),
+                                endY = size.height * 0.6f,
+                            ),
+                        )
+                    }
+                    .border(
+                        width = 1.5.dp,
+                        brush = Brush.linearGradient(
+                            listOf(
+                                Color.White.copy(alpha = 0.95f),
+                                Color.White.copy(alpha = 0.15f),
+                                Color.White.copy(alpha = 0.60f),
+                            ),
+                        ),
+                        shape = CircleShape,
+                    ),
                 contentAlignment = Alignment.Center,
             ) {
                 PathIcon(Glyph.SEARCH.pathData, Color.White, 26.dp)
@@ -999,6 +1098,67 @@ private fun VolumeHubPage(settings: PanelSettings, onOpen: (String) -> Unit, onB
     }
 }
 
+/** The three panel styles, each drawn live so they are easy to compare. */
+@Composable
+private fun StylePicker(settings: PanelSettings, onPick: (Int) -> Unit) {
+    val styles = listOf(
+        STYLE_CLASSIC to R.string.style_classic,
+        STYLE_CAPSULE to R.string.style_capsule,
+        STYLE_BAR to R.string.style_bar,
+    )
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+        styles.forEach { (style, labelRes) ->
+            val selected = settings.panelStyle == style
+            val shape = RoundedCornerShape(18.dp)
+            Column(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(20.dp))
+                    .clickable { onPick(style) }
+                    .padding(6.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(86.dp)
+                        .height(170.dp)
+                        .clip(shape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .border(
+                            BorderStroke(
+                                if (selected) 2.5.dp else 1.dp,
+                                if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                            ),
+                            shape,
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    VolumePanel(
+                        settings = settings.copy(
+                            panelStyle = style,
+                            vertical = true,
+                            widthDp = 52,
+                            heightDp = 140,
+                            stationEnabled = false,
+                        ),
+                        state = PanelState(
+                            stream = AudioManager.STREAM_MUSIC,
+                            level = 9,
+                            max = 15,
+                            dnd = true,
+                        ),
+                    )
+                }
+                Text(
+                    stringResource(labelRes),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun PanelPage(settings: PanelSettings, onChange: (PanelSettings) -> Unit, onBack: () -> Unit) {
     var previewLevel by remember { mutableIntStateOf(13) }
@@ -1036,26 +1196,7 @@ private fun PanelPage(settings: PanelSettings, onChange: (PanelSettings) -> Unit
 
             Section(stringResource(R.string.section_look)) {
                 Text(stringResource(R.string.panel_style))
-                Row(
-                    modifier = Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    FilterChip(
-                        selected = settings.panelStyle == STYLE_CLASSIC,
-                        onClick = { setStyle(STYLE_CLASSIC) },
-                        label = { Text(stringResource(R.string.style_classic)) },
-                    )
-                    FilterChip(
-                        selected = settings.panelStyle == STYLE_CAPSULE,
-                        onClick = { setStyle(STYLE_CAPSULE) },
-                        label = { Text(stringResource(R.string.style_capsule)) },
-                    )
-                    FilterChip(
-                        selected = settings.panelStyle == STYLE_BAR,
-                        onClick = { setStyle(STYLE_BAR) },
-                        label = { Text(stringResource(R.string.style_bar)) },
-                    )
-                }
+                StylePicker(settings) { setStyle(it) }
                 Text(stringResource(R.string.style_hint), style = MaterialTheme.typography.bodySmall)
                 SwitchRow(stringResource(R.string.vertical_panel), settings.vertical) {
                     // Rotate the panel: swap its width and height.
