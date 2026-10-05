@@ -757,18 +757,28 @@ private fun BarPanel(ctx: PanelCtx, modifier: Modifier) {
                 onTrack
             }
             val dotsTint = if (fraction > 0.9f) onAccent else onTrack
+            val showDnd = st.dnd && s.showDndIcon
             if (s.vertical) {
                 Box(
                     Modifier
                         .align(Alignment.BottomCenter)
                         .padding(bottom = 16.dp),
                 ) { PathIcon(glyph.pathData, tint, 26.dp) }
-                if (ctx.dots) {
-                    Box(
-                        Modifier
+                if (ctx.dots || showDnd) {
+                    Column(
+                        modifier = Modifier
                             .align(Alignment.TopCenter)
                             .padding(top = 6.dp),
-                    ) { DotsButton(dotsTint, true) { ctx.actions?.onToggleStation?.invoke() } }
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        if (ctx.dots) {
+                            DotsButton(dotsTint, true) { ctx.actions?.onToggleStation?.invoke() }
+                        }
+                        if (showDnd) {
+                            Spacer(Modifier.height(4.dp))
+                            PathIcon(Glyph.DND.pathData, dotsTint.copy(alpha = 0.9f), 16.dp)
+                        }
+                    }
                 }
             } else {
                 Box(
@@ -776,12 +786,21 @@ private fun BarPanel(ctx: PanelCtx, modifier: Modifier) {
                         .align(Alignment.CenterStart)
                         .padding(start = 16.dp),
                 ) { PathIcon(glyph.pathData, tint, 26.dp) }
-                if (ctx.dots) {
-                    Box(
-                        Modifier
+                if (ctx.dots || showDnd) {
+                    Row(
+                        modifier = Modifier
                             .align(Alignment.CenterEnd)
                             .padding(end = 6.dp),
-                    ) { DotsButton(dotsTint, false) { ctx.actions?.onToggleStation?.invoke() } }
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (showDnd) {
+                            PathIcon(Glyph.DND.pathData, dotsTint.copy(alpha = 0.9f), 16.dp)
+                            Spacer(Modifier.width(4.dp))
+                        }
+                        if (ctx.dots) {
+                            DotsButton(dotsTint, false) { ctx.actions?.onToggleStation?.invoke() }
+                        }
+                    }
                 }
             }
         },
