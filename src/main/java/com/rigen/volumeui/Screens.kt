@@ -1107,7 +1107,7 @@ private fun VolumeHubPage(settings: PanelSettings, onOpen: (String) -> Unit, onB
     }
 }
 
-/** The three panel styles, each drawn live so they are easy to compare. */
+/** The panel styles, each drawn live so they are easy to compare. All four are always visible. */
 @Composable
 private fun StylePicker(settings: PanelSettings, onPick: (Int) -> Unit) {
     val styles = listOf(
@@ -1116,67 +1116,71 @@ private fun StylePicker(settings: PanelSettings, onPick: (Int) -> Unit) {
         STYLE_CAPSULE2 to R.string.style_capsule2,
         STYLE_BAR to R.string.style_bar,
     )
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        styles.forEach { (style, labelRes) ->
-            val selected = settings.panelStyle == style
-            val shape = RoundedCornerShape(18.dp)
-            Column(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .clickable { onPick(style) }
-                    .padding(6.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .width(86.dp)
-                        .height(170.dp)
-                        .clip(shape)
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .border(
-                            BorderStroke(
-                                if (selected) 2.5.dp else 1.dp,
-                                if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
-                            ),
-                            shape,
-                        ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    val thumb = settings.copy(
-                        panelStyle = style,
-                        vertical = true,
-                        widthDp = 52,
-                        heightDp = 140,
-                        stationEnabled = false,
-                    )
-                    VolumePanel(
-                        // Capsule II always shows with the look it was made for.
-                        settings = if (style == STYLE_CAPSULE2) {
-                            thumb.copy(colorArgb = CAPSULE2_FRAME, barColorArgb = CAPSULE2_ACCENT)
-                        } else {
-                            thumb
-                        },
-                        state = PanelState(
-                            stream = AudioManager.STREAM_MUSIC,
-                            level = 9,
-                            max = 15,
-                            dnd = true,
-                        ),
-                    )
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        styles.chunked(2).forEach { pair ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                pair.forEach { (style, labelRes) ->
+                    StyleThumb(settings, style, labelRes, onPick)
                 }
-                Text(
-                    stringResource(labelRes),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                )
             }
         }
+    }
+}
+
+@Composable
+private fun StyleThumb(settings: PanelSettings, style: Int, labelRes: Int, onPick: (Int) -> Unit) {
+    val selected = settings.panelStyle == style
+    val shape = RoundedCornerShape(18.dp)
+    val thumb = settings.copy(
+        panelStyle = style,
+        vertical = true,
+        widthDp = 52,
+        heightDp = 140,
+        stationEnabled = false,
+    )
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .clickable { onPick(style) }
+            .padding(6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .width(110.dp)
+                .height(170.dp)
+                .clip(shape)
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .border(
+                    BorderStroke(
+                        if (selected) 2.5.dp else 1.dp,
+                        if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                    ),
+                    shape,
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            VolumePanel(
+                // Capsule II always shows with the look it was made for.
+                settings = if (style == STYLE_CAPSULE2) {
+                    thumb.copy(colorArgb = CAPSULE2_FRAME, barColorArgb = CAPSULE2_ACCENT)
+                } else {
+                    thumb
+                },
+                state = PanelState(
+                    stream = AudioManager.STREAM_MUSIC,
+                    level = 9,
+                    max = 15,
+                    dnd = true,
+                ),
+            )
+        }
+        Text(
+            stringResource(labelRes),
+            style = MaterialTheme.typography.labelLarge,
+            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
 
