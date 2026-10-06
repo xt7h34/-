@@ -1,11 +1,13 @@
 package com.rigen.volumeui
 
 import android.app.Application
+import android.content.ComponentName
 import android.content.Context
 import android.content.res.Configuration
 import android.media.AudioManager
 import android.os.Build
 import android.os.VibrationEffect
+import android.provider.Settings
 import android.os.Vibrator
 import java.io.PrintWriter
 import java.io.StringWriter
@@ -20,6 +22,11 @@ const val RULE_HIDE = 1
 const val RULE_ALT_POSITION = 2
 
 const val STATION_W_DP = 300
+
+// Where the sound is going right now (shown in the Volume Station).
+const val OUTPUT_SPEAKER = 0
+const val OUTPUT_BLUETOOTH = 1
+const val OUTPUT_WIRED = 2
 
 // Pages of the app. The service opens PAGE_VOLUME from the Volume Station's gear icon.
 const val EXTRA_PAGE = "page"
@@ -70,6 +77,9 @@ enum class Glyph(val pathData: String) {
     SEARCH("M15.5,14h-0.79l-0.28,-0.27C15.41,12.59 16,11.11 16,9.5 16,5.91 13.09,3 9.5,3S3,5.91 3,9.5 5.91,16 9.5,16c1.61,0 3.09,-0.59 4.23,-1.57l0.27,0.28v0.79l5,4.99L20.49,19l-4.99,-5zM9.5,14C7.01,14 5,11.99 5,9.5S7.01,5 9.5,5 14,7.01 14,9.5 11.99,14 9.5,14z"),
     CLOSE("M19,6.41L17.59,5 12,10.59 6.41,5 5,6.41 10.59,12 5,17.59 6.41,19 12,13.41 17.59,19 19,17.59 13.41,12z"),
     BATTERY("M15.67,4H14V2h-4v2H8.33C7.6,4 7,4.6 7,5.33v15.33C7,21.4 7.6,22 8.33,22h7.33c0.74,0 1.34,-0.6 1.34,-1.33V5.33C17,4.6 16.4,4 15.67,4z"),
+    VIBRATE("M0,15h2V9H0v6zm3,2h2V7H3v10zm19,-8v6h2V9h-2zm-3,8h2V7h-2v10zM16.5,3h-9C6.67,3 6,3.67 6,4.5v15c0,0.83 0.67,1.5 1.5,1.5h9c0.83,0 1.5,-0.67 1.5,-1.5v-15c0,-0.83 -0.67,-1.5 -1.5,-1.5zM16,19H8V5h8v14z"),
+    BLUETOOTH("M17.71,7.71L12,2h-1v7.59L6.41,5 5,6.41 10.59,12 5,17.59 6.41,19 11,14.41V22h1l5.71,-5.71 -4.3,-4.29 4.3,-4.29zM13,5.83l1.88,1.88L13,9.59V5.83zM14.88,16.29L13,18.17v-3.76l1.88,1.88z"),
+    HEADSET("M12,1c-4.97,0 -9,4.03 -9,9v7c0,1.66 1.34,3 3,3h3v-8H5v-2c0,-3.87 3.13,-7 7,-7s7,3.13 7,7v2h-4v8h3c1.66,0 3,-1.34 3,-3v-7c0,-4.97 -4.03,-9 -9,-9z"),
     PALETTE("M12,3c-4.97,0 -9,4.03 -9,9s4.03,9 9,9c0.83,0 1.5,-0.67 1.5,-1.5 0,-0.39 -0.15,-0.74 -0.39,-1.01 -0.23,-0.26 -0.38,-0.61 -0.38,-0.99 0,-0.83 0.67,-1.5 1.5,-1.5H16c2.76,0 5,-2.24 5,-5 0,-4.42 -4.03,-8 -9,-8zM6.5,12c-0.83,0 -1.5,-0.67 -1.5,-1.5S5.67,9 6.5,9 8,9.67 8,10.5 7.33,12 6.5,12zM9.5,8C8.67,8 8,7.33 8,6.5S8.67,5 9.5,5s1.5,0.67 1.5,1.5S10.33,8 9.5,8zM14.5,8c-0.83,0 -1.5,-0.67 -1.5,-1.5S13.67,5 14.5,5s1.5,0.67 1.5,1.5S15.33,8 14.5,8zM17.5,12c-0.83,0 -1.5,-0.67 -1.5,-1.5S16.67,9 17.5,9s1.5,0.67 1.5,1.5 -0.67,1.5 -1.5,1.5z"),
 }
 
@@ -109,6 +119,8 @@ data class PanelSettings(
     val posY: Float = 0.08f,
     /** Lets the user drag on the bar to change the volume. */
     val touchEnabled: Boolean = true,
+    /** Dragging moves the bar from where it is, instead of jumping to the finger. */
+    val relativeDrag: Boolean = false,
     /** 0 = off, 1 = double-press volume up to mute, 2 = double-press volume down to mute. */
     val doublePressKey: Int = 0,
     val haptics: Boolean = true,
@@ -119,6 +131,12 @@ data class PanelSettings(
     /** Buttons in the top-left corner of the Station card. */
     val stationMuteAll: Boolean = true,
     val stationDnd: Boolean = false,
+    /** Ringer mode button (sound / vibrate / silent). */
+    val stationRinger: Boolean = false,
+    /** Sound output button (speaker / Bluetooth / headphones). */
+    val stationOutput: Boolean = false,
+    /** The playing app's name and title above the media buttons. Needs media access. */
+    val stationNowPlaying: Boolean = false,
     // Per-app rules: package name -> RULE_*
     val appRules: Map<String, Int> = emptyMap(),
     val altPosX: Float = 0.5f,
@@ -153,6 +171,10 @@ object Prefs {
     private const val K_STATION = "station_enabled"
     private const val K_ST_MUTE = "station_mute_all"
     private const val K_ST_DND = "station_dnd_button"
+    private const val K_RELATIVE = "relative_drag"
+    private const val K_ST_RINGER = "station_ringer"
+    private const val K_ST_OUTPUT = "station_output"
+    private const val K_ST_NOW = "station_now_playing"
     private const val K_RULES = "app_rules"
     private const val K_ALT_X = "alt_pos_x"
     private const val K_ALT_Y = "alt_pos_y"
@@ -195,12 +217,16 @@ object Prefs {
             posX = p.getFloat(K_POS_X, d.posX),
             posY = p.getFloat(K_POS_Y, d.posY),
             touchEnabled = p.getBoolean(K_TOUCH, d.touchEnabled),
+            relativeDrag = p.getBoolean(K_RELATIVE, d.relativeDrag),
             doublePressKey = p.getInt(K_DOUBLE, d.doublePressKey),
             haptics = p.getBoolean(K_HAPTICS, d.haptics),
             volumeLimits = decodeLimits(p.getString(K_LIMITS, null)),
             stationEnabled = p.getBoolean(K_STATION, d.stationEnabled),
             stationMuteAll = p.getBoolean(K_ST_MUTE, d.stationMuteAll),
             stationDnd = p.getBoolean(K_ST_DND, d.stationDnd),
+            stationRinger = p.getBoolean(K_ST_RINGER, d.stationRinger),
+            stationOutput = p.getBoolean(K_ST_OUTPUT, d.stationOutput),
+            stationNowPlaying = p.getBoolean(K_ST_NOW, d.stationNowPlaying),
             appRules = decodeRules(p.getString(K_RULES, null)),
             altPosX = p.getFloat(K_ALT_X, d.altPosX),
             altPosY = p.getFloat(K_ALT_Y, d.altPosY),
@@ -226,12 +252,16 @@ object Prefs {
             .putFloat(K_POS_X, s.posX)
             .putFloat(K_POS_Y, s.posY)
             .putBoolean(K_TOUCH, s.touchEnabled)
+            .putBoolean(K_RELATIVE, s.relativeDrag)
             .putInt(K_DOUBLE, s.doublePressKey)
             .putBoolean(K_HAPTICS, s.haptics)
             .putString(K_LIMITS, s.volumeLimits.joinToString(","))
             .putBoolean(K_STATION, s.stationEnabled)
             .putBoolean(K_ST_MUTE, s.stationMuteAll)
             .putBoolean(K_ST_DND, s.stationDnd)
+            .putBoolean(K_ST_RINGER, s.stationRinger)
+            .putBoolean(K_ST_OUTPUT, s.stationOutput)
+            .putBoolean(K_ST_NOW, s.stationNowPlaying)
             .putString(K_RULES, s.appRules.entries.joinToString(";") { "${it.key}=${it.value}" })
             .putFloat(K_ALT_X, s.altPosX)
             .putFloat(K_ALT_Y, s.altPosY)
@@ -251,6 +281,17 @@ object Prefs {
         config.setLocale(locale)
         config.setLayoutDirection(locale)
         return base.createConfigurationContext(config)
+    }
+}
+
+/** True when the user has given this app media access (see [MediaListenerService]). */
+fun isMediaAccessGranted(context: Context): Boolean {
+    val enabled = Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners")
+        ?: return false
+    val cn = ComponentName(context, MediaListenerService::class.java)
+    return enabled.split(':').any {
+        it.equals(cn.flattenToString(), ignoreCase = true) ||
+            it.equals(cn.flattenToShortString(), ignoreCase = true)
     }
 }
 
