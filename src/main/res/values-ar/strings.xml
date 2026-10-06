@@ -130,4 +130,26 @@
     <string name="keepalive_open_failed">مقدرتش أفتح الشاشة دي على الجوال ده</string>
     <string name="style_capsule2">كبسولة ٢</string>
     <string name="haptic_test">جرّب الاهتزاز</string>
+    <string name="preview_station">إظهار كارت Volume Station</string>
+    <string name="presets_title">أحجام جاهزة</string>
+    <string name="preset_compact">صغير</string>
+    <string name="preset_large">كبير</string>
+    <string name="reset_style">رجّع الافتراضي</string>
+    <string name="relative_drag">سحب نسبي</string>
+    <string name="relative_drag_hint">الشريط بيتحرك من مكانه بنفس المسافة اللي صباعك بيتحركها، بدل ما يقفز لمكان اللمسة.</string>
+    <string name="station_ringer">إظهار زرار وضع الرنين</string>
+    <string name="station_output">إظهار زرار مخرج الصوت</string>
+    <string name="station_output_hint">أندرويد مش بيسمح للتطبيقات تحوّل الصوت لمخرج تاني، فالزرار بيفتح مبدّل المخرج بتاع النظام.</string>
+    <string name="station_now_playing">إظهار التطبيق الشغال وأزرار التحكم فيه</string>
+    <string name="media_perm_title">صلاحية الميديا</string>
+    <string name="media_perm_text">عشان نعرض مين شغّال ميديا، أندرويد بيطلب صلاحية الإشعارات. Kanade بيستخدم اسم وعنوان جلسة الميديا النشطة بس، ومبيقراش إشعاراتك ولا بيخزّنها ولا بيبعتها.</string>
+    <string name="media_perm_button">امنح صلاحية الميديا</string>
+    <string name="ringer_sound">صوت</string>
+    <string name="ringer_vibrate">اهتزاز</string>
+    <string name="ringer_silent">صامت</string>
+    <string name="output_speaker">السماعة</string>
+    <string name="output_bluetooth">بلوتوث</string>
+    <string name="output_wired">سماعات الأذن</string>
+    <string name="sample_app">تطبيق الموسيقى</string>
+    <string name="sample_title">اسم الأغنية</string>
 </resources>
