@@ -131,4 +131,26 @@
     <color name="ic_launcher_background">#F4F1FF</color>
     <string name="style_capsule2">Capsule II</string>
     <string name="haptic_test">Test vibration</string>
+    <string name="preview_station">Show the Volume Station card</string>
+    <string name="presets_title">Size presets</string>
+    <string name="preset_compact">Compact</string>
+    <string name="preset_large">Large</string>
+    <string name="reset_style">Reset to default</string>
+    <string name="relative_drag">Relative drag</string>
+    <string name="relative_drag_hint">The bar moves from where it is by the distance your finger travels, instead of jumping to the touch point.</string>
+    <string name="station_ringer">Show the ringer mode button</string>
+    <string name="station_output">Show the sound output button</string>
+    <string name="station_output_hint">Android does not let apps move the sound to another output, so this button opens the system output switcher.</string>
+    <string name="station_now_playing">Show the playing app and its controls</string>
+    <string name="media_perm_title">Media access</string>
+    <string name="media_perm_text">To show which app is playing, Android asks for notification access. Kanade only uses the name and title of the active media session. It never reads, stores or sends your notifications.</string>
+    <string name="media_perm_button">Grant media access</string>
+    <string name="ringer_sound">Sound</string>
+    <string name="ringer_vibrate">Vibrate</string>
+    <string name="ringer_silent">Silent</string>
+    <string name="output_speaker">Speaker</string>
+    <string name="output_bluetooth">Bluetooth</string>
+    <string name="output_wired">Headphones</string>
+    <string name="sample_app">Music app</string>
+    <string name="sample_title">Song title</string>
 </resources>
