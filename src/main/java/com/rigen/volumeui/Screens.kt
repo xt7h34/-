@@ -203,12 +203,12 @@ private val SWATCHES = listOf(
     0xFF4F5BA5, 0xFF3A9DB5, 0xFF43B85A, 0xFFE0558A,
 ).map { it.toInt() }
 
-private val ICON_BLUE = Color(0xFF3D7BF5)
-private val ICON_PURPLE = Color(0xFF7B61FF)
-private val ICON_GREEN = Color(0xFF34A853)
-private val ICON_ORANGE = Color(0xFFF29900)
-private val ICON_PINK = Color(0xFFE0558A)
-private val ICON_RED = Color(0xFFE5484D)
+internal val ICON_BLUE = Color(0xFF3D7BF5)
+internal val ICON_PURPLE = Color(0xFF7B61FF)
+internal val ICON_GREEN = Color(0xFF34A853)
+internal val ICON_ORANGE = Color(0xFFF29900)
+internal val ICON_PINK = Color(0xFFE0558A)
+internal val ICON_RED = Color(0xFFE5484D)
 
 private val LocalPageScroll = compositionLocalOf<ScrollState> { error("No page scroll state") }
 private val LocalPageList = compositionLocalOf<LazyListState> { error("No page list state") }
@@ -295,7 +295,7 @@ private fun BackButton(onBack: () -> Unit) {
 
 /** A page with the Settings-style title. Set [lazy] when the page scrolls with a LazyColumn. */
 @Composable
-private fun PageScaffold(
+internal fun PageScaffold(
     title: String,
     onBack: (() -> Unit)?,
     lazy: Boolean = false,
@@ -323,7 +323,7 @@ private fun PageScaffold(
 }
 
 @Composable
-private fun PageColumn(padding: PaddingValues, content: @Composable ColumnScope.() -> Unit) {
+internal fun PageColumn(padding: PaddingValues, content: @Composable ColumnScope.() -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -343,7 +343,7 @@ private fun PageColumn(padding: PaddingValues, content: @Composable ColumnScope.
 
 /** A rounded group of rows, like the groups in the system Settings. */
 @Composable
-private fun SettingsGroup(content: @Composable ColumnScope.() -> Unit) {
+internal fun SettingsGroup(content: @Composable ColumnScope.() -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
@@ -354,7 +354,7 @@ private fun SettingsGroup(content: @Composable ColumnScope.() -> Unit) {
 }
 
 @Composable
-private fun ItemDivider() {
+internal fun ItemDivider() {
     HorizontalDivider(
         modifier = Modifier.padding(start = 76.dp, end = 20.dp),
         color = MaterialTheme.colorScheme.outlineVariant,
@@ -363,7 +363,7 @@ private fun ItemDivider() {
 
 /** One row: a colored round icon, a title and a short summary. */
 @Composable
-private fun SettingsItem(
+internal fun SettingsItem(
     glyph: Glyph,
     iconColor: Color,
     title: String,
@@ -404,7 +404,7 @@ private fun SettingsItem(
 
 /** A card with a small colored title and free content (sliders, switches...). */
 @Composable
-private fun Section(title: String, content: @Composable ColumnScope.() -> Unit) {
+internal fun Section(title: String, content: @Composable ColumnScope.() -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
@@ -435,7 +435,7 @@ private fun LabeledSlider(
 }
 
 @Composable
-private fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+internal fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(label, Modifier.weight(1f))
         KanadeSwitch(checked, onChange)
@@ -447,7 +447,7 @@ private fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Un
  * a deep purple night with stars and clouds and the knob on the right.
  */
 @Composable
-private fun KanadeSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+internal fun KanadeSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
     val trackW = 76.dp
     val trackH = 40.dp
     val knob = 32.dp
@@ -725,13 +725,11 @@ private fun HomePage(serviceEnabled: Boolean, onOpen: (String) -> Unit) {
                         stringResource(R.string.item_volume_summary),
                     ) { onOpen(PAGE_VOLUME) }
                     ItemDivider()
-                    // Not available yet: it arrives with the Kanade ecosystem.
                     SettingsItem(
                         Glyph.CLOCK, ICON_PURPLE,
                         stringResource(R.string.clock_title),
                         stringResource(R.string.clock_summary),
-                        enabled = false,
-                    )
+                    ) { onOpen(PAGE_CLOCK) }
                 }
 
                 SettingsGroup {
@@ -1836,6 +1834,7 @@ class MainActivity : ComponentActivity() {
             var page by rememberSaveable { mutableStateOf(startPage) }
             val parent = when (page) {
                 PAGE_PANEL, PAGE_BEHAVIOR, PAGE_STATION, PAGE_APPS -> PAGE_VOLUME
+                PAGE_CLOCK_TIME, PAGE_ALARMS, PAGE_TIMER, PAGE_SLEEP -> PAGE_CLOCK
                 else -> PAGE_HOME
             }
             BackHandler(enabled = page != PAGE_HOME) { page = parent }
@@ -1848,6 +1847,11 @@ class MainActivity : ComponentActivity() {
                 PAGE_APPS -> AppsPage(settings, onChange, goBack)
                 PAGE_APP -> AppPage(settings, onChange, goBack)
                 PAGE_KEEPALIVE -> KeepAlivePage(goBack)
+                PAGE_CLOCK -> ClockHubPage({ page = it }, goBack)
+                PAGE_CLOCK_TIME -> WorldClockPage(goBack)
+                PAGE_ALARMS -> AlarmsPage(goBack)
+                PAGE_TIMER -> TimerPage(goBack)
+                PAGE_SLEEP -> SleepPage(goBack)
                 else -> HomePage(serviceEnabled) { page = it }
             }
         }

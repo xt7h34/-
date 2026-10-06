@@ -176,6 +176,12 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
 
     // Which app is in front, for the per-app rules.
     private var foregroundPackage: String? = null
+    private var floatingTimer: FloatingTimer? = null
+
+    /** Called by the Clock section whenever the timer starts, pauses, ends or its settings change. */
+    fun refreshFloatingTimer() {
+        handler.post { floatingTimer?.refresh() }
+    }
     private val launchableCache = mutableMapOf<String, Boolean>()
 
     // Key handling: double-press mute and hold-to-repeat.
@@ -239,6 +245,7 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
+        floatingTimer = FloatingTimer(this)
         Diag.mark(this, "svc_connected")
     }
 
@@ -258,10 +265,12 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
         try {
             if (event == null || event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
             val pkg = event.packageName?.toString() ?: return
+            if (pkg == packageName) floatingTimer?.onForeground(pkg)
             // Ignore ourselves, the system UI and anything that is not a normal app (keyboards...).
             if (pkg == packageName || pkg == "com.android.systemui" || pkg == "android") return
             if (!isLaunchable(pkg)) return
             foregroundPackage = pkg
+            floatingTimer?.onForeground(pkg)
         } catch (e: Throwable) {
             logError("onAccessibilityEvent", e)
         }
@@ -886,6 +895,8 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
         handler.removeCallbacks(collapseRunnable)
         stopRepeat()
         removePanel()
+        floatingTimer?.remove()
+        floatingTimer = null
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
