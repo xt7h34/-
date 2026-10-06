@@ -129,4 +129,6 @@
     <string name="keepalive_open_app">Open app info</string>
     <string name="keepalive_open_failed">Could not open that screen on this phone</string>
     <color name="ic_launcher_background">#F4F1FF</color>
+    <string name="style_capsule2">Capsule II</string>
+    <string name="haptic_test">Test vibration</string>
 </resources>
