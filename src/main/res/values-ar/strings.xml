@@ -128,4 +128,6 @@
     <string name="keepalive_open_battery">افتح تحسين البطارية</string>
     <string name="keepalive_open_app">افتح معلومات التطبيق</string>
     <string name="keepalive_open_failed">مقدرتش أفتح الشاشة دي على الجوال ده</string>
+    <string name="style_capsule2">كبسولة ٢</string>
+    <string name="haptic_test">جرّب الاهتزاز</string>
 </resources>
