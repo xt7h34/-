@@ -77,6 +77,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.darkColorScheme
@@ -192,7 +193,10 @@ fun KanadeTheme(themeMode: Int, dynamicColor: Boolean, content: @Composable () -
             bars.isAppearanceLightNavigationBars = !dark
         }
     }
-    MaterialTheme(colorScheme = scheme, content = content)
+    MaterialTheme(colorScheme = scheme) {
+        // Text outside a Material Surface falls back to BLACK, which vanishes on the dark theme.
+        CompositionLocalProvider(LocalContentColor provides scheme.onBackground, content = content)
+    }
 }
 
 // ───────────────────────────── Building blocks ─────────────────────────────
@@ -310,6 +314,12 @@ internal fun PageScaffold(
                 .background(MaterialTheme.colorScheme.background),
         ) {
             content(PaddingValues(0.dp))
+            // Content scrolls under the status bar: a soft cover keeps the clock and icons readable.
+            val bg = MaterialTheme.colorScheme.background
+            Column(Modifier.fillMaxWidth().align(Alignment.TopCenter)) {
+                Spacer(Modifier.fillMaxWidth().statusBarsPadding().background(bg))
+                Spacer(Modifier.fillMaxWidth().height(14.dp).background(Brush.verticalGradient(listOf(bg, bg.copy(alpha = 0f)))))
+            }
             CollapsingTitle(title, if (onBack != null) 64.dp else 24.dp) {
                 if (lazy) {
                     if (list.firstVisibleItemIndex == 0) list.firstVisibleItemScrollOffset else Int.MAX_VALUE / 4
@@ -1016,13 +1026,13 @@ private class PreviewModel(
     private val sampleTitle: String,
 ) {
     val levels = mutableStateMapOf(
-        AudioManager.STREAM_MUSIC to 13,
-        AudioManager.STREAM_VOICE_CALL to 4,
-        AudioManager.STREAM_RING to 10,
-        AudioManager.STREAM_NOTIFICATION to 8,
-        AudioManager.STREAM_ALARM to 11,
+        AudioManager.STREAM_MUSIC to 17,
+        AudioManager.STREAM_VOICE_CALL to 5,
+        AudioManager.STREAM_RING to 13,
+        AudioManager.STREAM_NOTIFICATION to 11,
+        AudioManager.STREAM_ALARM to 15,
     )
-    val maxes = STREAMS.associate { it.stream to 15 }
+    val maxes = STREAMS.associate { it.stream to PANEL_STEPS }
     var expanded by mutableStateOf(false)
     var dnd by mutableStateOf(false)
     var ringer by mutableIntStateOf(AudioManager.RINGER_MODE_NORMAL)
@@ -1034,18 +1044,18 @@ private class PreviewModel(
             beforeMute[stream] = now
             levels[stream] = 0
         } else {
-            levels[stream] = (beforeMute[stream] ?: 8).coerceAtLeast(1)
+            levels[stream] = (beforeMute[stream] ?: 10).coerceAtLeast(1)
         }
     }
 
     val actions = PanelActions(
-        onSeek = { stream, f -> levels[stream] = (f * 15).roundToInt().coerceIn(0, 15) },
+        onSeek = { stream, f -> levels[stream] = (f * PANEL_STEPS).roundToInt().coerceIn(0, PANEL_STEPS) },
         onTouch = { },
         onToggleStation = { expanded = !expanded },
         onMedia = { },
         onMuteAll = {
             val anyOn = STREAMS.any { (levels[it.stream] ?: 0) > 0 }
-            STREAMS.forEach { levels[it.stream] = if (anyOn) 0 else 8 }
+            STREAMS.forEach { levels[it.stream] = if (anyOn) 0 else 10 }
         },
         onToggleDnd = { dnd = !dnd },
         // In the preview the gear just closes the card.
@@ -1066,7 +1076,7 @@ private class PreviewModel(
     fun state(settings: PanelSettings, expanded: Boolean = this.expanded) = PanelState(
         stream = AudioManager.STREAM_MUSIC,
         level = levels[AudioManager.STREAM_MUSIC] ?: 0,
-        max = 15,
+        max = PANEL_STEPS,
         dnd = dnd,
         expanded = expanded,
         levels = levels,
@@ -1215,8 +1225,8 @@ private fun StyleThumb(settings: PanelSettings, style: Int, labelRes: Int, onPic
                 },
                 state = PanelState(
                     stream = AudioManager.STREAM_MUSIC,
-                    level = 9,
-                    max = 15,
+                    level = 12,
+                    max = PANEL_STEPS,
                     dnd = true,
                 ),
             )
@@ -1292,7 +1302,7 @@ private fun PanelPage(settings: PanelSettings, onChange: (PanelSettings) -> Unit
             }
 
             Section(stringResource(R.string.preview_title)) {
-                LabeledSlider(stringResource(R.string.preview_level, previewLevel), previewLevel, 0f..15f) {
+                LabeledSlider(stringResource(R.string.preview_level, previewLevel, PANEL_STEPS), previewLevel, 0f..PANEL_STEPS.toFloat()) {
                     pm.levels[AudioManager.STREAM_MUSIC] = it
                 }
                 SwitchRow(stringResource(R.string.preview_dnd), pm.dnd) { pm.dnd = it }

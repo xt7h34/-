@@ -12,7 +12,7 @@
     <string name="test_panel">جرّب اللوحة</string>
     <string name="enable_service_first">فعّل الخدمة الأول</string>
     <string name="preview_hint">اضغط على النقاط الثلاث في المعاينة عشان تجرّب Volume Station.</string>
-    <string name="preview_level">مستوى المعاينة: %1$d / 15</string>
+    <string name="preview_level">مستوى المعاينة: %1$d / %2$d</string>
     <string name="preview_dnd">معاينة أيقونة عدم الإزعاج</string>
     <string name="section_look">الشكل</string>
     <string name="vertical_panel">اللوحة رأسية</string>

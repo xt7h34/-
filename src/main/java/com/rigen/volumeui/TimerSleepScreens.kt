@@ -4,7 +4,10 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -307,13 +311,61 @@ private fun wakeFromAlarms(alarms: List<AlarmItem>): Int? {
 
 private fun fixGoal(m: Int): Int = if (m == 0) 1440 else m
 
+/**
+ * The sleep ring. Drag the bedtime or the wake-up handle to move it (5-minute steps). A touch that
+ * does not start on a handle is left alone, so the page can still scroll over the ring.
+ */
 @Composable
-private fun SleepDial(bedMin: Int, wakeMin: Int, modifier: Modifier = Modifier) {
+private fun SleepDial(
+    bedMin: Int,
+    wakeMin: Int,
+    onBed: (Int) -> Unit,
+    onWake: (Int) -> Unit,
+    onDone: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val measurer = rememberTextMeasurer()
     val track = MaterialTheme.colorScheme.surfaceVariant
     val accent = MaterialTheme.colorScheme.primary
+    val dot = MaterialTheme.colorScheme.onPrimary
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
-    Canvas(modifier) {
+    val bedNow by rememberUpdatedState(bedMin)
+    val wakeNow by rememberUpdatedState(wakeMin)
+    val onBedNow by rememberUpdatedState(onBed)
+    val onWakeNow by rememberUpdatedState(onWake)
+    val onDoneNow by rememberUpdatedState(onDone)
+    Canvas(
+        modifier.pointerInput(Unit) {
+            awaitEachGesture {
+                val down = awaitFirstDown(requireUnconsumed = false)
+                val w = size.width.toFloat()
+                val h = size.height.toFloat()
+                val r = minOf(w, h) / 2f
+                val ringR = r - r * 0.2f / 2f
+                val cx = w / 2f
+                val cy = h / 2f
+                fun handle(m: Int): Offset {
+                    val a = Math.toRadians(m / 1440.0 * 360.0 - 90.0)
+                    return Offset(cx + ringR * cos(a).toFloat(), cy + ringR * sin(a).toFloat())
+                }
+                val dBed = (down.position - handle(bedNow)).getDistance()
+                val dWake = (down.position - handle(wakeNow)).getDistance()
+                if (minOf(dBed, dWake) > 36.dp.toPx()) return@awaitEachGesture
+                val moveBed = dBed <= dWake
+                down.consume()
+                drag(down.id) { change ->
+                    change.consume()
+                    var deg = Math.toDegrees(
+                        atan2((change.position.x - cx).toDouble(), -(change.position.y - cy).toDouble()),
+                    )
+                    if (deg < 0) deg += 360.0
+                    val m = mod((deg / 360.0 * 288.0).roundToInt() * 5, 1440)
+                    if (moveBed) onBedNow(m) else onWakeNow(m)
+                }
+                onDoneNow()
+            }
+        },
+    ) {
         val r = size.minDimension / 2f
         val c = center
         val stroke = r * 0.2f
@@ -330,7 +382,7 @@ private fun SleepDial(bedMin: Int, wakeMin: Int, modifier: Modifier = Modifier) 
         for (m in listOf(bedMin, wakeMin)) {
             val a = Math.toRadians(m / 1440.0 * 360.0 - 90.0)
             drawCircle(
-                Color.White, stroke * 0.26f,
+                dot, stroke * 0.26f,
                 Offset(c.x + ringR * cos(a).toFloat(), c.y + ringR * sin(a).toFloat()),
             )
         }
@@ -515,7 +567,20 @@ fun SleepPage(onBack: () -> Unit) {
                     ) { dialog = 2 }
                 }
                 Spacer(Modifier.height(12.dp))
-                SleepDial(bedMin, wakeMin, Modifier.size(250.dp))
+                SleepDial(
+                    bedMin, wakeMin,
+                    onBed = { bedOverride = it },
+                    onWake = {
+                        // Like the time picker: moving the wake-up keeps the bedtime where it is.
+                        if (bedOverride < 0) bedOverride = bedMin
+                        manualWake = it
+                    },
+                    onDone = {
+                        ClockStore.setSleepBedOverride(ctx, bedOverride)
+                        ClockStore.setSleepManualWake(ctx, manualWake)
+                    },
+                    modifier = Modifier.size(250.dp),
+                )
                 Spacer(Modifier.height(8.dp))
                 Text(
                     formatDuration(ctx, planMin),

@@ -12,6 +12,7 @@ import android.os.Vibrator
 import java.io.PrintWriter
 import java.io.StringWriter
 import java.util.Locale
+import kotlin.math.roundToInt
 
 const val THEME_SYSTEM = 0
 const val THEME_LIGHT = 1
@@ -22,6 +23,15 @@ const val RULE_HIDE = 1
 const val RULE_ALT_POSITION = 2
 
 const val STATION_W_DP = 300
+
+/** The panel and the Volume Station always show this many steps, whatever the phone's real count is. */
+const val PANEL_STEPS = 20
+
+/** Converts a real stream level (0..realMax) to the 0..[PANEL_STEPS] scale. Any sound above zero shows at least 1. */
+fun toPanelLevel(real: Int, realMax: Int): Int {
+    if (real <= 0) return 0
+    return ((real * PANEL_STEPS) / realMax.coerceAtLeast(1).toFloat()).roundToInt().coerceIn(1, PANEL_STEPS)
+}
 
 // Where the sound is going right now (shown in the Volume Station).
 const val OUTPUT_SPEAKER = 0

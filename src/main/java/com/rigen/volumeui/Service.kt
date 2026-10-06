@@ -265,9 +265,15 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
         try {
             if (event == null || event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
             val pkg = event.packageName?.toString() ?: return
-            if (pkg == packageName) floatingTimer?.onForeground(pkg)
-            // Ignore ourselves, the system UI and anything that is not a normal app (keyboards...).
-            if (pkg == packageName || pkg == "com.android.systemui" || pkg == "android") return
+            if (pkg == packageName) {
+                // Our own overlay windows (the floating timer, the volume panel) fire window events
+                // too. If those counted as "our app is in front", the floating timer would remove
+                // itself the moment it appeared. Only the real app screen counts.
+                if (event.className?.toString() == MainActivity::class.java.name) floatingTimer?.onForeground(pkg)
+                return
+            }
+            // Ignore the system UI and anything that is not a normal app (keyboards...).
+            if (pkg == "com.android.systemui" || pkg == "android") return
             if (!isLaunchable(pkg)) return
             foregroundPackage = pkg
             floatingTimer?.onForeground(pkg)
@@ -814,12 +820,12 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
                 settings = settings,
                 state = PanelState(
                     stream = currentStream,
-                    level = level,
-                    max = maxLevel,
+                    level = toPanelLevel(level, maxLevel),
+                    max = PANEL_STEPS,
                     dnd = dnd,
                     expanded = expanded,
-                    levels = stationLevels,
-                    maxes = stationMax,
+                    levels = stationLevels.mapValues { (stream, v) -> toPanelLevel(v, stationMax[stream] ?: 1) },
+                    maxes = stationMax.mapValues { PANEL_STEPS },
                     mediaPlaying = mediaPlaying,
                     ringerMode = ringerMode,
                     outputKind = outputKind,

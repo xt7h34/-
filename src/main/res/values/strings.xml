@@ -12,7 +12,7 @@
     <string name="test_panel">Test the panel</string>
     <string name="enable_service_first">Turn on the service first</string>
     <string name="preview_hint">Tap the three dots in the preview to try the Volume Station.</string>
-    <string name="preview_level">Preview level: %1$d / 15</string>
+    <string name="preview_level">Preview level: %1$d / %2$d</string>
     <string name="preview_dnd">Preview the Do Not Disturb icon</string>
     <string name="section_look">Look</string>
     <string name="vertical_panel">Vertical panel</string>
