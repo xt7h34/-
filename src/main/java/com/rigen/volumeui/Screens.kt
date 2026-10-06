@@ -783,6 +783,10 @@ private fun searchIndex(): List<SearchEntry> {
         SearchEntry(stringResource(R.string.station_toggle), stationPage, PAGE_STATION),
         SearchEntry(stringResource(R.string.station_mute_all), stationPage, PAGE_STATION),
         SearchEntry(stringResource(R.string.station_dnd_button), stationPage, PAGE_STATION),
+        SearchEntry(stringResource(R.string.station_ringer), stationPage, PAGE_STATION),
+        SearchEntry(stringResource(R.string.station_output), stationPage, PAGE_STATION),
+        SearchEntry(stringResource(R.string.station_now_playing), stationPage, PAGE_STATION),
+        SearchEntry(stringResource(R.string.relative_drag), behaviorPage, PAGE_BEHAVIOR),
         SearchEntry(stringResource(R.string.apps_title), appsPage, PAGE_APPS),
         SearchEntry(stringResource(R.string.alt_position_title), appsPage, PAGE_APPS),
         SearchEntry(stringResource(R.string.section_theme), appPage, PAGE_APP),
@@ -1003,42 +1007,93 @@ private fun KeepAlivePage(onBack: () -> Unit) {
     }
 }
 
+/**
+ * The state behind every live preview of the panel (Volume Panel, Panel look, Volume Station):
+ * the levels, the three dots, mute buttons, ringer mode... all work on fake values here.
+ */
+private class PreviewModel(
+    private val hapticsOn: () -> Boolean,
+    context: Context,
+    private val sampleApp: String,
+    private val sampleTitle: String,
+) {
+    val levels = mutableStateMapOf(
+        AudioManager.STREAM_MUSIC to 13,
+        AudioManager.STREAM_VOICE_CALL to 4,
+        AudioManager.STREAM_RING to 10,
+        AudioManager.STREAM_NOTIFICATION to 8,
+        AudioManager.STREAM_ALARM to 11,
+    )
+    val maxes = STREAMS.associate { it.stream to 15 }
+    var expanded by mutableStateOf(false)
+    var dnd by mutableStateOf(false)
+    var ringer by mutableIntStateOf(AudioManager.RINGER_MODE_NORMAL)
+    private val beforeMute = mutableMapOf<Int, Int>()
+
+    private fun toggleMute(stream: Int) {
+        val now = levels[stream] ?: 0
+        if (now > 0) {
+            beforeMute[stream] = now
+            levels[stream] = 0
+        } else {
+            levels[stream] = (beforeMute[stream] ?: 8).coerceAtLeast(1)
+        }
+    }
+
+    val actions = PanelActions(
+        onSeek = { stream, f -> levels[stream] = (f * 15).roundToInt().coerceIn(0, 15) },
+        onTouch = { },
+        onToggleStation = { expanded = !expanded },
+        onMedia = { },
+        onMuteAll = {
+            val anyOn = STREAMS.any { (levels[it.stream] ?: 0) > 0 }
+            STREAMS.forEach { levels[it.stream] = if (anyOn) 0 else 8 }
+        },
+        onToggleDnd = { dnd = !dnd },
+        // In the preview the gear just closes the card.
+        onOpenSettings = { expanded = false },
+        onToggleMute = { toggleMute(AudioManager.STREAM_MUSIC) },
+        onTick = { if (hapticsOn()) Haptics.tick(context) },
+        onToggleMuteStream = { stream -> toggleMute(stream) },
+        onToggleRinger = {
+            ringer = when (ringer) {
+                AudioManager.RINGER_MODE_NORMAL -> AudioManager.RINGER_MODE_VIBRATE
+                AudioManager.RINGER_MODE_VIBRATE -> AudioManager.RINGER_MODE_SILENT
+                else -> AudioManager.RINGER_MODE_NORMAL
+            }
+        },
+        onOpenOutput = { },
+    )
+
+    fun state(settings: PanelSettings, expanded: Boolean = this.expanded) = PanelState(
+        stream = AudioManager.STREAM_MUSIC,
+        level = levels[AudioManager.STREAM_MUSIC] ?: 0,
+        max = 15,
+        dnd = dnd,
+        expanded = expanded,
+        levels = levels,
+        maxes = maxes,
+        ringerMode = ringer,
+        outputKind = OUTPUT_BLUETOOTH,
+        mediaApp = if (settings.stationNowPlaying) sampleApp else null,
+        mediaTitle = if (settings.stationNowPlaying) sampleTitle else null,
+    )
+}
+
+@Composable
+private fun rememberPreviewModel(settings: PanelSettings): PreviewModel {
+    val context = LocalContext.current
+    val hapticsOn by rememberUpdatedState(settings.haptics)
+    val app = stringResource(R.string.sample_app)
+    val title = stringResource(R.string.sample_title)
+    return remember { PreviewModel({ hapticsOn }, context, app, title) }
+}
+
 /** The "Volume Panel" option: a live preview and the pages that belong to it. */
 @Composable
 private fun VolumeHubPage(settings: PanelSettings, onOpen: (String) -> Unit, onBack: () -> Unit) {
     val context = LocalContext.current
-    // The preview is interactive: tap the three dots, drag the bars.
-    val levels = remember {
-        mutableStateMapOf(
-            AudioManager.STREAM_MUSIC to 13,
-            AudioManager.STREAM_VOICE_CALL to 4,
-            AudioManager.STREAM_RING to 10,
-            AudioManager.STREAM_NOTIFICATION to 8,
-            AudioManager.STREAM_ALARM to 11,
-        )
-    }
-    val maxes = remember { STREAMS.associate { it.stream to 15 } }
-    var expanded by remember { mutableStateOf(false) }
-    var previewDnd by remember { mutableStateOf(false) }
-    val actions = remember {
-        PanelActions(
-            onSeek = { stream, f -> levels[stream] = (f * 15).roundToInt().coerceIn(0, 15) },
-            onTouch = { },
-            onToggleStation = { expanded = !expanded },
-            onMedia = { },
-            onMuteAll = {
-                val anyOn = STREAMS.any { (levels[it.stream] ?: 0) > 0 }
-                STREAMS.forEach { levels[it.stream] = if (anyOn) 0 else 8 }
-            },
-            onToggleDnd = { previewDnd = !previewDnd },
-            // In the preview the gear just closes the card.
-            onOpenSettings = { expanded = false },
-            onToggleMute = {
-                val now = levels[AudioManager.STREAM_MUSIC] ?: 0
-                levels[AudioManager.STREAM_MUSIC] = if (now > 0) 0 else 8
-            },
-        )
-    }
+    val pm = rememberPreviewModel(settings)
 
     PageScaffold(stringResource(R.string.item_volume_title), onBack) { padding ->
         PageColumn(padding) {
@@ -1046,16 +1101,8 @@ private fun VolumeHubPage(settings: PanelSettings, onOpen: (String) -> Unit, onB
                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     PanelOrStation(
                         settings = settings,
-                        state = PanelState(
-                            stream = AudioManager.STREAM_MUSIC,
-                            level = levels[AudioManager.STREAM_MUSIC] ?: 0,
-                            max = 15,
-                            dnd = previewDnd,
-                            expanded = expanded,
-                            levels = levels,
-                            maxes = maxes,
-                        ),
-                        actions = actions,
+                        state = pm.state(settings),
+                        actions = pm.actions,
                     )
                 }
                 if (settings.stationEnabled) {
@@ -1184,10 +1231,42 @@ private fun StyleThumb(settings: PanelSettings, style: Int, labelRes: Int, onPic
     }
 }
 
+/**
+ * A size preset for the current style: the style's usual size times [scale], kept inside the
+ * range of the width and height sliders. With [resetLook] the corner radius, frame and colours go
+ * back to the app's defaults as well (Capsule II brings its own look): the "Reset to default" button.
+ */
+private fun sizePreset(s: PanelSettings, scale: Float, resetLook: Boolean): PanelSettings {
+    val d = PanelSettings()
+    // Capsule II only exists as a vertical panel.
+    val vertical = if (s.panelStyle == STYLE_CAPSULE2) true else s.vertical
+    val (baseW, baseH) = when {
+        s.panelStyle == STYLE_CLASSIC ->
+            if (vertical) d.heightDp to d.widthDp else d.widthDp to d.heightDp
+        else -> if (vertical) 64 to 260 else 260 to 64
+    }
+    val wRange = if (vertical) 32..120 else 160..360
+    val hRange = if (vertical) 160..360 else 32..120
+    var next = s.copy(
+        vertical = vertical,
+        widthDp = (baseW * scale).roundToInt().coerceIn(wRange),
+        heightDp = (baseH * scale).roundToInt().coerceIn(hRange),
+    )
+    if (resetLook) {
+        next = next.copy(cornerRadiusDp = d.cornerRadiusDp, showFrame = d.showFrame)
+        next = if (s.panelStyle == STYLE_CAPSULE2) {
+            next.copy(colorArgb = CAPSULE2_FRAME, barColorArgb = CAPSULE2_ACCENT)
+        } else {
+            next.copy(colorArgb = d.colorArgb, barColorArgb = d.barColorArgb)
+        }
+    }
+    return next
+}
+
 @Composable
 private fun PanelPage(settings: PanelSettings, onChange: (PanelSettings) -> Unit, onBack: () -> Unit) {
-    var previewLevel by remember { mutableIntStateOf(13) }
-    var previewDnd by remember { mutableStateOf(false) }
+    val pm = rememberPreviewModel(settings)
+    val previewLevel = pm.levels[AudioManager.STREAM_MUSIC] ?: 0
 
     // The capsule and the bar are tall shapes, so choosing one turns the panel vertical.
     fun setStyle(style: Int) {
@@ -1207,28 +1286,45 @@ private fun PanelPage(settings: PanelSettings, onChange: (PanelSettings) -> Unit
     PageScaffold(stringResource(R.string.item_panel_title), onBack) { padding ->
         PageColumn(padding) {
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                VolumePanel(
+                PanelOrStation(
                     settings = settings,
-                    state = PanelState(
-                        stream = AudioManager.STREAM_MUSIC,
-                        level = previewLevel,
-                        max = 15,
-                        dnd = previewDnd,
-                    ),
+                    state = pm.state(settings),
+                    actions = pm.actions,
                 )
             }
 
             Section(stringResource(R.string.preview_title)) {
                 LabeledSlider(stringResource(R.string.preview_level, previewLevel), previewLevel, 0f..15f) {
-                    previewLevel = it
+                    pm.levels[AudioManager.STREAM_MUSIC] = it
                 }
-                SwitchRow(stringResource(R.string.preview_dnd), previewDnd) { previewDnd = it }
+                SwitchRow(stringResource(R.string.preview_dnd), pm.dnd) { pm.dnd = it }
+                if (settings.stationEnabled) {
+                    SwitchRow(stringResource(R.string.preview_station), pm.expanded) { pm.expanded = it }
+                }
             }
 
             Section(stringResource(R.string.section_look)) {
                 Text(stringResource(R.string.panel_style))
                 StylePicker(settings) { setStyle(it) }
                 Text(stringResource(R.string.style_hint), style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(R.string.presets_title), style = MaterialTheme.typography.labelLarge)
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    AssistChip(
+                        onClick = { onChange(sizePreset(settings, 0.8f, resetLook = false)) },
+                        label = { Text(stringResource(R.string.preset_compact)) },
+                    )
+                    AssistChip(
+                        onClick = { onChange(sizePreset(settings, 1.25f, resetLook = false)) },
+                        label = { Text(stringResource(R.string.preset_large)) },
+                    )
+                    OutlinedButton(onClick = { onChange(sizePreset(settings, 1f, resetLook = true)) }) {
+                        Text(stringResource(R.string.reset_style))
+                    }
+                }
                 SwitchRow(stringResource(R.string.vertical_panel), settings.vertical) {
                     // Rotate the panel: swap its width and height.
                     onChange(settings.copy(vertical = it, widthDp = settings.heightDp, heightDp = settings.widthDp))
@@ -1313,6 +1409,10 @@ private fun BehaviorPage(settings: PanelSettings, onChange: (PanelSettings) -> U
                 SwitchRow(stringResource(R.string.touch_control), settings.touchEnabled) {
                     onChange(settings.copy(touchEnabled = it))
                 }
+                SwitchRow(stringResource(R.string.relative_drag), settings.relativeDrag) {
+                    onChange(settings.copy(relativeDrag = it))
+                }
+                Text(stringResource(R.string.relative_drag_hint), style = MaterialTheme.typography.bodySmall)
                 SwitchRow(stringResource(R.string.haptics), settings.haptics) {
                     onChange(settings.copy(haptics = it))
                 }
@@ -1370,36 +1470,12 @@ private fun BehaviorPage(settings: PanelSettings, onChange: (PanelSettings) -> U
 private fun StationPage(
     settings: PanelSettings,
     dndAccess: Boolean,
+    mediaAccess: Boolean,
     onChange: (PanelSettings) -> Unit,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
-    val levels = remember {
-        mutableStateMapOf(
-            AudioManager.STREAM_MUSIC to 13,
-            AudioManager.STREAM_VOICE_CALL to 4,
-            AudioManager.STREAM_RING to 10,
-            AudioManager.STREAM_NOTIFICATION to 8,
-            AudioManager.STREAM_ALARM to 11,
-        )
-    }
-    val maxes = remember { STREAMS.associate { it.stream to 15 } }
-    var previewDnd by remember { mutableStateOf(false) }
-    val actions = remember {
-        PanelActions(
-            onSeek = { stream, f -> levels[stream] = (f * 15).roundToInt().coerceIn(0, 15) },
-            onTouch = { },
-            onToggleStation = { },
-            onMedia = { },
-            onMuteAll = {
-                val anyOn = STREAMS.any { (levels[it.stream] ?: 0) > 0 }
-                STREAMS.forEach { levels[it.stream] = if (anyOn) 0 else 8 }
-            },
-            onToggleDnd = { previewDnd = !previewDnd },
-            onOpenSettings = { },
-            onToggleMute = { },
-        )
-    }
+    val pm = rememberPreviewModel(settings)
 
     PageScaffold(stringResource(R.string.section_station), onBack) { padding ->
         PageColumn(padding) {
@@ -1414,22 +1490,33 @@ private fun StationPage(
                 SwitchRow(stringResource(R.string.station_dnd_button), settings.stationDnd) {
                     onChange(settings.copy(stationDnd = it))
                 }
+                SwitchRow(stringResource(R.string.station_ringer), settings.stationRinger) {
+                    onChange(settings.copy(stationRinger = it))
+                }
+                SwitchRow(stringResource(R.string.station_output), settings.stationOutput) {
+                    onChange(settings.copy(stationOutput = it))
+                }
+                Text(stringResource(R.string.station_output_hint), style = MaterialTheme.typography.bodySmall)
+                SwitchRow(stringResource(R.string.station_now_playing), settings.stationNowPlaying) {
+                    onChange(settings.copy(stationNowPlaying = it))
+                }
+            }
+
+            if (settings.stationNowPlaying && !mediaAccess) {
+                Section(stringResource(R.string.media_perm_title)) {
+                    Text(stringResource(R.string.media_perm_text), style = MaterialTheme.typography.bodySmall)
+                    Button(onClick = {
+                        context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                    }) { Text(stringResource(R.string.media_perm_button)) }
+                }
             }
 
             Section(stringResource(R.string.preview_title)) {
                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     PanelOrStation(
                         settings = settings.copy(stationEnabled = true),
-                        state = PanelState(
-                            stream = AudioManager.STREAM_MUSIC,
-                            level = levels[AudioManager.STREAM_MUSIC] ?: 0,
-                            max = 15,
-                            dnd = previewDnd,
-                            expanded = true,
-                            levels = levels,
-                            maxes = maxes,
-                        ),
-                        actions = actions,
+                        state = pm.state(settings, expanded = true),
+                        actions = pm.actions,
                     )
                 }
             }
@@ -1702,6 +1789,7 @@ class MainActivity : ComponentActivity() {
 
     private var serviceEnabled by mutableStateOf(false)
     private var dndAccess by mutableStateOf(true)
+    private var mediaAccess by mutableStateOf(false)
 
     /** Uses the language chosen inside the app, if there is one. */
     override fun attachBaseContext(newBase: Context) {
@@ -1719,6 +1807,7 @@ class MainActivity : ComponentActivity() {
         serviceEnabled = isServiceEnabled()
         dndAccess = getSystemService(NotificationManager::class.java)
             ?.isNotificationPolicyAccessGranted ?: true
+        mediaAccess = isMediaAccessGranted(this)
     }
 
     private fun isServiceEnabled(): Boolean {
@@ -1755,7 +1844,7 @@ class MainActivity : ComponentActivity() {
                 PAGE_VOLUME -> VolumeHubPage(settings, { page = it }, goBack)
                 PAGE_PANEL -> PanelPage(settings, onChange, goBack)
                 PAGE_BEHAVIOR -> BehaviorPage(settings, onChange, goBack)
-                PAGE_STATION -> StationPage(settings, dndAccess, onChange, goBack)
+                PAGE_STATION -> StationPage(settings, dndAccess, mediaAccess, onChange, goBack)
                 PAGE_APPS -> AppsPage(settings, onChange, goBack)
                 PAGE_APP -> AppPage(settings, onChange, goBack)
                 PAGE_KEEPALIVE -> KeepAlivePage(goBack)
