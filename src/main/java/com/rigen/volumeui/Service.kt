@@ -326,7 +326,11 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
 
     private fun haptic() {
         if (!settings.haptics) return
-        panelCompose?.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+        try {
+            Haptics.tick(applicationContext)
+        } catch (e: Throwable) {
+            logError("haptic", e)
+        }
     }
 
     private fun isDndOn(): Boolean {
