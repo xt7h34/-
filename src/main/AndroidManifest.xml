@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Lets the app vibrate for the volume steps. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
     <!-- Lets the app appear in the "Do Not Disturb access" list (needed for ring and notification volumes). -->
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
 
