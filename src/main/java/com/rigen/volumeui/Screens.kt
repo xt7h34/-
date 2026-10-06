@@ -1194,6 +1194,9 @@ private fun PanelPage(settings: PanelSettings, onChange: (PanelSettings) -> Unit
         var next = settings.copy(panelStyle = style)
         if (style != STYLE_CLASSIC && !settings.vertical) {
             next = next.copy(vertical = true, widthDp = 64, heightDp = 260)
+        } else if (style != STYLE_CLASSIC && next.widthDp < 52) {
+            // Too narrow for the capsule shapes: use the size the style pictures are drawn at.
+            next = next.copy(widthDp = 52)
         }
         if (style == STYLE_CAPSULE2) {
             next = next.copy(colorArgb = CAPSULE2_FRAME, barColorArgb = CAPSULE2_ACCENT)
