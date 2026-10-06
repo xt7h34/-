@@ -661,10 +661,13 @@ private fun CapsulePanel(ctx: PanelCtx, modifier: Modifier) {
     }
 
     if (s.vertical) {
-        val button = (s.widthDp - 20).coerceIn(24, 56)
+        // Everything scales with the real width, so a narrow panel still draws its full shape.
+        val pad = (s.widthDp / 5).coerceIn(4, 10)
+        val button = (s.widthDp - 2 * pad).coerceIn(16, 56)
         val corner = (button / 2).coerceIn(8, 28)
+        val fillIcon = (button / 2 + 4).coerceIn(12, 22)
         Column(
-            modifier = pill.padding(10.dp),
+            modifier = pill.padding(pad.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             CircleButton(accent, button.dp, topGlyph.pathData, onAccent, (button / 2).dp, toggleMute)
@@ -684,7 +687,7 @@ private fun CapsulePanel(ctx: PanelCtx, modifier: Modifier) {
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
-                insideFill = { PathIcon(glyph.pathData, iconColor, 22.dp) },
+                insideFill = { PathIcon(glyph.pathData, iconColor, fillIcon.dp) },
             )
             if (ctx.dots) {
                 Spacer(Modifier.height(6.dp))
@@ -748,7 +751,14 @@ private fun Capsule2Panel(ctx: PanelCtx, modifier: Modifier) {
     val iconColor = if (pct >= s.redThresholdPct) HIGH_VOLUME_RED else onAccent
     val glyph = if (st.level == 0) Glyph.MUTED else glyphForStream(st.stream)
     val topGlyph = if (st.level == 0) Glyph.MUTED else Glyph.VOLUME
-    val button = (s.widthDp - 20).coerceIn(24, 56)
+    // Everything scales with the real width. A fixed 10dp padding plus 6dp insets used to leave
+    // a zero-width fill on narrow panels, so the preview looked empty and squashed.
+    val pad = (s.widthDp / 5).coerceIn(4, 10)
+    val inner = (s.widthDp - 2 * pad).coerceAtLeast(12)
+    val button = inner.coerceIn(16, 56)
+    val inset = (inner / 6).coerceIn(2, 6)
+    val bigR = (inner / 2).coerceIn(8, 22)
+    val fillIcon = (inner / 2 + 4).coerceIn(12, 22)
 
     var pill = modifier
         .width(s.widthDp.dp)
@@ -760,7 +770,7 @@ private fun Capsule2Panel(ctx: PanelCtx, modifier: Modifier) {
     }
 
     Column(
-        modifier = pill.padding(10.dp),
+        modifier = pill.padding(pad.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         CircleButton(
@@ -786,10 +796,10 @@ private fun Capsule2Panel(ctx: PanelCtx, modifier: Modifier) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(trackH)
-                        .padding(horizontal = 6.dp)
+                        .padding(horizontal = inset.dp)
                         .clip(
                             RoundedCornerShape(
-                                topStart = 22.dp, topEnd = 22.dp, bottomEnd = 6.dp, bottomStart = 6.dp,
+                                topStart = bigR.dp, topEnd = bigR.dp, bottomEnd = 6.dp, bottomStart = 6.dp,
                             ),
                         )
                         .background(track),
@@ -818,16 +828,16 @@ private fun Capsule2Panel(ctx: PanelCtx, modifier: Modifier) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(fillH)
-                        .padding(horizontal = 6.dp)
+                        .padding(horizontal = inset.dp)
                         .clip(
                             RoundedCornerShape(
-                                topStart = 6.dp, topEnd = 6.dp, bottomEnd = 22.dp, bottomStart = 22.dp,
+                                topStart = 6.dp, topEnd = 6.dp, bottomEnd = bigR.dp, bottomStart = bigR.dp,
                             ),
                         )
                         .background(accent),
                     contentAlignment = Alignment.Center,
                 ) {
-                    PathIcon(glyph.pathData, iconColor, 22.dp)
+                    PathIcon(glyph.pathData, iconColor, fillIcon.dp)
                 }
             }
         }
