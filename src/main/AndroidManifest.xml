@@ -1,13 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Lets the app vibrate for the volume steps. -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
-    <!-- Lets the app appear in the "Do Not Disturb access" list (needed for ring and notification volumes). -->
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
 
-    <!-- Lets the app list the apps that have a launcher icon, for the per-app rules. -->
     <queries>
         <intent>
             <action android:name="android.intent.action.MAIN" />
@@ -43,5 +40,16 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/accessibility_service_config" />
         </service>
+
+        <service
+            android:name=".MediaListenerService"
+            android:exported="true"
+            android:label="Kanade System"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
     </application>
 </manifest>
