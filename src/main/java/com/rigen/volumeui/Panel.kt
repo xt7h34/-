@@ -1,5 +1,6 @@
 package com.rigen.volumeui
 
+import android.media.AudioManager
 import android.view.KeyEvent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -42,8 +43,15 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.setProgress
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -66,6 +74,13 @@ data class PanelState(
     val levels: Map<Int, Int> = emptyMap(),
     val maxes: Map<Int, Int> = emptyMap(),
     val mediaPlaying: Boolean = false,
+    /** AudioManager.RINGER_MODE_NORMAL / VIBRATE / SILENT. */
+    val ringerMode: Int = AudioManager.RINGER_MODE_NORMAL,
+    /** OUTPUT_SPEAKER / OUTPUT_BLUETOOTH / OUTPUT_WIRED. */
+    val outputKind: Int = OUTPUT_SPEAKER,
+    /** Name and title of the app that is playing, when media access is on. */
+    val mediaApp: String? = null,
+    val mediaTitle: String? = null,
 )
 
 /** What the panel can ask for. A null [PanelActions] makes it display-only. */
@@ -83,6 +98,19 @@ class PanelActions(
     val onOpenSettings: () -> Unit,
     /** The speaker button of the capsule style: mute or unmute the main volume. */
     val onToggleMute: () -> Unit,
+    /**
+     * Relative drag: the bar moves from its current value by the distance the finger travels,
+     * instead of jumping to where the finger lands.
+     */
+    val relativeDrag: Boolean = false,
+    /** One volume step was crossed while dragging. The host plays the haptic tick. */
+    val onTick: (() -> Unit)? = null,
+    /** The speaker icon of one bar in the Volume Station: mute or unmute that volume. */
+    val onToggleMuteStream: (Int) -> Unit = {},
+    /** Sound, vibrate, silent. */
+    val onToggleRinger: () -> Unit = {},
+    /** Open the system's sound output switcher. */
+    val onOpenOutput: () -> Unit = {},
 )
 
 private class PanelColors(val fg: Color, val bar: Color, val frame: Color)
@@ -95,6 +123,24 @@ private class PanelCtx(
 ) {
     val dots: Boolean get() = settings.stationEnabled && actions != null
 }
+
+/** What a bar needs for screen readers, relative drag and the per-step tick. */
+private class BarA11y(
+    val label: String,
+    val steps: Int,
+    val relative: Boolean,
+    val onTick: (() -> Unit)?,
+)
+
+@Composable
+private fun streamLabel(stream: Int): String {
+    val res = STREAMS.firstOrNull { it.stream == stream }?.labelRes ?: return ""
+    return stringResource(res)
+}
+
+@Composable
+private fun PanelCtx.a11y(): BarA11y =
+    BarA11y(streamLabel(state.stream), state.max, actions?.relativeDrag == true, actions?.onTick)
 
 @Composable
 fun PathIcon(pathData: String, color: Color, iconSize: Dp, modifier: Modifier = Modifier) {
@@ -179,6 +225,7 @@ private fun seekCallback(ctx: PanelCtx): ((Float) -> Unit)? {
 private fun StreamRow(ctx: PanelCtx) {
     val s = ctx.settings
     val st = ctx.state
+    val a11y = ctx.a11y()
     val fraction = if (st.max > 0) (st.level.toFloat() / st.max).coerceIn(0f, 1f) else 0f
     val pct = (fraction * 100).roundToInt()
     val iconColor = if (pct >= s.redThresholdPct) HIGH_VOLUME_RED else ctx.colors.fg
@@ -202,6 +249,7 @@ private fun StreamRow(ctx: PanelCtx) {
             barColor = ctx.colors.bar,
             onSeek = seekCallback(ctx),
             onTouch = ctx.actions?.onTouch,
+            a11y = a11y,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight(),
@@ -230,6 +278,7 @@ private fun StreamRow(ctx: PanelCtx) {
 private fun StreamColumn(ctx: PanelCtx) {
     val s = ctx.settings
     val st = ctx.state
+    val a11y = ctx.a11y()
     val fraction = if (st.max > 0) (st.level.toFloat() / st.max).coerceIn(0f, 1f) else 0f
     val pct = (fraction * 100).roundToInt()
     val iconColor = if (pct >= s.redThresholdPct) HIGH_VOLUME_RED else ctx.colors.fg
@@ -260,6 +309,7 @@ private fun StreamColumn(ctx: PanelCtx) {
             barColor = ctx.colors.bar,
             onSeek = seekCallback(ctx),
             onTouch = ctx.actions?.onTouch,
+            a11y = a11y,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(),
@@ -366,33 +416,130 @@ fun StationCard(
                 threshold = settings.redThresholdPct,
                 onSeek = seek,
                 onTouch = actions?.onTouch,
+                a11y = BarA11y(
+                    stringResource(info.labelRes), max, actions?.relativeDrag == true, actions?.onTick,
+                ),
+                onToggleMute = if (actions != null) {
+                    { actions.onToggleMuteStream(info.stream) }
+                } else {
+                    null
+                },
             )
         }
 
-        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(inner),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                TapIcon(Glyph.PREVIOUS.pathData, fg, 44.dp, 24.dp) {
-                    actions?.onMedia?.invoke(KeyEvent.KEYCODE_MEDIA_PREVIOUS)
-                }
-                TapIcon(
-                    (if (state.mediaPlaying) Glyph.PAUSE else Glyph.PLAY).pathData,
-                    fg, 44.dp, 28.dp,
+        if (settings.stationRinger || settings.stationOutput) {
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    actions?.onMedia?.invoke(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
-                }
-                TapIcon(Glyph.NEXT.pathData, fg, 44.dp, 24.dp) {
-                    actions?.onMedia?.invoke(KeyEvent.KEYCODE_MEDIA_NEXT)
+                    if (settings.stationRinger) {
+                        val (glyph, label) = when (state.ringerMode) {
+                            AudioManager.RINGER_MODE_VIBRATE -> Glyph.VIBRATE to R.string.ringer_vibrate
+                            AudioManager.RINGER_MODE_SILENT -> Glyph.MUTED to R.string.ringer_silent
+                            else -> Glyph.VOLUME to R.string.ringer_sound
+                        }
+                        StationChip(glyph, stringResource(label), fg, inner, Modifier.weight(1f)) {
+                            actions?.onToggleRinger?.invoke()
+                        }
+                    }
+                    if (settings.stationOutput) {
+                        val (glyph, label) = when (state.outputKind) {
+                            OUTPUT_BLUETOOTH -> Glyph.BLUETOOTH to R.string.output_bluetooth
+                            OUTPUT_WIRED -> Glyph.HEADSET to R.string.output_wired
+                            else -> Glyph.VOLUME to R.string.output_speaker
+                        }
+                        StationChip(glyph, stringResource(label), fg, inner, Modifier.weight(1f)) {
+                            actions?.onOpenOutput?.invoke()
+                        }
+                    }
                 }
             }
         }
+
+        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(inner),
+            ) {
+                if (settings.stationNowPlaying && state.mediaApp != null) {
+                    Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp)) {
+                        Text(
+                            text = state.mediaApp,
+                            color = fg.copy(alpha = 0.75f),
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (!state.mediaTitle.isNullOrBlank()) {
+                            Text(
+                                text = state.mediaTitle,
+                                color = fg,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TapIcon(Glyph.PREVIOUS.pathData, fg, 44.dp, 24.dp) {
+                        actions?.onMedia?.invoke(KeyEvent.KEYCODE_MEDIA_PREVIOUS)
+                    }
+                    TapIcon(
+                        (if (state.mediaPlaying) Glyph.PAUSE else Glyph.PLAY).pathData,
+                        fg, 44.dp, 28.dp,
+                    ) {
+                        actions?.onMedia?.invoke(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
+                    }
+                    TapIcon(Glyph.NEXT.pathData, fg, 44.dp, 24.dp) {
+                        actions?.onMedia?.invoke(KeyEvent.KEYCODE_MEDIA_NEXT)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** A wide rounded button with an icon and a short label (ringer mode, sound output). */
+@Composable
+private fun StationChip(
+    glyph: Glyph,
+    label: String,
+    fg: Color,
+    bg: Color,
+    modifier: Modifier,
+    onTap: () -> Unit,
+) {
+    val tap by rememberUpdatedState(onTap)
+    Row(
+        modifier = modifier
+            .height(44.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(bg)
+            .pointerInput(Unit) { detectTapGestures(onTap = { tap() }) }
+            .padding(horizontal = 12.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        PathIcon(glyph.pathData, fg, 20.dp)
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = label,
+            color = fg,
+            fontSize = 13.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -408,10 +555,13 @@ private fun StationVolumeFrame(
     threshold: Int,
     onSeek: ((Float) -> Unit)?,
     onTouch: ((Boolean) -> Unit)?,
+    a11y: BarA11y? = null,
+    onToggleMute: (() -> Unit)? = null,
 ) {
     val fraction = if (max > 0) (level.toFloat() / max).coerceIn(0f, 1f) else 0f
     val pct = (fraction * 100).roundToInt()
     val iconColor = if (pct >= threshold) HIGH_VOLUME_RED else fg
+    val muteTap by rememberUpdatedState(onToggleMute)
     val glyph = if (level == 0) Glyph.MUTED else info.glyph
 
     Row(
@@ -423,8 +573,17 @@ private fun StationVolumeFrame(
             .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        PathIcon(glyph.pathData, iconColor, 26.dp)
-        Spacer(Modifier.width(12.dp))
+        // Tap the icon to mute or unmute just this volume.
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .pointerInput(Unit) { detectTapGestures(onTap = { muteTap?.invoke() }) },
+            contentAlignment = Alignment.Center,
+        ) {
+            PathIcon(glyph.pathData, iconColor, 26.dp)
+        }
+        Spacer(Modifier.width(8.dp))
         Column(Modifier.weight(1f)) {
             Text(
                 text = stringResource(info.labelRes),
@@ -438,6 +597,7 @@ private fun StationVolumeFrame(
                 barColor = barColor,
                 onSeek = onSeek,
                 onTouch = onTouch,
+                a11y = a11y,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(30.dp),
@@ -458,42 +618,89 @@ private fun StationVolumeFrame(
 // ───────────────────────────── Parts ─────────────────────────────
 
 /**
- * Touch handling for a bar: pressing or dragging reports the position (0..1). Horizontal bars
- * grow from the left and vertical bars from the bottom.
+ * Touch handling for a bar. Horizontal bars grow from the left and vertical bars from the bottom.
+ *
+ * - Normal mode: pressing or dragging reports the position (0..1) under the finger.
+ * - Relative mode ([BarA11y.relative]): nothing happens on touch; dragging moves the value from
+ *   where it was, by the distance travelled.
+ * - Every time the drag crosses a volume step, [BarA11y.onTick] fires (haptic tick).
+ * - Screen readers get a slider: "<name>, 60%", with increase / decrease actions.
  */
 @Composable
 private fun Modifier.seekGestures(
     vertical: Boolean,
     onSeek: ((Float) -> Unit)?,
     onTouch: ((Boolean) -> Unit)?,
+    fraction: Float = 0f,
+    a11y: BarA11y? = null,
 ): Modifier {
     val seekCb by rememberUpdatedState(onSeek)
     val touchCb by rememberUpdatedState(onTouch)
-    return this.pointerInput(vertical) {
-        awaitEachGesture {
-            val down = awaitFirstDown()
-            val seek = seekCb ?: return@awaitEachGesture
-            val length = (if (vertical) size.height else size.width).toFloat()
-            if (length <= 0f) return@awaitEachGesture
-            fun fractionAt(p: Float): Float {
-                val f = (p / length).coerceIn(0f, 1f)
-                return if (vertical) 1f - f else f
-            }
-            touchCb?.invoke(true)
-            seek(fractionAt(if (vertical) down.position.y else down.position.x))
-            down.consume()
-            do {
-                val event = awaitPointerEvent()
-                event.changes.forEach { c ->
-                    if (c.positionChanged()) {
-                        seek(fractionAt(if (vertical) c.position.y else c.position.x))
-                        c.consume()
+    val fractionNow by rememberUpdatedState(fraction)
+    val a11yNow by rememberUpdatedState(a11y)
+    val steps = a11y?.steps ?: 0
+    return this
+        .pointerInput(vertical) {
+            awaitEachGesture {
+                val down = awaitFirstDown()
+                val seek = seekCb ?: return@awaitEachGesture
+                val length = (if (vertical) size.height else size.width).toFloat()
+                if (length <= 0f) return@awaitEachGesture
+                val relative = a11yNow?.relative == true
+                val stepCount = a11yNow?.steps ?: 0
+                val startFraction = fractionNow
+                fun coord(pos: Offset) = if (vertical) pos.y else pos.x
+                fun fractionAt(p: Float): Float {
+                    val f = (p / length).coerceIn(0f, 1f)
+                    return if (vertical) 1f - f else f
+                }
+                val origin = coord(down.position)
+                var lastStep = if (stepCount > 0) (startFraction * stepCount).roundToInt() else -1
+                fun emit(f: Float) {
+                    seek(f)
+                    if (stepCount > 0) {
+                        val step = (f * stepCount).roundToInt()
+                        if (step != lastStep) {
+                            lastStep = step
+                            a11yNow?.onTick?.invoke()
+                        }
                     }
                 }
-            } while (event.changes.any { it.pressed })
-            touchCb?.invoke(false)
+                fun target(pos: Offset): Float {
+                    if (!relative) return fractionAt(coord(pos))
+                    val delta = (coord(pos) - origin) / length
+                    return (startFraction + if (vertical) -delta else delta).coerceIn(0f, 1f)
+                }
+                touchCb?.invoke(true)
+                if (!relative) emit(target(down.position))
+                down.consume()
+                do {
+                    val event = awaitPointerEvent()
+                    event.changes.forEach { c ->
+                        if (c.positionChanged()) {
+                            emit(target(c.position))
+                            c.consume()
+                        }
+                    }
+                } while (event.changes.any { it.pressed })
+                touchCb?.invoke(false)
+            }
         }
-    }
+        .semantics {
+            val info = a11y
+            if (info != null && info.label.isNotEmpty()) contentDescription = info.label
+            val f = fraction.coerceIn(0f, 1f)
+            stateDescription = "${(f * 100).roundToInt()}%"
+            progressBarRangeInfo = ProgressBarRangeInfo(f, 0f..1f, if (steps > 1) steps - 1 else 0)
+            if (onSeek != null) {
+                setProgress { value ->
+                    touchCb?.invoke(true)
+                    onSeek(value.coerceIn(0f, 1f))
+                    touchCb?.invoke(false)
+                    true
+                }
+            }
+        }
 }
 
 /** The thin bar. The whole cell around it is the touch target. It always fills from the left or the bottom. */
@@ -506,13 +713,14 @@ private fun VolumeBar(
     onSeek: ((Float) -> Unit)?,
     onTouch: ((Boolean) -> Unit)?,
     modifier: Modifier,
+    a11y: BarA11y? = null,
 ) {
     val animated by animateFloatAsState(fraction, tween(120), label = "bar")
     val track = barColor.copy(alpha = 0.25f)
     val round = RoundedCornerShape((thickness / 2).dp)
 
     Box(
-        modifier = modifier.seekGestures(vertical, onSeek, onTouch),
+        modifier = modifier.seekGestures(vertical, onSeek, onTouch, fraction, a11y),
         contentAlignment = Alignment.Center,
     ) {
         // Keep the bar left-to-right in every language, so touch and drawing agree.
@@ -566,13 +774,14 @@ private fun FatBar(
     modifier: Modifier,
     insideFill: (@Composable () -> Unit)? = null,
     overlay: (@Composable BoxScope.() -> Unit)? = null,
+    a11y: BarA11y? = null,
 ) {
     val animated by animateFloatAsState(fraction, tween(120), label = "fat")
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(cornerDp.dp))
             .background(track)
-            .seekGestures(vertical, onSeek, onTouch),
+            .seekGestures(vertical, onSeek, onTouch, fraction, a11y),
     ) {
         CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
             if (vertical) {
@@ -640,6 +849,7 @@ private fun CircleButton(
 private fun CapsulePanel(ctx: PanelCtx, modifier: Modifier) {
     val s = ctx.settings
     val st = ctx.state
+    val a11y = ctx.a11y()
     val c = ctx.colors
     val fraction = if (st.max > 0) (st.level.toFloat() / st.max).coerceIn(0f, 1f) else 0f
     val pct = (fraction * 100).roundToInt()
@@ -684,6 +894,7 @@ private fun CapsulePanel(ctx: PanelCtx, modifier: Modifier) {
                 cornerDp = corner,
                 onSeek = seekCallback(ctx),
                 onTouch = ctx.actions?.onTouch,
+                a11y = a11y,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
@@ -715,6 +926,7 @@ private fun CapsulePanel(ctx: PanelCtx, modifier: Modifier) {
                 cornerDp = corner,
                 onSeek = seekCallback(ctx),
                 onTouch = ctx.actions?.onTouch,
+                a11y = a11y,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight(),
@@ -741,6 +953,7 @@ private fun Capsule2Panel(ctx: PanelCtx, modifier: Modifier) {
         return
     }
     val st = ctx.state
+    val a11y = ctx.a11y()
     val c = ctx.colors
     val fraction = if (st.max > 0) (st.level.toFloat() / st.max).coerceIn(0f, 1f) else 0f
     val pct = (fraction * 100).roundToInt()
@@ -785,7 +998,7 @@ private fun Capsule2Panel(ctx: PanelCtx, modifier: Modifier) {
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .seekGestures(true, seekCallback(ctx), ctx.actions?.onTouch),
+                .seekGestures(true, seekCallback(ctx), ctx.actions?.onTouch, fraction, a11y),
         ) {
             val total = maxHeight
             val handleSpace = 14.dp // 4 gap + 5 handle + 5 gap
@@ -853,6 +1066,7 @@ private fun Capsule2Panel(ctx: PanelCtx, modifier: Modifier) {
 private fun BarPanel(ctx: PanelCtx, modifier: Modifier) {
     val s = ctx.settings
     val st = ctx.state
+    val a11y = ctx.a11y()
     val c = ctx.colors
     val fraction = if (st.max > 0) (st.level.toFloat() / st.max).coerceIn(0f, 1f) else 0f
     val pct = (fraction * 100).roundToInt()
@@ -871,6 +1085,7 @@ private fun BarPanel(ctx: PanelCtx, modifier: Modifier) {
         cornerDp = corner,
         onSeek = seekCallback(ctx),
         onTouch = ctx.actions?.onTouch,
+        a11y = a11y,
         modifier = modifier
             .width(s.widthDp.dp)
             .height(s.heightDp.dp),
