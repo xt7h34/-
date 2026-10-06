@@ -4,6 +4,9 @@ import android.app.Application
 import android.content.Context
 import android.content.res.Configuration
 import android.media.AudioManager
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
 import java.io.PrintWriter
 import java.io.StringWriter
 import java.util.Locale
@@ -33,6 +36,11 @@ const val PAGE_KEEPALIVE = "keepalive"
 const val STYLE_CLASSIC = 0
 const val STYLE_CAPSULE = 1
 const val STYLE_BAR = 2
+const val STYLE_CAPSULE2 = 3
+
+/** The look "Capsule II" is made for: a white pill with an indigo fill. */
+val CAPSULE2_FRAME: Int = 0xFFFFFFFF.toInt()
+val CAPSULE2_ACCENT: Int = 0xFF4F5BA5.toInt()
 
 val DEFAULT_LIMITS: List<Int> = listOf(100, 100, 100, 100, 100)
 
@@ -243,6 +251,19 @@ object Prefs {
         config.setLocale(locale)
         config.setLayoutDirection(locale)
         return base.createConfigurationContext(config)
+    }
+}
+
+/** A short, crisp vibration tick. It does not depend on the system's "touch feedback" switch. */
+object Haptics {
+    fun tick(context: Context) {
+        val vibrator = context.getSystemService(Vibrator::class.java) ?: return
+        if (!vibrator.hasVibrator()) return
+        if (Build.VERSION.SDK_INT >= 29) {
+            vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
+        } else {
+            vibrator.vibrate(VibrationEffect.createOneShot(15L, 100))
+        }
     }
 }
 
