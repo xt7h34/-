@@ -20,6 +20,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -103,14 +104,17 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -439,25 +443,18 @@ private fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Un
 }
 
 /**
- * A glass switch: a green track, and a wide translucent knob with a bright rim, a soft shine,
- * a white "C" highlight and a glowing shadow.
+ * A day and night switch. Off is a pastel day sky with a cloud and the knob on the left. On is
+ * a deep purple night with stars and clouds and the knob on the right.
  */
 @Composable
 private fun KanadeSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    val trackW = 66.dp
-    val trackH = 38.dp
-    val knobW = 46.dp
-    val knobH = 36.dp
-    val margin = 1.dp
-    val offset by animateDpAsState(if (checked) trackW - knobW - margin else margin, label = "knob")
-    val trackTop by animateColorAsState(if (checked) Color(0xFF6FD083) else Color(0xFFB4B7C2), label = "trackTop")
-    val trackBottom by animateColorAsState(if (checked) Color(0xFF47B761) else Color(0xFF8E919D), label = "trackBottom")
-    val knobTop by animateColorAsState(if (checked) Color(0xE69BE8AE) else Color(0xE6F2F3F7), label = "knobTop")
-    val knobBottom by animateColorAsState(if (checked) Color(0xE657C971) else Color(0xE6C9CBD3), label = "knobBottom")
-    val glow = if (checked) Color(0xFF3FAE59) else Color(0xFF7C7F8B)
+    val trackW = 76.dp
+    val trackH = 40.dp
+    val knob = 32.dp
+    val margin = 4.dp
+    val progress by animateFloatAsState(if (checked) 1f else 0f, label = "night")
     val interaction = remember { MutableInteractionSource() }
-    val trackShape = RoundedCornerShape(trackH / 2)
-    val knobShape = RoundedCornerShape(knobH / 2)
+    val knobX = margin + (trackW - knob - margin * 2) * progress
 
     Box(
         modifier = Modifier
@@ -467,80 +464,92 @@ private fun KanadeSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
             },
         contentAlignment = Alignment.CenterStart,
     ) {
-        // The track, with a soft shine along its top edge.
-        Box(
-            modifier = Modifier
+        Canvas(
+            Modifier
                 .fillMaxSize()
-                .clip(trackShape)
-                .background(Brush.verticalGradient(listOf(trackTop, trackBottom)))
-                .drawBehind {
-                    drawRect(
-                        Brush.verticalGradient(
-                            listOf(Color.White.copy(alpha = 0.30f), Color.Transparent),
-                            endY = size.height * 0.5f,
-                        ),
-                    )
-                },
-        )
-        // The knob sits on top and casts a soft glow.
-        Box(
-            modifier = Modifier
-                .offset(x = offset)
-                .size(knobW, knobH)
-                .shadow(8.dp, knobShape, ambientColor = glow, spotColor = glow)
-                .clip(knobShape)
-                .background(Brush.verticalGradient(listOf(knobTop, knobBottom)))
-                .border(
-                    width = 2.dp,
-                    brush = Brush.linearGradient(
-                        listOf(
-                            Color.White.copy(alpha = 0.95f),
-                            Color.White.copy(alpha = 0.20f),
-                            Color.White.copy(alpha = 0.80f),
-                        ),
-                    ),
-                    shape = knobShape,
+                .shadow(
+                    5.dp,
+                    RoundedCornerShape(trackH / 2),
+                    ambientColor = Color(0x44000000),
+                    spotColor = Color(0x44000000),
                 ),
         ) {
-            Canvas(Modifier.fillMaxSize()) {
-                val w = size.width
-                val h = size.height
-                val shineCenter = Offset(w * 0.30f, h * 0.25f)
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        listOf(Color.White.copy(alpha = 0.45f), Color.Transparent),
-                        center = shineCenter,
-                        radius = h * 0.7f,
-                    ),
-                    radius = h * 0.7f,
-                    center = shineCenter,
-                )
-                // The white "C": open toward the side the knob came from.
-                val top = h * 0.22f
-                val bottom = h * 0.78f
-                val r = (bottom - top) / 2f
-                val left = w * 0.26f
-                val right = w * 0.86f
-                val shine = Path().apply {
-                    if (checked) {
-                        moveTo(left, top)
-                        lineTo(right - r, top)
-                        arcTo(Rect(right - 2 * r, top, right, bottom), -90f, 180f, false)
-                        lineTo(left, bottom)
-                    } else {
-                        moveTo(w - left, top)
-                        lineTo(w - right + r, top)
-                        arcTo(Rect(w - right, top, w - right + 2 * r, bottom), -90f, -180f, false)
-                        lineTo(w - left, bottom)
-                    }
+            val w = size.width
+            val h = size.height
+            val p = progress
+            val dayA = 1f - p
+
+            // The sky: day on the way out, night on the way in.
+            drawRect(
+                Brush.horizontalGradient(
+                    listOf(Color(0xFFFFE6C2), Color(0xFFD6BFFF), Color(0xFF93D2F5)),
+                ),
+                alpha = dayA,
+            )
+            drawRect(
+                Brush.horizontalGradient(
+                    listOf(Color(0xFF1B0FC4), Color(0xFF4A22D8), Color(0xFF6B19C2)),
+                ),
+                alpha = p,
+            )
+
+            // A pale cloud on the right in the day.
+            drawCircle(Color.White.copy(alpha = 0.50f * dayA), h * 0.20f, Offset(w * 0.60f, h * 0.38f))
+            drawCircle(Color(0xFFEDE6FF).copy(alpha = 0.60f * dayA), h * 0.26f, Offset(w * 0.74f, h * 0.60f))
+            drawCircle(Color(0xFFE4EEFF).copy(alpha = 0.60f * dayA), h * 0.30f, Offset(w * 0.86f, h * 0.66f))
+
+            // Purple clouds on the left at night.
+            drawCircle(Color(0xFF8A4DF5).copy(alpha = 0.55f * p), h * 0.24f, Offset(w * 0.34f, h * 0.42f))
+            drawCircle(Color(0xFF5B2BE0).copy(alpha = 0.55f * p), h * 0.30f, Offset(w * 0.22f, h * 0.66f))
+            drawCircle(Color(0xFF3A1FD0).copy(alpha = 0.55f * p), h * 0.30f, Offset(w * 0.42f, h * 0.70f))
+
+            // Little sparkles at night.
+            fun star(cx: Float, cy: Float, r: Float) {
+                val sparkle = Path().apply {
+                    moveTo(cx, cy - r)
+                    lineTo(cx + r * 0.2f, cy - r * 0.2f)
+                    lineTo(cx + r, cy)
+                    lineTo(cx + r * 0.2f, cy + r * 0.2f)
+                    lineTo(cx, cy + r)
+                    lineTo(cx - r * 0.2f, cy + r * 0.2f)
+                    lineTo(cx - r, cy)
+                    lineTo(cx - r * 0.2f, cy - r * 0.2f)
+                    close()
                 }
-                drawPath(
-                    shine,
-                    Color.White.copy(alpha = 0.95f),
-                    style = Stroke(width = 3.5.dp.toPx(), cap = StrokeCap.Round),
-                )
+                drawPath(sparkle, Color.White.copy(alpha = 0.9f * p))
             }
+            star(w * 0.50f, h * 0.30f, h * 0.13f)
+            star(w * 0.34f, h * 0.20f, h * 0.07f)
+            star(w * 0.14f, h * 0.30f, h * 0.06f)
+            star(w * 0.58f, h * 0.76f, h * 0.06f)
+            star(w * 0.26f, h * 0.80f, h * 0.05f)
+
+            // The rim: white by day, purple at night.
+            val rim = lerp(Color.White, Color(0xFF7A20C8), p)
+            val edge = 1.dp.toPx()
+            drawRoundRect(
+                color = rim.copy(alpha = 0.95f),
+                topLeft = Offset(edge, edge),
+                size = Size(w - 2 * edge, h - 2 * edge),
+                cornerRadius = CornerRadius(h / 2f),
+                style = Stroke(width = 2.dp.toPx()),
+            )
         }
+        // The round white knob.
+        Box(
+            modifier = Modifier
+                .offset(x = knobX)
+                .size(knob)
+                .shadow(
+                    6.dp,
+                    CircleShape,
+                    ambientColor = Color(0x55000000),
+                    spotColor = Color(0x55000000),
+                )
+                .clip(CircleShape)
+                .background(Brush.verticalGradient(listOf(Color(0xFFFBFBFD), Color(0xFFECECF1))))
+                .border(1.5.dp, Color.White.copy(alpha = 0.9f), CircleShape),
+        )
     }
 }
 
@@ -1104,9 +1113,15 @@ private fun StylePicker(settings: PanelSettings, onPick: (Int) -> Unit) {
     val styles = listOf(
         STYLE_CLASSIC to R.string.style_classic,
         STYLE_CAPSULE to R.string.style_capsule,
+        STYLE_CAPSULE2 to R.string.style_capsule2,
         STYLE_BAR to R.string.style_bar,
     )
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         styles.forEach { (style, labelRes) ->
             val selected = settings.panelStyle == style
             val shape = RoundedCornerShape(18.dp)
@@ -1133,14 +1148,20 @@ private fun StylePicker(settings: PanelSettings, onPick: (Int) -> Unit) {
                         ),
                     contentAlignment = Alignment.Center,
                 ) {
+                    val thumb = settings.copy(
+                        panelStyle = style,
+                        vertical = true,
+                        widthDp = 52,
+                        heightDp = 140,
+                        stationEnabled = false,
+                    )
                     VolumePanel(
-                        settings = settings.copy(
-                            panelStyle = style,
-                            vertical = true,
-                            widthDp = 52,
-                            heightDp = 140,
-                            stationEnabled = false,
-                        ),
+                        // Capsule II always shows with the look it was made for.
+                        settings = if (style == STYLE_CAPSULE2) {
+                            thumb.copy(colorArgb = CAPSULE2_FRAME, barColorArgb = CAPSULE2_ACCENT)
+                        } else {
+                            thumb
+                        },
                         state = PanelState(
                             stream = AudioManager.STREAM_MUSIC,
                             level = 9,
@@ -1169,6 +1190,9 @@ private fun PanelPage(settings: PanelSettings, onChange: (PanelSettings) -> Unit
         var next = settings.copy(panelStyle = style)
         if (style != STYLE_CLASSIC && !settings.vertical) {
             next = next.copy(vertical = true, widthDp = 64, heightDp = 260)
+        }
+        if (style == STYLE_CAPSULE2) {
+            next = next.copy(colorArgb = CAPSULE2_FRAME, barColorArgb = CAPSULE2_ACCENT)
         }
         onChange(next)
     }
@@ -1275,6 +1299,7 @@ private fun PanelPage(settings: PanelSettings, onChange: (PanelSettings) -> Unit
 
 @Composable
 private fun BehaviorPage(settings: PanelSettings, onChange: (PanelSettings) -> Unit, onBack: () -> Unit) {
+    val context = LocalContext.current
     PageScaffold(stringResource(R.string.item_behavior_title), onBack) { padding ->
         PageColumn(padding) {
             Section(stringResource(R.string.section_controls)) {
@@ -1283,6 +1308,9 @@ private fun BehaviorPage(settings: PanelSettings, onChange: (PanelSettings) -> U
                 }
                 SwitchRow(stringResource(R.string.haptics), settings.haptics) {
                     onChange(settings.copy(haptics = it))
+                }
+                OutlinedButton(onClick = { Haptics.tick(context) }) {
+                    Text(stringResource(R.string.haptic_test))
                 }
                 LabeledSlider(
                     stringResource(R.string.hide_delay, (settings.hideDelayMs / 1000f).toString()),
