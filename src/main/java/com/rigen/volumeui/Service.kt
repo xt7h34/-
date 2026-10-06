@@ -2,14 +2,22 @@ package com.rigen.volumeui
 
 import android.accessibilityservice.AccessibilityService
 import android.app.NotificationManager
+import android.content.ActivityNotFoundException
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
+import android.media.AudioDeviceInfo
 import android.media.AudioManager
+import android.media.MediaMetadata
+import android.media.session.MediaController
+import android.media.session.MediaSessionManager
+import android.media.session.PlaybackState
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.provider.Settings
 import android.util.DisplayMetrics
 import android.util.Log
 import android.view.Gravity
@@ -38,6 +46,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
@@ -101,6 +110,28 @@ class VolumeController(context: Context) {
         return level(stream)
     }
 
+    fun ringerMode(): Int = audio.ringerMode
+
+    fun setRingerMode(mode: Int) {
+        audio.ringerMode = mode
+    }
+
+    /** Where the sound is going: the built-in speaker, Bluetooth, or wired headphones. */
+    fun outputKind(): Int {
+        val devices = audio.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+        val bluetooth = devices.any {
+            it.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
+                (Build.VERSION.SDK_INT >= 31 && it.type == AudioDeviceInfo.TYPE_BLE_HEADSET)
+        }
+        if (bluetooth) return OUTPUT_BLUETOOTH
+        val wired = devices.any {
+            it.type == AudioDeviceInfo.TYPE_WIRED_HEADSET ||
+                it.type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES ||
+                it.type == AudioDeviceInfo.TYPE_USB_HEADSET
+        }
+        return if (wired) OUTPUT_WIRED else OUTPUT_SPEAKER
+    }
+
     /** Sends a media key (previous / play-pause / next) to whatever is playing. */
     fun dispatchMedia(keyCode: Int) {
         audio.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
@@ -135,6 +166,11 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
     private var dnd by mutableStateOf(false)
     private var expanded by mutableStateOf(false)
     private var mediaPlaying by mutableStateOf(false)
+    private var ringerMode by mutableIntStateOf(AudioManager.RINGER_MODE_NORMAL)
+    private var outputKind by mutableIntStateOf(OUTPUT_SPEAKER)
+    private var mediaApp by mutableStateOf<String?>(null)
+    private var mediaTitle by mutableStateOf<String?>(null)
+    private var mediaController: MediaController? = null
     private val stationLevels = mutableStateMapOf<Int, Int>()
     private val stationMax = mutableStateMapOf<Int, Int>()
 
@@ -172,7 +208,7 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
         }
     }
 
-    private val actions = PanelActions(
+    private fun buildActions(relative: Boolean) = PanelActions(
         onSeek = { stream, fraction -> seekStream(stream, fraction) },
         onTouch = { down -> onPanelTouch(down) },
         onToggleStation = { changeExpanded(!expanded) },
@@ -181,6 +217,11 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
         onToggleDnd = { toggleDnd() },
         onOpenSettings = { openSettings() },
         onToggleMute = { toggleMuteCurrent() },
+        // The service already plays a tick whenever a drag changes the level (see seekStream).
+        relativeDrag = relative,
+        onToggleMuteStream = { stream -> toggleMuteStream(stream) },
+        onToggleRinger = { toggleRinger() },
+        onOpenOutput = { openOutputSwitcher() },
     )
 
     override fun onCreate() {
@@ -381,6 +422,39 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
             stationMax[info.stream] = controller.max(info.stream)
             stationLevels[info.stream] = controller.level(info.stream)
         }
+        try {
+            ringerMode = controller.ringerMode()
+            outputKind = controller.outputKind()
+        } catch (e: Throwable) {
+            logError("refreshStation", e)
+        }
+        refreshNowPlaying()
+    }
+
+    /** The app that is playing media and its title. Needs media access; off by default. */
+    private fun refreshNowPlaying() {
+        mediaController = null
+        mediaApp = null
+        mediaTitle = null
+        if (!settings.stationNowPlaying) return
+        try {
+            val manager = getSystemService(MediaSessionManager::class.java) ?: return
+            val sessions = manager.getActiveSessions(ComponentName(this, MediaListenerService::class.java))
+            val session = sessions.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PLAYING }
+                ?: sessions.firstOrNull()
+                ?: return
+            mediaController = session
+            mediaApp = try {
+                packageManager.getApplicationLabel(packageManager.getApplicationInfo(session.packageName, 0)).toString()
+            } catch (e: Exception) {
+                session.packageName
+            }
+            mediaTitle = session.metadata?.getString(MediaMetadata.METADATA_KEY_TITLE)
+        } catch (e: SecurityException) {
+            // Media access was not granted (or was taken back): just show nothing.
+        } catch (e: Exception) {
+            logError("refreshNowPlaying", e)
+        }
     }
 
     /** A bar was touched (the main one or one in the Volume Station). */
@@ -402,10 +476,105 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
     }
 
     private fun sendMedia(keyCode: Int) {
-        controller.dispatchMedia(keyCode)
+        // With media access the buttons talk to the app shown in the card; otherwise to whatever plays.
+        val session = mediaController
+        if (session != null && settings.stationNowPlaying) {
+            try {
+                val controls = session.transportControls
+                when (keyCode) {
+                    KeyEvent.KEYCODE_MEDIA_PREVIOUS -> controls.skipToPrevious()
+                    KeyEvent.KEYCODE_MEDIA_NEXT -> controls.skipToNext()
+                    else -> if (session.playbackState?.state == PlaybackState.STATE_PLAYING) {
+                        controls.pause()
+                    } else {
+                        controls.play()
+                    }
+                }
+            } catch (e: Throwable) {
+                logError("sendMedia", e)
+                controller.dispatchMedia(keyCode)
+            }
+        } else {
+            controller.dispatchMedia(keyCode)
+        }
         haptic()
         if (expanded) resetIdle()
-        handler.postDelayed({ mediaPlaying = controller.isMusicActive() }, 400L)
+        handler.postDelayed({
+            mediaPlaying = controller.isMusicActive()
+            if (expanded) refreshNowPlaying()
+        }, 400L)
+    }
+
+    /** The speaker icon of one bar in the Station: mute that volume, or bring it back. */
+    private fun toggleMuteStream(stream: Int) {
+        try {
+            val limits = settings.volumeLimits
+            val now = controller.level(stream)
+            if (now > 0) {
+                preMuteVolume[stream] = now
+                controller.setLevel(stream, 0, limits)
+            } else {
+                val back = preMuteVolume[stream] ?: (controller.max(stream) / 2)
+                controller.setLevel(stream, back.coerceAtLeast(1), limits)
+            }
+            val after = controller.level(stream)
+            stationLevels[stream] = after
+            if (stream == currentStream) level = after
+            ringerMode = controller.ringerMode() // muting the ring volume can change the ringer mode
+            haptic()
+        } catch (e: SecurityException) {
+            toastDndNeeded()
+        } catch (e: Throwable) {
+            logError("toggleMuteStream", e)
+        }
+        if (expanded) resetIdle()
+    }
+
+    /** Sound, then vibrate, then silent, then sound again. */
+    private fun toggleRinger() {
+        try {
+            val next = when (controller.ringerMode()) {
+                AudioManager.RINGER_MODE_NORMAL -> AudioManager.RINGER_MODE_VIBRATE
+                AudioManager.RINGER_MODE_VIBRATE -> AudioManager.RINGER_MODE_SILENT
+                else -> AudioManager.RINGER_MODE_NORMAL
+            }
+            try {
+                controller.setRingerMode(next)
+            } catch (e: SecurityException) {
+                // Silent needs "Do Not Disturb access": go back to sound instead of getting stuck.
+                toastDndNeeded()
+                controller.setRingerMode(AudioManager.RINGER_MODE_NORMAL)
+            }
+            ringerMode = controller.ringerMode()
+            stationLevels[AudioManager.STREAM_RING] = controller.level(AudioManager.STREAM_RING)
+            haptic()
+        } catch (e: Throwable) {
+            logError("toggleRinger", e)
+        }
+        if (expanded) resetIdle()
+    }
+
+    /**
+     * Android does not let an app move another app's sound to a different output, so this opens
+     * the system's own volume panel (it has the output switcher) and closes the Station.
+     */
+    private fun openOutputSwitcher() {
+        try {
+            val flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            val intent = if (Build.VERSION.SDK_INT >= 29) {
+                Intent(Settings.Panel.ACTION_VOLUME)
+            } else {
+                Intent(Settings.ACTION_SOUND_SETTINGS)
+            }.addFlags(flags)
+            try {
+                startActivity(intent)
+            } catch (e: ActivityNotFoundException) {
+                startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS).addFlags(flags))
+            }
+            changeExpanded(false)
+        } catch (e: Throwable) {
+            logError("openOutputSwitcher", e)
+        }
     }
 
     /** The capsule's speaker button: mute the main volume, or bring it back. */
@@ -610,6 +779,7 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
 
     @Composable
     private fun PanelHost(vs: MutableTransitionState<Boolean>) {
+        val acts = remember(settings.relativeDrag) { buildActions(settings.relativeDrag) }
         // Slide in from the nearest screen edge.
         val sign = if (settings.vertical) {
             if (settings.posX > 0.5f) 1 else -1
@@ -642,9 +812,13 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
                     levels = stationLevels,
                     maxes = stationMax,
                     mediaPlaying = mediaPlaying,
+                    ringerMode = ringerMode,
+                    outputKind = outputKind,
+                    mediaApp = mediaApp,
+                    mediaTitle = mediaTitle,
                 ),
                 modifier = Modifier.padding(12.dp),
-                actions = actions,
+                actions = acts,
             )
         }
     }
