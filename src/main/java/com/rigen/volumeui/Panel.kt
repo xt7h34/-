@@ -10,6 +10,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -144,6 +145,7 @@ fun VolumePanel(
 
     when (settings.panelStyle) {
         STYLE_CAPSULE -> CapsulePanel(ctx, modifier)
+        STYLE_CAPSULE2 -> Capsule2Panel(ctx, modifier)
         STYLE_BAR -> BarPanel(ctx, modifier)
         else -> {
             var frame = modifier
@@ -718,6 +720,119 @@ private fun CapsulePanel(ctx: PanelCtx, modifier: Modifier) {
                 Spacer(Modifier.width(6.dp))
                 DotsButton(c.fg, false) { ctx.actions?.onToggleStation?.invoke() }
             }
+        }
+    }
+}
+
+/**
+ * Capsule II: a white pill with a round speaker button, a pale slider with a small dot, a thin
+ * handle line that rides on top of a solid fill block, and the three dots. Vertical only: a
+ * horizontal panel falls back to the plain capsule.
+ */
+@Composable
+private fun Capsule2Panel(ctx: PanelCtx, modifier: Modifier) {
+    val s = ctx.settings
+    if (!s.vertical) {
+        CapsulePanel(ctx, modifier)
+        return
+    }
+    val st = ctx.state
+    val c = ctx.colors
+    val fraction = if (st.max > 0) (st.level.toFloat() / st.max).coerceIn(0f, 1f) else 0f
+    val pct = (fraction * 100).roundToInt()
+    val animated by animateFloatAsState(fraction, tween(120), label = "cap2")
+    val accent = c.bar
+    val onAccent = if (accent.luminance() > 0.5f) Color.Black else Color.White
+    val track = c.fg.copy(alpha = 0.10f)
+    val iconColor = if (pct >= s.redThresholdPct) HIGH_VOLUME_RED else onAccent
+    val glyph = if (st.level == 0) Glyph.MUTED else glyphForStream(st.stream)
+    val topGlyph = if (st.level == 0) Glyph.MUTED else Glyph.VOLUME
+    val button = (s.widthDp - 20).coerceIn(24, 56)
+
+    var pill = modifier
+        .width(s.widthDp.dp)
+        .height(s.heightDp.dp)
+    if (s.showFrame) {
+        pill = pill
+            .clip(RoundedCornerShape(50))
+            .background(c.frame)
+    }
+
+    Column(
+        modifier = pill.padding(10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        CircleButton(
+            accent, button.dp, topGlyph.pathData, onAccent, (button / 2).dp,
+        ) { ctx.actions?.onToggleMute?.invoke() }
+        if (st.dnd && s.showDndIcon) {
+            Spacer(Modifier.height(6.dp))
+            PathIcon(Glyph.DND.pathData, c.fg.copy(alpha = 0.9f), 14.dp)
+        }
+        Spacer(Modifier.height(10.dp))
+        BoxWithConstraints(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .seekGestures(true, seekCallback(ctx), ctx.actions?.onTouch),
+        ) {
+            val total = maxHeight
+            val handleSpace = 14.dp // 4 gap + 5 handle + 5 gap
+            val fillH = (total * animated - handleSpace).coerceAtLeast(0.dp)
+            val trackH = (total - fillH - handleSpace).coerceAtLeast(0.dp)
+            Column(Modifier.fillMaxSize()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(trackH)
+                        .padding(horizontal = 6.dp)
+                        .clip(
+                            RoundedCornerShape(
+                                topStart = 22.dp, topEnd = 22.dp, bottomEnd = 6.dp, bottomStart = 6.dp,
+                            ),
+                        )
+                        .background(track),
+                ) {
+                    if (trackH > 36.dp) {
+                        Box(
+                            Modifier
+                                .align(Alignment.TopCenter)
+                                .padding(top = 14.dp)
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(accent),
+                        )
+                    }
+                }
+                Spacer(Modifier.height(4.dp))
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(5.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(accent),
+                )
+                Spacer(Modifier.height(5.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(fillH)
+                        .padding(horizontal = 6.dp)
+                        .clip(
+                            RoundedCornerShape(
+                                topStart = 6.dp, topEnd = 6.dp, bottomEnd = 22.dp, bottomStart = 22.dp,
+                            ),
+                        )
+                        .background(accent),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    PathIcon(glyph.pathData, iconColor, 22.dp)
+                }
+            }
+        }
+        if (ctx.dots) {
+            Spacer(Modifier.height(6.dp))
+            DotsButton(c.fg, true) { ctx.actions?.onToggleStation?.invoke() }
         }
     }
 }
