@@ -156,15 +156,17 @@ class AlarmRingService : Service() {
         noteId = intent.getIntExtra(EXTRA_NOTE, 0)
         val title = intent.getStringExtra(EXTRA_TITLE) ?: getString(R.string.alarm_title)
         val tone = intent.getStringExtra(EXTRA_TONE) ?: ""
-        val override = ClockStore.ringOverride(this)
+        val inDnd = ClockStore.ringInDnd(this)
+        val inSilent = ClockStore.ringInSilent(this)
+        val inVibrate = ClockStore.ringInVibrate(this)
 
         val nm = getSystemService(NotificationManager::class.java)
-        val channelId = if (override) CH_RING_DND else CH_RING
+        val channelId = if (inDnd) CH_RING_DND else CH_RING
         val ch = NotificationChannel(channelId, getString(R.string.ch_alarm), NotificationManager.IMPORTANCE_HIGH)
         ch.setSound(null, null)
         ch.enableVibration(false)
         ch.lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-        if (override) ch.setBypassDnd(true)
+        if (inDnd) ch.setBypassDnd(true)
         nm.createNotificationChannel(ch)
 
         val screen = PendingIntent.getActivity(
@@ -201,16 +203,44 @@ class AlarmRingService : Service() {
         } catch (e: Throwable) {
             Diag.error(this, "ring wakelock", e)
         }
-        if (override) relaxSilence()
-        startSound(tone)
-        startVibration(override)
+        // Each switch decides what happens when the phone is in that mode. The stricter one wins.
+        val am = getSystemService(AudioManager::class.java)
+        val filter = nm.currentInterruptionFilter
+        val dndActive = filter != NotificationManager.INTERRUPTION_FILTER_ALL &&
+            filter != NotificationManager.INTERRUPTION_FILTER_UNKNOWN
+        val ringer = am.ringerMode
+        var sound = true
+        var vibrate = true
+        var force = false
+        if (dndActive) {
+            if (inDnd) {
+                force = true
+            } else {
+                sound = false
+                vibrate = false
+            }
+        }
+        if (ringer == AudioManager.RINGER_MODE_SILENT) {
+            if (inSilent) {
+                force = true
+            } else {
+                sound = false
+                vibrate = false
+            }
+        }
+        if (ringer == AudioManager.RINGER_MODE_VIBRATE) {
+            if (inVibrate) force = true else sound = false
+        }
+        if (force && sound) relaxSilence(dndActive && inDnd)
+        if (sound) startSound(tone)
+        if (vibrate) startVibration()
         handler.removeCallbacks(timeout)
         handler.postDelayed(timeout, TIMEOUT_MS)
         return START_NOT_STICKY
     }
 
     /** Makes sure a quiet alarm volume or "total silence" cannot swallow the alarm. */
-    private fun relaxSilence() {
+    private fun relaxSilence(relaxDnd: Boolean) {
         try {
             val am = getSystemService(AudioManager::class.java)
             val max = am.getStreamMaxVolume(AudioManager.STREAM_ALARM)
@@ -222,6 +252,7 @@ class AlarmRingService : Service() {
         } catch (e: Throwable) {
             Diag.error(this, "ring volume", e)
         }
+        if (!relaxDnd) return
         try {
             val nm = getSystemService(NotificationManager::class.java)
             if (nm.isNotificationPolicyAccessGranted &&
@@ -288,10 +319,8 @@ class AlarmRingService : Service() {
     }
 
     @Suppress("DEPRECATION")
-    private fun startVibration(override: Boolean) {
+    private fun startVibration() {
         try {
-            val am = getSystemService(AudioManager::class.java)
-            if (!override && am.ringerMode == AudioManager.RINGER_MODE_SILENT) return
             val v = getSystemService(Vibrator::class.java)
             val attrs = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build()
@@ -693,6 +722,7 @@ private fun RingClock(
 private fun DismissButton(mode: Int, enabled: Boolean, onDismiss: () -> Unit) {
     val dismissNow by rememberUpdatedState(onDismiss)
     val scope = rememberCoroutineScope()
+    var dragX by remember { mutableFloatStateOf(0f) }
     var dragY by remember { mutableFloatStateOf(0f) }
     var hold by remember { mutableFloatStateOf(0f) }
     val limit = with(LocalDensity.current) { 150.dp.toPx() }
@@ -728,12 +758,28 @@ private fun DismissButton(mode: Int, enabled: Boolean, onDismiss: () -> Unit) {
             else -> Modifier.pointerInput(Unit) {
                 detectDragGestures(
                     onDragEnd = {
-                        if (-dragY > limit * 0.8f) dismissNow() else dragY = 0f
+                        if (kotlin.math.hypot(dragX, dragY) > limit * 0.8f) {
+                            dismissNow()
+                        } else {
+                            dragX = 0f
+                            dragY = 0f
+                        }
                     },
-                    onDragCancel = { dragY = 0f },
+                    onDragCancel = {
+                        dragX = 0f
+                        dragY = 0f
+                    },
                 ) { change, amount ->
                     change.consume()
-                    dragY = (dragY + amount.y).coerceIn(-limit, 0f)
+                    var nx = dragX + amount.x
+                    var ny = dragY + amount.y
+                    val d = kotlin.math.hypot(nx, ny)
+                    if (d > limit) {
+                        nx = nx / d * limit
+                        ny = ny / d * limit
+                    }
+                    dragX = nx
+                    dragY = ny
                 }
             }
         }
@@ -741,7 +787,7 @@ private fun DismissButton(mode: Int, enabled: Boolean, onDismiss: () -> Unit) {
 
     Box(
         Modifier
-            .offset { IntOffset(0, dragY.roundToInt()) }
+            .offset { IntOffset(dragX.roundToInt(), dragY.roundToInt()) }
             .size(82.dp)
             .clip(CircleShape)
             .background(Color(0x59FFFFFF))

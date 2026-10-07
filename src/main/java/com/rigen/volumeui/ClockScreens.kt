@@ -615,6 +615,7 @@ fun AlarmsPage(onBack: () -> Unit) {
 
     PageScaffold(stringResource(R.string.clock_tab_alarms), onBack) { padding ->
         PageColumn(padding) {
+            FullScreenNotice()
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Button(
                     onClick = {
@@ -798,7 +799,9 @@ private fun AlarmEditor(
 @Composable
 private fun AlarmSettingsDialog(onClose: () -> Unit, onCustomize: () -> Unit) {
     val ctx = LocalContext.current
-    var override by remember { mutableStateOf(ClockStore.ringOverride(ctx)) }
+    var inDnd by remember { mutableStateOf(ClockStore.ringInDnd(ctx)) }
+    var inSilent by remember { mutableStateOf(ClockStore.ringInSilent(ctx)) }
+    var inVibrate by remember { mutableStateOf(ClockStore.ringInVibrate(ctx)) }
     var dismissMode by remember { mutableIntStateOf(ClockStore.ringDismiss(ctx)) }
     Dialog(onDismissRequest = onClose) {
         Column(
@@ -809,12 +812,22 @@ private fun AlarmSettingsDialog(onClose: () -> Unit, onCustomize: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(stringResource(R.string.alarm_menu_title), style = MaterialTheme.typography.titleLarge)
-            SwitchRow(stringResource(R.string.alarm_override), override) {
-                override = it
-                ClockStore.setRingOverride(ctx, it)
+            FullScreenNotice()
+            Text(stringResource(R.string.alarm_ring_in), style = MaterialTheme.typography.labelLarge)
+            SwitchRow(stringResource(R.string.alarm_in_dnd), inDnd) {
+                inDnd = it
+                ClockStore.setRingInDnd(ctx, it)
+            }
+            SwitchRow(stringResource(R.string.alarm_in_silent), inSilent) {
+                inSilent = it
+                ClockStore.setRingInSilent(ctx, it)
+            }
+            SwitchRow(stringResource(R.string.alarm_in_vibrate), inVibrate) {
+                inVibrate = it
+                ClockStore.setRingInVibrate(ctx, it)
             }
             Text(
-                stringResource(R.string.alarm_override_hint),
+                stringResource(R.string.alarm_ring_in_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -840,6 +853,38 @@ private fun AlarmSettingsDialog(onClose: () -> Unit, onCustomize: () -> Unit) {
             }
             TextButton(onClick = onClose, modifier = Modifier.align(Alignment.End)) {
                 Text(stringResource(R.string.ring_done))
+            }
+        }
+    }
+}
+
+/** Android 14+ keeps full-screen alarms off until the user allows them. Tells them how. */
+@Composable
+private fun FullScreenNotice() {
+    val ctx = LocalContext.current
+    var ok by remember { mutableStateOf(ClockEngine.canFullScreen(ctx)) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            ok = ClockEngine.canFullScreen(ctx)
+            delay(1000)
+        }
+    }
+    if (!ok) {
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    stringResource(R.string.fsi_title),
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                )
+                Text(
+                    stringResource(R.string.fsi_body),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                )
+                Button(onClick = { ClockEngine.openFullScreenSettings(ctx) }) {
+                    Text(stringResource(R.string.fsi_allow))
+                }
             }
         }
     }

@@ -246,6 +246,13 @@ fun TimerPage(onBack: () -> Unit) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (android.os.Build.MANUFACTURER.equals("samsung", ignoreCase = true)) {
+                    Text(
+                        stringResource(R.string.live_samsung),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 OutlinedButton(onClick = { ClockEngine.openLiveSettings(ctx) }) {
                     Text(stringResource(R.string.live_open))
                 }

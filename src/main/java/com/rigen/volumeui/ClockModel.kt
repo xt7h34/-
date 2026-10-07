@@ -115,9 +115,13 @@ object ClockStore {
     fun ringSnooze(c: Context): Int = sp(c).getInt("r_snooze", 5).coerceIn(1, 30)
     fun setRingSnooze(c: Context, v: Int) = sp(c).edit().putInt("r_snooze", v.coerceIn(1, 30)).apply()
 
-    /** Ring even in Do Not Disturb, silent or vibrate, and even when the alarm volume is low. */
-    fun ringOverride(c: Context): Boolean = sp(c).getBoolean("r_override", true)
-    fun setRingOverride(c: Context, v: Boolean) = sp(c).edit().putBoolean("r_override", v).apply()
+    /** Each switch: the alarm still rings when the phone is in that mode. Off = it follows the mode. */
+    fun ringInDnd(c: Context): Boolean = sp(c).getBoolean("r_in_dnd", true)
+    fun setRingInDnd(c: Context, v: Boolean) = sp(c).edit().putBoolean("r_in_dnd", v).apply()
+    fun ringInSilent(c: Context): Boolean = sp(c).getBoolean("r_in_silent", true)
+    fun setRingInSilent(c: Context, v: Boolean) = sp(c).edit().putBoolean("r_in_silent", v).apply()
+    fun ringInVibrate(c: Context): Boolean = sp(c).getBoolean("r_in_vibrate", true)
+    fun setRingInVibrate(c: Context, v: Boolean) = sp(c).edit().putBoolean("r_in_vibrate", v).apply()
 
     fun nextAlarmId(c: Context): Int = (alarms(c).maxOfOrNull { it.id } ?: 0) + 1
 
@@ -463,6 +467,21 @@ object ClockEngine {
             null
         }
         return LiveInfo(Build.VERSION.SDK_INT, allowed, qualifies, promoted)
+    }
+
+    /** Android 14+ asks the user to allow full-screen alarms. Older versions always allow. */
+    fun canFullScreen(c: Context): Boolean =
+        if (Build.VERSION.SDK_INT >= 34) notes(c).canUseFullScreenIntent() else true
+
+    fun openFullScreenSettings(c: Context) {
+        try {
+            c.startActivity(
+                Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, android.net.Uri.parse("package:" + c.packageName))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        } catch (e: Throwable) {
+            openLiveSettings(c)
+        }
     }
 
     /** Opens the "Live updates" switch of this app, or the normal notification settings. */

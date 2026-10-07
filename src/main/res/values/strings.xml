@@ -256,7 +256,7 @@
     <string name="ring_background">Background</string>
     <string name="ring_done">Done</string>
     <string name="ring_snooze_mins">Snooze %1$d mins</string>
-    <string name="ring_hint_drag">Swipe up to stop</string>
+    <string name="ring_hint_drag">Swipe in any direction to stop</string>
     <string name="ring_hint_tap">Tap to stop</string>
     <string name="ring_hint_hold">Hold to stop</string>
     <string name="live_title">Live update (Android 16)</string>
@@ -268,4 +268,13 @@
     <string name="live_no">no</string>
     <string name="live_hint">Start a timer to check. If the first line says no, open the settings and turn on Live updates.</string>
     <string name="live_open">Open live update settings</string>
+    <string name="alarm_ring_in">Ring even when the phone is in:</string>
+    <string name="alarm_in_dnd">Do Not Disturb</string>
+    <string name="alarm_in_silent">Silent mode</string>
+    <string name="alarm_in_vibrate">Vibrate mode</string>
+    <string name="alarm_ring_in_hint">Turn a mode off and the alarm follows it: in that mode it will not play its sound. Do Not Disturb needs access for Kanade to let alarms through when it is on total silence.</string>
+    <string name="fsi_title">Allow full-screen alarms</string>
+    <string name="fsi_body">Without this permission the alarm screen cannot open over the lock screen, and you only get a notification. Tap the button and turn on the switch for Kanade.</string>
+    <string name="fsi_allow">Allow</string>
+    <string name="live_samsung">Samsung decides what shows in the status bar chip and the Now Bar. If the three lines say yes and nothing shows: open Settings, Notifications, Live notifications (or the Now Bar settings) and allow Kanade. On some versions it is Developer options, then Live notifications for all apps.</string>
 </resources>

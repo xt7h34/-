@@ -255,7 +255,7 @@
     <string name="ring_background">الخلفية</string>
     <string name="ring_done">تم</string>
     <string name="ring_snooze_mins">غفوة %1$d دقايق</string>
-    <string name="ring_hint_drag">اسحب لأعلى للإيقاف</string>
+    <string name="ring_hint_drag">اسحب في أي اتجاه للإيقاف</string>
     <string name="ring_hint_tap">اضغط للإيقاف</string>
     <string name="ring_hint_hold">اضغط مطولًا للإيقاف</string>
     <string name="live_title">التحديث المباشر (أندرويد 16)</string>
@@ -267,4 +267,13 @@
     <string name="live_no">لأ</string>
     <string name="live_hint">شغّل تايمر عشان تتأكد. لو السطر الأول لأ، افتح الإعدادات وشغّل Live updates.</string>
     <string name="live_open">افتح إعدادات التحديث المباشر</string>
+    <string name="alarm_ring_in">يرن حتى لو الموبايل على:</string>
+    <string name="alarm_in_dnd">عدم الإزعاج</string>
+    <string name="alarm_in_silent">الوضع الصامت</string>
+    <string name="alarm_in_vibrate">وضع الاهتزاز</string>
+    <string name="alarm_ring_in_hint">لو قفلت وضع، المنبه بيمشي معاه: في الوضع ده مش هيشغّل صوته. عدم الإزعاج محتاج صلاحية لـ Kanade عشان يعدّي المنبه لو كان على الصمت التام.</string>
+    <string name="fsi_title">اسمح بالمنبه ملء الشاشة</string>
+    <string name="fsi_body">من غير الصلاحية دي شاشة المنبه مش هتفتح فوق القفل، وهييجي إشعار بس. اضغط الزر وشغّل المفتاح لـ Kanade.</string>
+    <string name="fsi_allow">سماح</string>
+    <string name="live_samsung">سامسونج هي اللي بتقرر إيه اللي يظهر في الـ chip وشريط Now Bar. لو الأسطر التلاتة أيوه ومفيش حاجة ظاهرة: افتح الإعدادات، الإشعارات، Live notifications (أو إعدادات Now Bar) واسمح لـ Kanade. في بعض الإصدارات بتكون من خيارات المطور، Live notifications for all apps.</string>
 </resources>
