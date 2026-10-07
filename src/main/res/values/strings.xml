@@ -235,4 +235,11 @@
     <string name="dur_h">%1$d h</string>
     <string name="dur_m">%1$d m</string>
     <string name="sleep_use_alarm">Use my alarm</string>
+    <string name="panel_enabled">Show the volume panel</string>
+    <string name="panel_enabled_hint">Turn it off to keep the other options (limits, double press, app rules) and use Android\'s own volume panel.</string>
+    <string name="number_title">Volume number</string>
+    <string name="number_off">No number</string>
+    <string name="number_icon">Instead of the bar icon</string>
+    <string name="number_mute">Instead of the mute button</string>
+    <string name="number_hint">In Classic the number stays at the end of the bar. The mute button option works in Capsule and Capsule II.</string>
 </resources>

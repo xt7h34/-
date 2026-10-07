@@ -1293,6 +1293,13 @@ private fun PanelPage(settings: PanelSettings, onChange: (PanelSettings) -> Unit
 
     PageScaffold(stringResource(R.string.item_panel_title), onBack) { padding ->
         PageColumn(padding) {
+            Section(stringResource(R.string.item_panel_title)) {
+                SwitchRow(stringResource(R.string.panel_enabled), settings.panelEnabled) {
+                    onChange(settings.copy(panelEnabled = it))
+                }
+                Text(stringResource(R.string.panel_enabled_hint), style = MaterialTheme.typography.bodySmall)
+            }
+
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                 PanelOrStation(
                     settings = settings,
@@ -1315,6 +1322,33 @@ private fun PanelPage(settings: PanelSettings, onChange: (PanelSettings) -> Unit
                 Text(stringResource(R.string.panel_style))
                 StylePicker(settings) { setStyle(it) }
                 Text(stringResource(R.string.style_hint), style = MaterialTheme.typography.bodySmall)
+                val capsuleStyle = settings.panelStyle == STYLE_CAPSULE || settings.panelStyle == STYLE_CAPSULE2
+                Text(stringResource(R.string.number_title), style = MaterialTheme.typography.labelLarge)
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    FilterChip(
+                        selected = settings.numberMode == NUMBER_NONE,
+                        onClick = { onChange(settings.copy(numberMode = NUMBER_NONE)) },
+                        label = { Text(stringResource(R.string.number_off)) },
+                    )
+                    FilterChip(
+                        selected = settings.numberMode == NUMBER_ICON ||
+                            (settings.numberMode == NUMBER_MUTE && !capsuleStyle),
+                        onClick = { onChange(settings.copy(numberMode = NUMBER_ICON)) },
+                        label = { Text(stringResource(R.string.number_icon)) },
+                    )
+                    if (capsuleStyle) {
+                        FilterChip(
+                            selected = settings.numberMode == NUMBER_MUTE,
+                            onClick = { onChange(settings.copy(numberMode = NUMBER_MUTE)) },
+                            label = { Text(stringResource(R.string.number_mute)) },
+                        )
+                    }
+                }
+                Text(stringResource(R.string.number_hint), style = MaterialTheme.typography.bodySmall)
                 Text(stringResource(R.string.presets_title), style = MaterialTheme.typography.labelLarge)
                 Row(
                     modifier = Modifier.horizontalScroll(rememberScrollState()),

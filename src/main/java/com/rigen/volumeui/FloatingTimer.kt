@@ -92,6 +92,7 @@ class FloatingTimer(private val service: VolumeAccessibilityService) {
                     FloatingPill(
                         onDrag = { dx, dy -> moveBy(dx, dy) },
                         onOpen = { openTimer() },
+                        onCancel = { ClockEngine.timerCancel(service) },
                         onHide = {
                             ClockStore.setFloatingHidden(service, true)
                             main.post { remove() }
@@ -160,7 +161,12 @@ class FloatingTimer(private val service: VolumeAccessibilityService) {
 }
 
 @Composable
-private fun FloatingPill(onDrag: (Float, Float) -> Unit, onOpen: () -> Unit, onHide: () -> Unit) {
+private fun FloatingPill(
+    onDrag: (Float, Float) -> Unit,
+    onOpen: () -> Unit,
+    onCancel: () -> Unit,
+    onHide: () -> Unit,
+) {
     val ctx = LocalContext.current
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var state by remember { mutableStateOf(ClockStore.timer(ctx)) }
@@ -205,6 +211,17 @@ private fun FloatingPill(onDrag: (Float, Float) -> Unit, onOpen: () -> Unit, onH
                 (if (state.running) Glyph.PAUSE else Glyph.PLAY).pathData,
                 Color.White, 18.dp,
             )
+        }
+        Box(
+            Modifier
+                .padding(start = 6.dp)
+                .size(34.dp)
+                .clip(CircleShape)
+                .background(Color(0x33FFFFFF))
+                .clickable { onCancel() },
+            contentAlignment = Alignment.Center,
+        ) {
+            PathIcon(Glyph.STOP.pathData, Color(0xFFFF8A80), 16.dp)
         }
         Box(
             Modifier

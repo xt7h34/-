@@ -254,15 +254,17 @@ private fun StreamRow(ctx: PanelCtx) {
                 .weight(1f)
                 .fillMaxHeight(),
         )
-        Spacer(Modifier.width(10.dp))
-        Text(
-            text = "$pct",
-            color = ctx.colors.fg,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.End,
-            modifier = Modifier.width(32.dp),
-        )
+        if (s.numberMode != NUMBER_NONE) {
+            Spacer(Modifier.width(10.dp))
+            Text(
+                text = "$pct",
+                color = ctx.colors.fg,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.End,
+                modifier = Modifier.width(32.dp),
+            )
+        }
         if (st.dnd && s.showDndIcon) {
             Spacer(Modifier.width(8.dp))
             PathIcon(Glyph.DND.pathData, ctx.colors.fg.copy(alpha = 0.9f), 16.dp)
@@ -293,15 +295,17 @@ private fun StreamColumn(ctx: PanelCtx) {
             .padding(horizontal = 4.dp, vertical = 14.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(
-            text = "$pct",
-            color = ctx.colors.fg,
-            fontSize = if (s.widthDp < 48) 11.sp else 14.sp,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Spacer(Modifier.height(8.dp))
+        if (s.numberMode != NUMBER_NONE) {
+            Text(
+                text = "$pct",
+                color = ctx.colors.fg,
+                fontSize = if (s.widthDp < 48) 11.sp else 14.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(8.dp))
+        }
         VolumeBar(
             fraction = fraction,
             vertical = true,
@@ -825,6 +829,7 @@ private fun CircleButton(
     iconColor: Color,
     iconSize: Dp,
     onTap: () -> Unit,
+    label: String? = null,
 ) {
     val tap by rememberUpdatedState(onTap)
     Box(
@@ -835,8 +840,22 @@ private fun CircleButton(
             .pointerInput(Unit) { detectTapGestures(onTap = { tap() }) },
         contentAlignment = Alignment.Center,
     ) {
-        PathIcon(pathData, iconColor, iconSize)
+        if (label != null) NumberLabel(label, iconColor, iconSize) else PathIcon(pathData, iconColor, iconSize)
     }
+}
+
+/** The volume number, sized like the icon it replaces. */
+@Composable
+private fun NumberLabel(text: String, color: Color, size: Dp) {
+    Text(
+        text = text,
+        color = color,
+        fontSize = (size.value * if (text.length >= 3) 0.62f else 0.78f).sp,
+        fontWeight = FontWeight.Bold,
+        maxLines = 1,
+        softWrap = false,
+        textAlign = TextAlign.Center,
+    )
 }
 
 // ───────────────────────────── Other panel styles ─────────────────────────────
@@ -860,6 +879,8 @@ private fun CapsulePanel(ctx: PanelCtx, modifier: Modifier) {
     val glyph = if (st.level == 0) Glyph.MUTED else glyphForStream(st.stream)
     val topGlyph = if (st.level == 0) Glyph.MUTED else Glyph.VOLUME
     val toggleMute: () -> Unit = { ctx.actions?.onToggleMute?.invoke() }
+    val muteLabel = if (s.numberMode == NUMBER_MUTE) "$pct" else null
+    val fillNumber = s.numberMode == NUMBER_ICON
 
     var pill = modifier
         .width(s.widthDp.dp)
@@ -880,7 +901,7 @@ private fun CapsulePanel(ctx: PanelCtx, modifier: Modifier) {
             modifier = pill.padding(pad.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            CircleButton(accent, button.dp, topGlyph.pathData, onAccent, (button / 2).dp, toggleMute)
+            CircleButton(accent, button.dp, topGlyph.pathData, onAccent, (button / 2).dp, toggleMute, muteLabel)
             if (st.dnd && s.showDndIcon) {
                 Spacer(Modifier.height(6.dp))
                 PathIcon(Glyph.DND.pathData, c.fg.copy(alpha = 0.9f), 14.dp)
@@ -898,7 +919,9 @@ private fun CapsulePanel(ctx: PanelCtx, modifier: Modifier) {
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
-                insideFill = { PathIcon(glyph.pathData, iconColor, fillIcon.dp) },
+                insideFill = {
+                    if (fillNumber) NumberLabel("$pct", iconColor, fillIcon.dp) else PathIcon(glyph.pathData, iconColor, fillIcon.dp)
+                },
             )
             if (ctx.dots) {
                 Spacer(Modifier.height(6.dp))
@@ -912,7 +935,7 @@ private fun CapsulePanel(ctx: PanelCtx, modifier: Modifier) {
             modifier = pill.padding(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            CircleButton(accent, button.dp, topGlyph.pathData, onAccent, (button / 2).dp, toggleMute)
+            CircleButton(accent, button.dp, topGlyph.pathData, onAccent, (button / 2).dp, toggleMute, muteLabel)
             if (st.dnd && s.showDndIcon) {
                 Spacer(Modifier.width(6.dp))
                 PathIcon(Glyph.DND.pathData, c.fg.copy(alpha = 0.9f), 14.dp)
@@ -930,7 +953,9 @@ private fun CapsulePanel(ctx: PanelCtx, modifier: Modifier) {
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight(),
-                insideFill = { PathIcon(glyph.pathData, iconColor, 22.dp) },
+                insideFill = {
+                    if (fillNumber) NumberLabel("$pct", iconColor, 22.dp) else PathIcon(glyph.pathData, iconColor, 22.dp)
+                },
             )
             if (ctx.dots) {
                 Spacer(Modifier.width(6.dp))
@@ -988,7 +1013,9 @@ private fun Capsule2Panel(ctx: PanelCtx, modifier: Modifier) {
     ) {
         CircleButton(
             accent, button.dp, topGlyph.pathData, onAccent, (button / 2).dp,
-        ) { ctx.actions?.onToggleMute?.invoke() }
+            onTap = { ctx.actions?.onToggleMute?.invoke() },
+            label = if (s.numberMode == NUMBER_MUTE) "$pct" else null,
+        )
         if (st.dnd && s.showDndIcon) {
             Spacer(Modifier.height(6.dp))
             PathIcon(Glyph.DND.pathData, c.fg.copy(alpha = 0.9f), 14.dp)
@@ -1050,7 +1077,11 @@ private fun Capsule2Panel(ctx: PanelCtx, modifier: Modifier) {
                         .background(accent),
                     contentAlignment = Alignment.Center,
                 ) {
-                    PathIcon(glyph.pathData, iconColor, fillIcon.dp)
+                    if (s.numberMode == NUMBER_ICON) {
+                        NumberLabel("$pct", iconColor, fillIcon.dp)
+                    } else {
+                        PathIcon(glyph.pathData, iconColor, fillIcon.dp)
+                    }
                 }
             }
         }
@@ -1104,7 +1135,7 @@ private fun BarPanel(ctx: PanelCtx, modifier: Modifier) {
                     Modifier
                         .align(Alignment.BottomCenter)
                         .padding(bottom = 16.dp),
-                ) { PathIcon(glyph.pathData, tint, 26.dp) }
+                ) { if (s.numberMode != NUMBER_NONE) NumberLabel("$pct", tint, 26.dp) else PathIcon(glyph.pathData, tint, 26.dp) }
                 if (ctx.dots || showDnd) {
                     Column(
                         modifier = Modifier
@@ -1126,7 +1157,7 @@ private fun BarPanel(ctx: PanelCtx, modifier: Modifier) {
                     Modifier
                         .align(Alignment.CenterStart)
                         .padding(start = 16.dp),
-                ) { PathIcon(glyph.pathData, tint, 26.dp) }
+                ) { if (s.numberMode != NUMBER_NONE) NumberLabel("$pct", tint, 26.dp) else PathIcon(glyph.pathData, tint, 26.dp) }
                 if (ctx.dots || showDnd) {
                     Row(
                         modifier = Modifier

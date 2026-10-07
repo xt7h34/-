@@ -234,4 +234,11 @@
     <string name="dur_h">%1$d س</string>
     <string name="dur_m">%1$d د</string>
     <string name="sleep_use_alarm">استخدم المنبه</string>
+    <string name="panel_enabled">إظهار لوحة الصوت</string>
+    <string name="panel_enabled_hint">اقفلها لو عايز تفضل باقي الخيارات شغالة (الحدود، الضغط المزدوج، قواعد التطبيقات) مع لوحة الصوت بتاعة أندرويد.</string>
+    <string name="number_title">رقم الصوت</string>
+    <string name="number_off">من غير رقم</string>
+    <string name="number_icon">مكان أيقونة الشريط</string>
+    <string name="number_mute">مكان زرار الكتم</string>
+    <string name="number_hint">في الكلاسيك الرقم بيفضل في آخر الشريط. خيار زرار الكتم شغال في الكبسولة والكبسولة 2.</string>
 </resources>

@@ -70,6 +70,11 @@ class VolumeController(context: Context) {
 
     fun level(stream: Int): Int = audio.getStreamVolume(stream)
 
+    /** Shows Android's own volume panel without changing anything (used when our panel is off). */
+    fun showSystemUi(stream: Int) {
+        audio.adjustStreamVolume(stream, AudioManager.ADJUST_SAME, AudioManager.FLAG_SHOW_UI)
+    }
+
     fun max(stream: Int): Int = audio.getStreamMaxVolume(stream).coerceAtLeast(1)
 
     fun activeStream(): Int =
@@ -418,6 +423,15 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
             loaded
         }
         if (mode == RULE_HIDE) return
+        if (!loaded.panelEnabled && !ignoreRules) {
+            // Our panel is off: the keys still work, and Android shows its own panel as feedback.
+            try {
+                controller.showSystemUi(stream)
+            } catch (e: Throwable) {
+                logError("showSystemUi", e)
+            }
+            return
+        }
 
         currentStream = stream
         level = controller.level(stream)

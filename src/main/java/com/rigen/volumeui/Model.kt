@@ -55,6 +55,15 @@ const val STYLE_CAPSULE = 1
 const val STYLE_BAR = 2
 const val STYLE_CAPSULE2 = 3
 
+/** What the panel does with the volume number. */
+const val NUMBER_NONE = 0
+
+/** The number takes the place of the icon inside the bar. */
+const val NUMBER_ICON = 1
+
+/** The number takes the place of the mute button (capsule styles). */
+const val NUMBER_MUTE = 2
+
 /** The look "Capsule II" is made for: a white pill with an indigo fill. */
 val CAPSULE2_FRAME: Int = 0xFFFFFFFF.toInt()
 val CAPSULE2_ACCENT: Int = 0xFF4F5BA5.toInt()
@@ -72,6 +81,7 @@ enum class Glyph(val pathData: String) {
     DND("M12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2zM17,13H7v-2h10v2z"),
     PLAY("M8,5v14l11,-7z"),
     PAUSE("M6,19h4V5H6v14zm8,-14v14h4V5h-4z"),
+    STOP("M6,6h12v12H6z"),
     PREVIOUS("M6,6h2v12H6zm3.5,6l8.5,6V6z"),
     NEXT("M6,18l8.5,-6L6,6v12zM16,6v12h2V6h-2z"),
     HOME("M10,20v-6h4v6h5v-8h3L12,3 2,12h3v8z"),
@@ -125,6 +135,10 @@ data class PanelSettings(
     val panelStyle: Int = STYLE_CLASSIC,
     val showFrame: Boolean = true,
     val showDndIcon: Boolean = true,
+    /** Off = the panel is never drawn, but the keys still work (limits, double press...). */
+    val panelEnabled: Boolean = true,
+    /** NUMBER_NONE, NUMBER_ICON or NUMBER_MUTE. */
+    val numberMode: Int = NUMBER_ICON,
     val redThresholdPct: Int = 85,
     // Behavior
     val hideDelayMs: Int = 1500,
@@ -176,6 +190,8 @@ object Prefs {
     private const val K_DELAY = "hide_delay_ms"
     private const val K_RED = "red_threshold_pct"
     private const val K_DND = "show_dnd_icon"
+    private const val K_PANEL_ON = "panel_enabled"
+    private const val K_NUMBER = "number_mode"
     private const val K_POS_X = "pos_x"
     private const val K_POS_Y = "pos_y"
     private const val K_TOUCH = "touch_enabled"
@@ -226,6 +242,8 @@ object Prefs {
             panelStyle = p.getInt(K_STYLE, d.panelStyle),
             showFrame = p.getBoolean(K_FRAME, d.showFrame),
             showDndIcon = p.getBoolean(K_DND, d.showDndIcon),
+            panelEnabled = p.getBoolean(K_PANEL_ON, d.panelEnabled),
+            numberMode = p.getInt(K_NUMBER, d.numberMode),
             redThresholdPct = p.getInt(K_RED, d.redThresholdPct),
             hideDelayMs = p.getInt(K_DELAY, d.hideDelayMs),
             posX = p.getFloat(K_POS_X, d.posX),
@@ -261,6 +279,8 @@ object Prefs {
             .putInt(K_STYLE, s.panelStyle)
             .putBoolean(K_FRAME, s.showFrame)
             .putBoolean(K_DND, s.showDndIcon)
+            .putBoolean(K_PANEL_ON, s.panelEnabled)
+            .putInt(K_NUMBER, s.numberMode)
             .putInt(K_RED, s.redThresholdPct)
             .putInt(K_DELAY, s.hideDelayMs)
             .putFloat(K_POS_X, s.posX)

@@ -10,7 +10,6 @@ import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
 import android.media.AudioManager
-import android.media.RingtoneManager
 import android.os.Build
 import android.os.Bundle
 import org.json.JSONArray
@@ -161,13 +160,16 @@ object ClockStore {
 
 /** Alarms, the timer and their notifications. */
 object ClockEngine {
-    private const val CH_ALARM = "kanade_alarm"
+    // A channel keeps the sound it was created with, so the new ringtone needs a new channel id.
+    private const val CH_ALARM_OLD = "kanade_alarm"
+    private const val CH_ALARM = "kanade_alarm_v2"
     private const val CH_TIMER = "kanade_timer"
     const val ACTION_ALARM = "com.kanade.clock.ALARM"
     const val ACTION_SNOOZE = "com.kanade.clock.SNOOZE"
     const val ACTION_DISMISS = "com.kanade.clock.DISMISS"
     const val ACTION_TIMER_END = "com.kanade.clock.TIMER_END"
     const val ACTION_TIMER_TOGGLE = "com.kanade.clock.TIMER_TOGGLE"
+    const val ACTION_TIMER_CANCEL = "com.kanade.clock.TIMER_CANCEL"
     private const val NOTE_TIMER = 2000
     private const val NOTE_TIMER_DONE = 2001
     private const val RC_TIMER = 900001
@@ -196,7 +198,8 @@ object ClockEngine {
     private fun ensureChannels(c: Context) {
         if (Build.VERSION.SDK_INT < 26) return
         val nm = notes(c)
-        val sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+        val sound = android.net.Uri.parse("android.resource://" + c.packageName + "/" + R.raw.kanade_alarm)
+        nm.deleteNotificationChannel(CH_ALARM_OLD)
         val attrs = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM)
             .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build()
         val alarm = NotificationChannel(CH_ALARM, c.getString(R.string.ch_alarm), NotificationManager.IMPORTANCE_HIGH)
@@ -267,7 +270,7 @@ object ClockEngine {
             b.addAction(0, c.getString(R.string.alarm_snooze), broadcast(c, ACTION_SNOOZE, alarmId, 700000 + alarmId))
         }
         if (Build.VERSION.SDK_INT < 26) {
-            b.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM), AudioManager.STREAM_ALARM)
+            b.setSound(android.net.Uri.parse("android.resource://" + c.packageName + "/" + R.raw.kanade_alarm), AudioManager.STREAM_ALARM)
             b.setPriority(Notification.PRIORITY_MAX)
         }
         val n = b.build()
@@ -362,8 +365,10 @@ object ClockEngine {
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
+            .setColor(0xFF4F5BD5.toInt())
             .setContentIntent(openApp(c, PAGE_TIMER, 7))
         if (t.running) {
+            b.setContentText(c.getString(R.string.timer_running_card))
             b.setUsesChronometer(true)
             b.setChronometerCountDown(true)
             b.setShowWhen(true)
@@ -377,8 +382,17 @@ object ClockEngine {
             c.getString(if (t.running) R.string.timer_pause else R.string.timer_resume),
             broadcast(c, ACTION_TIMER_TOGGLE, 0, 800001),
         )
-        // Android 16 can show an ongoing notification as a chip in the status bar. Older versions ignore this.
-        b.addExtras(Bundle().apply { putBoolean("android.requestPromotedOngoing", true) })
+        b.addAction(0, c.getString(R.string.timer_cancel), broadcast(c, ACTION_TIMER_CANCEL, 0, 800002))
+        // Android 16 shows an ongoing notification as a live update: a chip in the status bar and a
+        // bar on the lock screen. It needs the POST_PROMOTED_NOTIFICATIONS permission (manifest) and
+        // this request. While running, the system counts down by itself; while paused the chip
+        // shows the time that is left. Older versions ignore all of this.
+        b.addExtras(
+            Bundle().apply {
+                putBoolean("android.requestPromotedOngoing", true)
+                if (!t.running) putString("android.shortCriticalText", formatMs(t.left))
+            },
+        )
         nm.notify(NOTE_TIMER, b.build())
     }
 
@@ -414,6 +428,7 @@ class ClockReceiver : BroadcastReceiver() {
                 ClockEngine.ACTION_DISMISS -> ClockEngine.dismiss(context, id)
                 ClockEngine.ACTION_TIMER_END -> ClockEngine.onTimerEnd(context)
                 ClockEngine.ACTION_TIMER_TOGGLE -> ClockEngine.timerToggle(context)
+                ClockEngine.ACTION_TIMER_CANCEL -> ClockEngine.timerCancel(context)
                 Intent.ACTION_BOOT_COMPLETED -> ClockEngine.restore(context)
             }
         } catch (e: Throwable) {
