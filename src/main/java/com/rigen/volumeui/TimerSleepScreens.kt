@@ -222,6 +222,34 @@ fun TimerPage(onBack: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            Section(stringResource(R.string.live_title)) {
+                var info by remember { mutableStateOf(ClockEngine.liveInfo(ctx)) }
+                LaunchedEffect(state.active, state.running) {
+                    delay(700)
+                    info = ClockEngine.liveInfo(ctx)
+                }
+                fun yn(b: Boolean?): String = when (b) {
+                    true -> ctx.getString(R.string.live_yes)
+                    false -> ctx.getString(R.string.live_no)
+                    null -> "?"
+                }
+                val summary = if (info.sdk < 36) {
+                    stringResource(R.string.live_old_android, info.sdk)
+                } else {
+                    ctx.getString(R.string.live_allowed, yn(info.allowed)) + "\n" +
+                        ctx.getString(R.string.live_qualifies, yn(info.qualifies)) + "\n" +
+                        ctx.getString(R.string.live_promoted, yn(info.promoted))
+                }
+                Text(summary, style = MaterialTheme.typography.bodySmall)
+                Text(
+                    stringResource(R.string.live_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedButton(onClick = { ClockEngine.openLiveSettings(ctx) }) {
+                    Text(stringResource(R.string.live_open))
+                }
+            }
         }
     }
 }

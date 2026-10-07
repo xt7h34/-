@@ -3,6 +3,9 @@ package com.rigen.volumeui
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Intent
+import android.media.RingtoneManager
+import android.net.Uri
 import android.content.pm.PackageManager
 import android.location.Address
 import android.location.Geocoder
@@ -39,6 +42,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -556,6 +560,8 @@ fun AlarmsPage(onBack: () -> Unit) {
     var alarms by remember { mutableStateOf(ClockStore.alarms(ctx)) }
     var editing by remember { mutableStateOf<AlarmItem?>(null) }
     var editingNew by remember { mutableStateOf(false) }
+    var showMenu by remember { mutableStateOf(false) }
+    var showStyle by remember { mutableStateOf(false) }
     val askNotifications = rememberNotifPermission()
 
     fun store(list: List<AlarmItem>) {
@@ -585,17 +591,48 @@ fun AlarmsPage(onBack: () -> Unit) {
         return
     }
 
+    if (showStyle) {
+        BackHandler { showStyle = false }
+        AlarmRingScreen(
+            editing = true,
+            title = stringResource(R.string.alarm_title),
+            showSnooze = true,
+            onDismiss = {},
+            onSnooze = {},
+            onDone = { showStyle = false },
+        )
+        return
+    }
+    if (showMenu) {
+        AlarmSettingsDialog(
+            onClose = { showMenu = false },
+            onCustomize = {
+                showMenu = false
+                showStyle = true
+            },
+        )
+    }
+
     PageScaffold(stringResource(R.string.clock_tab_alarms), onBack) { padding ->
         PageColumn(padding) {
-            Button(
-                onClick = {
-                    editingNew = true
-                    editing = AlarmItem(ClockStore.nextAlarmId(ctx), 8, 0, "", true, 0)
-                },
-            ) {
-                PathIcon(Glyph.ADD.pathData, MaterialTheme.colorScheme.onPrimary, 18.dp)
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.alarm_add))
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Button(
+                    onClick = {
+                        editingNew = true
+                        editing = AlarmItem(ClockStore.nextAlarmId(ctx), 8, 0, "", true, 0)
+                    },
+                ) {
+                    PathIcon(Glyph.ADD.pathData, MaterialTheme.colorScheme.onPrimary, 18.dp)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.alarm_add))
+                }
+                Spacer(Modifier.weight(1f))
+                Box(
+                    Modifier.size(44.dp).clip(CircleShape).clickable { showMenu = true },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    PathIcon(Glyph.MORE.pathData, MaterialTheme.colorScheme.onBackground, 22.dp)
+                }
             }
             if (alarms.isEmpty()) {
                 Text(stringResource(R.string.alarm_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -643,6 +680,7 @@ fun AlarmsPage(onBack: () -> Unit) {
     }
 }
 
+@Suppress("DEPRECATION")
 @Composable
 private fun AlarmEditor(
     initial: AlarmItem,
@@ -655,6 +693,19 @@ private fun AlarmEditor(
     var m by remember { mutableIntStateOf(initial.minute) }
     var label by remember { mutableStateOf(initial.label) }
     var days by remember { mutableIntStateOf(initial.days) }
+    var tone by remember { mutableStateOf(initial.ringtone) }
+    val ctx = LocalContext.current
+    val pickTone = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        val uri: Uri? = if (Build.VERSION.SDK_INT >= 33) {
+            r.data?.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI, Uri::class.java)
+        } else {
+            r.data?.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+        }
+        if (uri != null) tone = uri.toString()
+    }
+    val toneName = remember(tone) {
+        if (tone.isBlank()) "" else runCatching { RingtoneManager.getRingtone(ctx, Uri.parse(tone)).getTitle(ctx) }.getOrDefault("")
+    }
     Column(
         Modifier
             .fillMaxSize()
@@ -684,6 +735,28 @@ private fun AlarmEditor(
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(12.dp))
+        Text(stringResource(R.string.alarm_sound), style = MaterialTheme.typography.labelLarge)
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            FilterChip(
+                selected = tone.isBlank(),
+                onClick = { tone = "" },
+                label = { Text(stringResource(R.string.alarm_sound_kanade)) },
+            )
+            FilterChip(
+                selected = tone.isNotBlank(),
+                onClick = {
+                    val i = Intent(RingtoneManager.ACTION_RINGTONE_PICKER)
+                        .putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
+                        .putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, false)
+                        .putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
+                    if (tone.isNotBlank()) i.putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, Uri.parse(tone))
+                    pickTone.launch(i)
+                },
+                label = { Text(if (toneName.isNotBlank()) toneName else stringResource(R.string.alarm_sound_device)) },
+            )
+        }
+        Spacer(Modifier.height(12.dp))
         Text(stringResource(R.string.alarm_repeat), style = MaterialTheme.typography.labelLarge)
         Spacer(Modifier.height(8.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -712,9 +785,62 @@ private fun AlarmEditor(
                 }
             }
             Button(
-                onClick = { onSave(AlarmItem(initial.id, h, m, label.trim(), true, days)) },
+                onClick = {
+                    onSave(initial.copy(hour = h, minute = m, label = label.trim(), enabled = true, days = days, ringtone = tone))
+                },
                 modifier = Modifier.weight(1f),
             ) { Text(stringResource(R.string.alarm_save)) }
+        }
+    }
+}
+
+/** The three dots next to "Add alarm": how alarms ring, and the way to stop them. */
+@Composable
+private fun AlarmSettingsDialog(onClose: () -> Unit, onCustomize: () -> Unit) {
+    val ctx = LocalContext.current
+    var override by remember { mutableStateOf(ClockStore.ringOverride(ctx)) }
+    var dismissMode by remember { mutableIntStateOf(ClockStore.ringDismiss(ctx)) }
+    Dialog(onDismissRequest = onClose) {
+        Column(
+            Modifier
+                .clip(RoundedCornerShape(28.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainer)
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(stringResource(R.string.alarm_menu_title), style = MaterialTheme.typography.titleLarge)
+            SwitchRow(stringResource(R.string.alarm_override), override) {
+                override = it
+                ClockStore.setRingOverride(ctx, it)
+            }
+            Text(
+                stringResource(R.string.alarm_override_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(stringResource(R.string.alarm_dismiss_method), style = MaterialTheme.typography.labelLarge)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(
+                    DISMISS_DRAG to R.string.dismiss_drag,
+                    DISMISS_TAP to R.string.dismiss_tap,
+                    DISMISS_HOLD to R.string.dismiss_hold,
+                ).forEach { (mode, label) ->
+                    FilterChip(
+                        selected = dismissMode == mode,
+                        onClick = {
+                            dismissMode = mode
+                            ClockStore.setRingDismiss(ctx, mode)
+                        },
+                        label = { Text(stringResource(label)) },
+                    )
+                }
+            }
+            Button(onClick = onCustomize, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.alarm_customize))
+            }
+            TextButton(onClick = onClose, modifier = Modifier.align(Alignment.End)) {
+                Text(stringResource(R.string.ring_done))
+            }
         }
     }
 }

@@ -12,6 +12,7 @@ import android.media.AudioAttributes
 import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Calendar
@@ -30,6 +31,8 @@ data class AlarmItem(
     val label: String,
     val enabled: Boolean,
     val days: Int,
+    /** "" = the Kanade tone, otherwise the uri of a sound picked on the phone. */
+    val ringtone: String = "",
 )
 
 class TimerState(
@@ -81,6 +84,7 @@ object ClockStore {
             AlarmItem(
                 o.getInt("id"), o.getInt("h"), o.getInt("m"),
                 o.optString("label", ""), o.optBoolean("on", true), o.optInt("days", 0),
+                o.optString("tone", ""),
             )
         }
     } catch (e: Exception) {
@@ -92,11 +96,28 @@ object ClockStore {
         list.forEach {
             arr.put(
                 JSONObject().put("id", it.id).put("h", it.hour).put("m", it.minute)
-                    .put("label", it.label).put("on", it.enabled).put("days", it.days),
+                    .put("label", it.label).put("on", it.enabled).put("days", it.days)
+                    .put("tone", it.ringtone),
             )
         }
         sp(c).edit().putString("alarms", arr.toString()).apply()
     }
+
+    // ── How the alarm rings and looks ──
+    fun ringBg(c: Context): String = sp(c).getString("r_bg", "default") ?: "default"
+    fun setRingBg(c: Context, v: String) = sp(c).edit().putString("r_bg", v).apply()
+    fun ringBgVersion(c: Context): Long = sp(c).getLong("r_bg_ver", 0L)
+    fun setRingBgVersion(c: Context, v: Long) = sp(c).edit().putLong("r_bg_ver", v).apply()
+    fun ringClock(c: Context): Int = sp(c).getInt("r_clock", 2)
+    fun setRingClock(c: Context, v: Int) = sp(c).edit().putInt("r_clock", v).apply()
+    fun ringDismiss(c: Context): Int = sp(c).getInt("r_dismiss", DISMISS_DRAG)
+    fun setRingDismiss(c: Context, v: Int) = sp(c).edit().putInt("r_dismiss", v).apply()
+    fun ringSnooze(c: Context): Int = sp(c).getInt("r_snooze", 5).coerceIn(1, 30)
+    fun setRingSnooze(c: Context, v: Int) = sp(c).edit().putInt("r_snooze", v.coerceIn(1, 30)).apply()
+
+    /** Ring even in Do Not Disturb, silent or vibrate, and even when the alarm volume is low. */
+    fun ringOverride(c: Context): Boolean = sp(c).getBoolean("r_override", true)
+    fun setRingOverride(c: Context, v: Boolean) = sp(c).edit().putBoolean("r_override", v).apply()
 
     fun nextAlarmId(c: Context): Int = (alarms(c).maxOfOrNull { it.id } ?: 0) + 1
 
@@ -173,7 +194,6 @@ object ClockEngine {
     private const val NOTE_TIMER = 2000
     private const val NOTE_TIMER_DONE = 2001
     private const val RC_TIMER = 900001
-    private const val SNOOZE_MS = 10 * 60_000L
 
     private fun alarmManager(c: Context) = c.getSystemService(Context.ALARM_SERVICE) as AlarmManager
     private fun notes(c: Context) = c.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -181,7 +201,7 @@ object ClockEngine {
     private fun receiverIntent(c: Context, action: String, id: Int = 0): Intent =
         Intent(c, ClockReceiver::class.java).setAction(action).putExtra("id", id)
 
-    private fun broadcast(c: Context, action: String, id: Int, requestCode: Int): PendingIntent =
+    internal fun broadcast(c: Context, action: String, id: Int, requestCode: Int): PendingIntent =
         PendingIntent.getBroadcast(
             c, requestCode, receiverIntent(c, action, id),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
@@ -237,7 +257,7 @@ object ClockEngine {
     fun onAlarmFired(c: Context, id: Int) {
         val list = ClockStore.alarms(c)
         val a = list.firstOrNull { it.id == id } ?: return
-        ring(c, 1000 + id, a.label.ifBlank { c.getString(R.string.alarm_title) }, id)
+        ring(c, 1000 + id, a.label.ifBlank { c.getString(R.string.alarm_title) }, id, a.ringtone)
         if (a.days == 0) {
             ClockStore.saveAlarms(c, list.map { if (it.id == id) it.copy(enabled = false) else it })
         } else {
@@ -246,15 +266,34 @@ object ClockEngine {
     }
 
     fun snooze(c: Context, id: Int) {
+        stopRinging(c)
         notes(c).cancel(1000 + id)
-        val at = System.currentTimeMillis() + SNOOZE_MS
+        val at = System.currentTimeMillis() + ClockStore.ringSnooze(c) * 60_000L
         val op = broadcast(c, ACTION_ALARM, id, 500000 + id)
         alarmManager(c).setAlarmClock(AlarmManager.AlarmClockInfo(at, openApp(c, PAGE_ALARMS, 5)), op)
         // The snoozed ring must still be able to find the alarm: keep it in the list as is.
     }
 
+    private fun stopRinging(c: Context) {
+        try {
+            c.stopService(Intent(c, AlarmRingService::class.java))
+        } catch (e: Throwable) {
+            Diag.error(c, "stopRinging", e)
+        }
+    }
+
+    /** Rings with the full ring screen. If Android refuses the service, a plain notification still rings. */
+    private fun ring(c: Context, noteId: Int, title: String, alarmId: Int, tone: String = "") {
+        try {
+            AlarmRingService.start(c, noteId, title, alarmId, tone)
+        } catch (e: Throwable) {
+            Diag.error(c, "ring service, using a notification", e)
+            ringFallback(c, noteId, title, alarmId)
+        }
+    }
+
     @Suppress("DEPRECATION")
-    private fun ring(c: Context, noteId: Int, title: String, alarmId: Int) {
+    private fun ringFallback(c: Context, noteId: Int, title: String, alarmId: Int) {
         ensureChannels(c)
         val b = if (Build.VERSION.SDK_INT >= 26) Notification.Builder(c, CH_ALARM) else Notification.Builder(c)
         b.setSmallIcon(R.drawable.ic_stat_alarm)
@@ -279,6 +318,7 @@ object ClockEngine {
     }
 
     fun dismiss(c: Context, noteId: Int) {
+        stopRinging(c)
         notes(c).cancel(noteId)
     }
 
@@ -394,6 +434,55 @@ object ClockEngine {
             },
         )
         nm.notify(NOTE_TIMER, b.build())
+    }
+
+    /** What Android 16 says about the timer's live update. Read by reflection: we compile against an older SDK. */
+    class LiveInfo(val sdk: Int, val allowed: Boolean?, val qualifies: Boolean?, val promoted: Boolean?)
+
+    fun liveInfo(c: Context): LiveInfo {
+        val nm = notes(c)
+        val allowed = try {
+            nm.javaClass.getMethod("canPostPromotedNotifications").invoke(nm) as? Boolean
+        } catch (e: Throwable) {
+            null
+        }
+        val posted = try {
+            nm.activeNotifications.firstOrNull { it.id == NOTE_TIMER }?.notification
+        } catch (e: Throwable) {
+            null
+        }
+        val qualifies = try {
+            posted?.javaClass?.getMethod("hasPromotableCharacteristics")?.invoke(posted) as? Boolean
+        } catch (e: Throwable) {
+            null
+        }
+        val promoted = try {
+            val flag = Notification::class.java.getField("FLAG_PROMOTED_ONGOING").getInt(null)
+            posted?.let { (it.flags and flag) != 0 }
+        } catch (e: Throwable) {
+            null
+        }
+        return LiveInfo(Build.VERSION.SDK_INT, allowed, qualifies, promoted)
+    }
+
+    /** Opens the "Live updates" switch of this app, or the normal notification settings. */
+    fun openLiveSettings(c: Context) {
+        val pkg = c.packageName
+        try {
+            c.startActivity(
+                Intent("android.settings.APP_NOTIFICATION_PROMOTION_SETTINGS")
+                    .putExtra(Settings.EXTRA_APP_PACKAGE, pkg).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        } catch (e: Throwable) {
+            try {
+                c.startActivity(
+                    Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                        .putExtra(Settings.EXTRA_APP_PACKAGE, pkg).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
+            } catch (e2: Throwable) {
+                Diag.error(c, "openLiveSettings", e2)
+            }
+        }
     }
 
     /** After a reboot: put the alarms and the timer back. */

@@ -386,7 +386,8 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
     }
 
     private fun haptic() {
-        if (!settings.haptics) return
+        // With the panel off Android shows its own panel, so there is no tick of ours.
+        if (!settings.haptics || !settings.panelEnabled) return
         try {
             Haptics.tick(applicationContext)
         } catch (e: Throwable) {
