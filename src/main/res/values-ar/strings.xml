@@ -296,4 +296,17 @@
     <string name="sw_reset">إعادة</string>
     <string name="sw_laps">اللفّات</string>
     <string name="sw_lap_n">لفّة %1$d</string>
+    <string name="widget_next_alarm_label">المنبه القادم</string>
+    <string name="widget_next_alarm_desc">بيعرض المنبه اللي هيرن بعد كده.</string>
+    <string name="widget_sleep_label">النوم</string>
+    <string name="widget_sleep_desc">نومك الليلة اللي فاتت مقارنة بهدفك.</string>
+    <string name="widget_no_alarm">مفيش منبه</string>
+    <string name="widget_today">النهارده</string>
+    <string name="widget_tomorrow">بكرة</string>
+    <string name="widget_sleep_last_night">الليلة اللي فاتت</string>
+    <string name="widget_sleep_last_logged">آخر نوم متسجّل</string>
+    <string name="widget_no_sleep">لسه مفيش نوم متسجّل</string>
+    <string name="widget_sleep_detail">الهدف %1$s \u2022 متوسط 7 ليالي %2$s</string>
+    <string name="widget_bedtime">ميعاد النوم %1$s</string>
+    <string name="widget_hm">%1$d س %2$d د</string>
 </resources>

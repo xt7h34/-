@@ -42,6 +42,30 @@
             </intent-filter>
         </activity>
 
+        <receiver
+            android:name=".NextAlarmWidget"
+            android:exported="false"
+            android:label="@string/widget_next_alarm_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_next_alarm" />
+        </receiver>
+
+        <receiver
+            android:name=".SleepWidget"
+            android:exported="false"
+            android:label="@string/widget_sleep_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_sleep" />
+        </receiver>
+
         <activity
             android:name=".AlarmRingActivity"
             android:exported="false"

@@ -119,6 +119,7 @@ object ClockStore {
             )
         }
         sp(c).edit().putString("alarms", arr.toString()).apply()
+        ClockWidgets.updateAll(c)
     }
 
     // ── How the alarm rings and looks ──
@@ -255,7 +256,10 @@ object ClockStore {
 
     // ── Sleep ──
     fun sleepGoal(c: Context): Int = sp(c).getInt("s_goal", 480)
-    fun setSleepGoal(c: Context, v: Int) = sp(c).edit().putInt("s_goal", v).apply()
+    fun setSleepGoal(c: Context, v: Int) {
+        sp(c).edit().putInt("s_goal", v).apply()
+        ClockWidgets.updateAll(c)
+    }
     fun sleepBedOverride(c: Context): Int = sp(c).getInt("s_bed", -1)
     fun setSleepBedOverride(c: Context, v: Int) = sp(c).edit().putInt("s_bed", v).apply()
     fun sleepManualWake(c: Context): Int = sp(c).getInt("s_wake", -1)
@@ -277,6 +281,7 @@ object ClockStore {
         val arr = JSONArray()
         list.sortedBy { it.wake }.takeLast(60).forEach { arr.put(JSONObject().put("b", it.bed).put("w", it.wake)) }
         sp(c).edit().putString("sleep", arr.toString()).apply()
+        ClockWidgets.updateAll(c)
     }
 }
 
@@ -365,6 +370,7 @@ object ClockEngine {
         } else {
             scheduleAlarm(c, a)
         }
+        ClockWidgets.updateAll(c)
     }
 
     fun snooze(c: Context, id: Int) {
@@ -609,6 +615,7 @@ object ClockEngine {
             if (t.endAt <= now) onTimerEnd(c, t.id) else scheduleTimerEnd(c, t.id, t.endAt)
         }
         updateTimerNote(c)
+        ClockWidgets.updateAll(c)
     }
 }
 

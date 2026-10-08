@@ -297,4 +297,17 @@
     <string name="sw_reset">Reset</string>
     <string name="sw_laps">Laps</string>
     <string name="sw_lap_n">Lap %1$d</string>
+    <string name="widget_next_alarm_label">Next alarm</string>
+    <string name="widget_next_alarm_desc">Shows the alarm that rings next.</string>
+    <string name="widget_sleep_label">Sleep</string>
+    <string name="widget_sleep_desc">Your last night of sleep against your goal.</string>
+    <string name="widget_no_alarm">No alarm</string>
+    <string name="widget_today">Today</string>
+    <string name="widget_tomorrow">Tomorrow</string>
+    <string name="widget_sleep_last_night">Last night</string>
+    <string name="widget_sleep_last_logged">Last logged sleep</string>
+    <string name="widget_no_sleep">No sleep logged yet</string>
+    <string name="widget_sleep_detail">Goal %1$s \u2022 7-night avg %2$s</string>
+    <string name="widget_bedtime">Bedtime %1$s</string>
+    <string name="widget_hm">%1$dh %2$dm</string>
 </resources>
