@@ -22,6 +22,7 @@ const val PAGE_CLOCK_TIME = "clock_time"
 const val PAGE_ALARMS = "alarms"
 const val PAGE_TIMER = "timer"
 const val PAGE_SLEEP = "sleep"
+const val PAGE_STOPWATCH = "stopwatch"
 
 /** [days] is a bit mask, bit 0 = Sunday ... bit 6 = Saturday. Zero means "once". */
 data class AlarmItem(
@@ -33,9 +34,14 @@ data class AlarmItem(
     val days: Int,
     /** "" = the Kanade tone, otherwise the uri of a sound picked on the phone. */
     val ringtone: String = "",
+    /** Minutes of snooze for this alarm. 0 = the general setting. */
+    val snooze: Int = 0,
+    /** "Skip next": the alarm does not ring at or before this time. */
+    val skipUntil: Long = 0L,
 )
 
 class TimerState(
+    val id: Int,
     val active: Boolean,
     val total: Long,
     val running: Boolean,
@@ -43,6 +49,11 @@ class TimerState(
     val left: Long,
 ) {
     fun remaining(now: Long): Long = if (running) (endAt - now).coerceAtLeast(0L) else left
+}
+
+/** [startAt] is on the SystemClock.elapsedRealtime clock; [laps] are the elapsed times when Lap was pressed. */
+class StopwatchState(val running: Boolean, val startAt: Long, val acc: Long, val laps: List<Long>) {
+    fun elapsed(nowElapsed: Long): Long = acc + if (running) (nowElapsed - startAt).coerceAtLeast(0L) else 0L
 }
 
 class SleepEntry(val bed: Long, val wake: Long) {
@@ -56,13 +67,19 @@ fun nextTrigger(a: AlarmItem, now: Long = System.currentTimeMillis()): Long {
     c.set(Calendar.MINUTE, a.minute)
     c.set(Calendar.SECOND, 0)
     c.set(Calendar.MILLISECOND, 0)
+    var found = -1L
     for (i in 0..8) {
         val dow = c.get(Calendar.DAY_OF_WEEK) - 1
         val dayOk = a.days == 0 || ((a.days shr dow) and 1) == 1
-        if (c.timeInMillis > now && dayOk) return c.timeInMillis
+        if (c.timeInMillis > now && dayOk) {
+            found = c.timeInMillis
+            break
+        }
         c.add(Calendar.DAY_OF_YEAR, 1)
     }
-    return c.timeInMillis
+    val t = if (found >= 0L) found else c.timeInMillis
+    // "Skip next": ignore the one occurrence the user skipped and take the one after it.
+    return if (a.skipUntil > 0L && t <= a.skipUntil) nextTrigger(a.copy(skipUntil = 0L), t) else t
 }
 
 fun dayKey(ms: Long): Int {
@@ -85,6 +102,7 @@ object ClockStore {
                 o.getInt("id"), o.getInt("h"), o.getInt("m"),
                 o.optString("label", ""), o.optBoolean("on", true), o.optInt("days", 0),
                 o.optString("tone", ""),
+                o.optInt("snz", 0), o.optLong("skip", 0L),
             )
         }
     } catch (e: Exception) {
@@ -97,7 +115,7 @@ object ClockStore {
             arr.put(
                 JSONObject().put("id", it.id).put("h", it.hour).put("m", it.minute)
                     .put("label", it.label).put("on", it.enabled).put("days", it.days)
-                    .put("tone", it.ringtone),
+                    .put("tone", it.ringtone).put("snz", it.snooze).put("skip", it.skipUntil),
             )
         }
         sp(c).edit().putString("alarms", arr.toString()).apply()
@@ -123,6 +141,26 @@ object ClockStore {
     fun ringInVibrate(c: Context): Boolean = sp(c).getBoolean("r_in_vibrate", true)
     fun setRingInVibrate(c: Context, v: Boolean) = sp(c).edit().putBoolean("r_in_vibrate", v).apply()
 
+    fun ringRamp(c: Context): Boolean = sp(c).getBoolean("r_ramp", false)
+    fun setRingRamp(c: Context, v: Boolean) = sp(c).edit().putBoolean("r_ramp", v).apply()
+
+    /** 0 = like the phone, 1 = 0 1 2, 2 = Arabic-Indic digits. */
+    fun ringDigits(c: Context): Int = sp(c).getInt("r_digits", 0)
+    fun setRingDigits(c: Context, v: Int) = sp(c).edit().putInt("r_digits", v).apply()
+
+    fun ringLocale(c: Context): java.util.Locale {
+        val base = java.util.Locale.getDefault()
+        val digits = when (ringDigits(c)) {
+            1 -> "latn"
+            2 -> "arab"
+            else -> return base
+        }
+        return java.util.Locale.Builder().setLocale(base).setUnicodeLocaleKeyword("nu", digits).build()
+    }
+
+    fun relDismissedAt(c: Context): Long = sp(c).getLong("rel_dismissed", 0L)
+    fun setRelDismissedAt(c: Context, v: Long) = sp(c).edit().putLong("rel_dismissed", v).apply()
+
     fun nextAlarmId(c: Context): Int = (alarms(c).maxOfOrNull { it.id } ?: 0) + 1
 
     // ── World clock ──
@@ -137,18 +175,77 @@ object ClockStore {
         sp(c).edit().putString("zones", JSONArray(list).toString()).apply()
     }
 
-    // ── Timer ──
-    fun timer(c: Context): TimerState {
+    // ── Timers (several can run at once) ──
+    fun timers(c: Context): List<TimerState> {
         val p = sp(c)
-        return TimerState(
-            p.getBoolean("t_active", false), p.getLong("t_total", 0L), p.getBoolean("t_running", false),
-            p.getLong("t_end", 0L), p.getLong("t_left", 0L),
-        )
+        val raw = p.getString("timers", null)
+        if (raw == null) {
+            // The old single timer, from before there could be several.
+            if (p.getBoolean("t_active", false)) {
+                val t = TimerState(
+                    1, true, p.getLong("t_total", 0L), p.getBoolean("t_running", false),
+                    p.getLong("t_end", 0L), p.getLong("t_left", 0L),
+                )
+                saveTimers(c, listOf(t))
+                p.edit().putBoolean("t_active", false).apply()
+                return listOf(t)
+            }
+            return emptyList()
+        }
+        return try {
+            val arr = JSONArray(raw)
+            (0 until arr.length()).map {
+                val o = arr.getJSONObject(it)
+                TimerState(
+                    o.getInt("id"), true, o.getLong("total"), o.getBoolean("run"),
+                    o.getLong("end"), o.getLong("left"),
+                )
+            }
+        } catch (e: Exception) {
+            emptyList()
+        }
     }
 
-    fun saveTimer(c: Context, t: TimerState) {
-        sp(c).edit().putBoolean("t_active", t.active).putLong("t_total", t.total)
-            .putBoolean("t_running", t.running).putLong("t_end", t.endAt).putLong("t_left", t.left).apply()
+    fun saveTimers(c: Context, list: List<TimerState>) {
+        val arr = JSONArray()
+        list.forEach {
+            arr.put(
+                JSONObject().put("id", it.id).put("total", it.total).put("run", it.running)
+                    .put("end", it.endAt).put("left", it.left),
+            )
+        }
+        sp(c).edit().putString("timers", arr.toString()).apply()
+    }
+
+    /** The timer the notification and the floating pill follow: the one that ends first, else the first. */
+    fun primaryTimer(list: List<TimerState>): TimerState =
+        list.filter { it.running }.minByOrNull { it.endAt }
+            ?: list.firstOrNull()
+            ?: TimerState(0, false, 0L, false, 0L, 0L)
+
+    fun timer(c: Context): TimerState = primaryTimer(timers(c))
+
+    fun nextTimerId(list: List<TimerState>): Int = (list.maxOfOrNull { it.id } ?: 0) + 1
+
+    // ── Stopwatch ──
+    fun stopwatch(c: Context): StopwatchState {
+        val p = sp(c)
+        var running = p.getBoolean("sw_running", false)
+        val start = p.getLong("sw_start", 0L)
+        // The clock behind it restarts at boot, so a stopwatch that was running cannot go on.
+        if (running && start > android.os.SystemClock.elapsedRealtime()) running = false
+        val laps = try {
+            val arr = JSONArray(p.getString("sw_laps", "[]"))
+            (0 until arr.length()).map { arr.getLong(it) }
+        } catch (e: Exception) {
+            emptyList()
+        }
+        return StopwatchState(running, start, p.getLong("sw_acc", 0L), laps)
+    }
+
+    fun saveStopwatch(c: Context, s: StopwatchState) {
+        sp(c).edit().putBoolean("sw_running", s.running).putLong("sw_start", s.startAt)
+            .putLong("sw_acc", s.acc).putString("sw_laps", JSONArray(s.laps).toString()).apply()
     }
 
     fun floatingEnabled(c: Context): Boolean = sp(c).getBoolean("t_float", true)
@@ -196,8 +293,9 @@ object ClockEngine {
     const val ACTION_TIMER_TOGGLE = "com.kanade.clock.TIMER_TOGGLE"
     const val ACTION_TIMER_CANCEL = "com.kanade.clock.TIMER_CANCEL"
     private const val NOTE_TIMER = 2000
-    private const val NOTE_TIMER_DONE = 2001
-    private const val RC_TIMER = 900001
+    private const val NOTE_TIMER_DONE = 2100 // + the timer's id
+    private const val RC_TIMER = 910000 // + the timer's id
+    const val MAX_TIMERS = 8
 
     private fun alarmManager(c: Context) = c.getSystemService(Context.ALARM_SERVICE) as AlarmManager
     private fun notes(c: Context) = c.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -272,7 +370,9 @@ object ClockEngine {
     fun snooze(c: Context, id: Int) {
         stopRinging(c)
         notes(c).cancel(1000 + id)
-        val at = System.currentTimeMillis() + ClockStore.ringSnooze(c) * 60_000L
+        val own = ClockStore.alarms(c).firstOrNull { it.id == id }?.snooze ?: 0
+        val minutes = if (own > 0) own else ClockStore.ringSnooze(c)
+        val at = System.currentTimeMillis() + minutes * 60_000L
         val op = broadcast(c, ACTION_ALARM, id, 500000 + id)
         alarmManager(c).setAlarmClock(AlarmManager.AlarmClockInfo(at, openApp(c, PAGE_ALARMS, 5)), op)
         // The snoozed ring must still be able to find the alarm: keep it in the list as is.
@@ -321,15 +421,20 @@ object ClockEngine {
         notes(c).notify(noteId, n)
     }
 
+    /** Rings once with the real screen and sound, to check the look without waiting for an alarm. */
+    fun testRing(c: Context) {
+        ring(c, 1999, c.getString(R.string.alarm_title), -1, "")
+    }
+
     fun dismiss(c: Context, noteId: Int) {
         stopRinging(c)
         notes(c).cancel(noteId)
     }
 
-    // ───────────── Timer ─────────────
+    // ───────────── Timers ─────────────
 
-    private fun scheduleTimerEnd(c: Context, at: Long) {
-        val op = broadcast(c, ACTION_TIMER_END, 0, RC_TIMER)
+    private fun scheduleTimerEnd(c: Context, id: Int, at: Long) {
+        val op = broadcast(c, ACTION_TIMER_END, id, RC_TIMER + id)
         val am = alarmManager(c)
         if (Build.VERSION.SDK_INT < 31 || am.canScheduleExactAlarms()) {
             am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, op)
@@ -338,8 +443,8 @@ object ClockEngine {
         }
     }
 
-    private fun cancelTimerEnd(c: Context) {
-        alarmManager(c).cancel(broadcast(c, ACTION_TIMER_END, 0, RC_TIMER))
+    private fun cancelTimerEnd(c: Context, id: Int) {
+        alarmManager(c).cancel(broadcast(c, ACTION_TIMER_END, id, RC_TIMER + id))
     }
 
     private fun changed(c: Context) {
@@ -347,64 +452,81 @@ object ClockEngine {
         VolumeAccessibilityService.instance?.refreshFloatingTimer()
     }
 
-    fun timerStart(c: Context, total: Long) {
+    /** The timer with this id, or (id 0) the one the notification follows. */
+    private fun target(c: Context, id: Int): TimerState? {
+        val list = ClockStore.timers(c)
+        if (list.isEmpty()) return null
+        return if (id > 0) list.firstOrNull { it.id == id } else ClockStore.primaryTimer(list)
+    }
+
+    private fun replaceTimer(c: Context, t: TimerState) {
+        ClockStore.saveTimers(c, ClockStore.timers(c).map { if (it.id == t.id) t else it })
+    }
+
+    /** Starts a new timer and returns its id, or 0 when there are already too many. */
+    fun timerStart(c: Context, total: Long): Int {
+        val list = ClockStore.timers(c)
+        if (list.size >= MAX_TIMERS) return 0
         val now = System.currentTimeMillis()
+        val id = ClockStore.nextTimerId(list)
         ClockStore.setFloatingHidden(c, false)
-        notes(c).cancel(NOTE_TIMER_DONE)
-        ClockStore.saveTimer(c, TimerState(true, total, true, now + total, total))
-        scheduleTimerEnd(c, now + total)
+        ClockStore.saveTimers(c, list + TimerState(id, true, total, true, now + total, total))
+        scheduleTimerEnd(c, id, now + total)
+        changed(c)
+        return id
+    }
+
+    fun timerPause(c: Context, id: Int = 0) {
+        val t = target(c, id) ?: return
+        if (!t.running) return
+        replaceTimer(c, TimerState(t.id, true, t.total, false, 0L, t.remaining(System.currentTimeMillis())))
+        cancelTimerEnd(c, t.id)
         changed(c)
     }
 
-    fun timerPause(c: Context) {
-        val t = ClockStore.timer(c)
-        if (!t.active || !t.running) return
-        val left = t.remaining(System.currentTimeMillis())
-        ClockStore.saveTimer(c, TimerState(true, t.total, false, 0L, left))
-        cancelTimerEnd(c)
-        changed(c)
-    }
-
-    fun timerResume(c: Context) {
-        val t = ClockStore.timer(c)
-        if (!t.active || t.running) return
+    fun timerResume(c: Context, id: Int = 0) {
+        val t = target(c, id) ?: return
+        if (t.running) return
         val end = System.currentTimeMillis() + t.left
-        ClockStore.saveTimer(c, TimerState(true, t.total, true, end, t.left))
-        scheduleTimerEnd(c, end)
+        replaceTimer(c, TimerState(t.id, true, t.total, true, end, t.left))
+        scheduleTimerEnd(c, t.id, end)
         changed(c)
     }
 
-    fun timerToggle(c: Context) {
-        if (ClockStore.timer(c).running) timerPause(c) else timerResume(c)
+    fun timerToggle(c: Context, id: Int = 0) {
+        val t = target(c, id) ?: return
+        if (t.running) timerPause(c, t.id) else timerResume(c, t.id)
     }
 
-    fun timerCancel(c: Context) {
-        ClockStore.saveTimer(c, TimerState(false, 0L, false, 0L, 0L))
-        cancelTimerEnd(c)
+    fun timerCancel(c: Context, id: Int = 0) {
+        val t = target(c, id) ?: return
+        ClockStore.saveTimers(c, ClockStore.timers(c).filter { it.id != t.id })
+        cancelTimerEnd(c, t.id)
         changed(c)
     }
 
-    fun onTimerEnd(c: Context) {
-        val t = ClockStore.timer(c)
-        if (!t.active || !t.running) return
-        ClockStore.saveTimer(c, TimerState(false, 0L, false, 0L, 0L))
+    fun onTimerEnd(c: Context, id: Int) {
+        val t = ClockStore.timers(c).firstOrNull { it.id == id } ?: return
+        if (!t.running) return
+        ClockStore.saveTimers(c, ClockStore.timers(c).filter { it.id != id })
         changed(c)
-        ring(c, NOTE_TIMER_DONE, c.getString(R.string.timer_done), 0)
+        ring(c, NOTE_TIMER_DONE + id, c.getString(R.string.timer_done), 0)
     }
 
-    /** The always-there notification: it is what shows the timer next to the other notifications. */
+    /** The always-there notification: it follows the timer that ends first. */
     @Suppress("DEPRECATION")
     fun updateTimerNote(c: Context) {
         val nm = notes(c)
-        val t = ClockStore.timer(c)
-        if (!t.active) {
+        val list = ClockStore.timers(c)
+        if (list.isEmpty()) {
             nm.cancel(NOTE_TIMER)
             return
         }
+        val t = ClockStore.primaryTimer(list)
         ensureChannels(c)
         val b = if (Build.VERSION.SDK_INT >= 26) Notification.Builder(c, CH_TIMER) else Notification.Builder(c)
         b.setSmallIcon(R.drawable.ic_stat_timer)
-            .setContentTitle(c.getString(R.string.timer_title))
+            .setContentTitle(c.getString(R.string.timer_title) + if (list.size > 1) " • " + list.size else "")
             .setCategory(Notification.CATEGORY_PROGRESS)
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setOngoing(true)
@@ -424,13 +546,11 @@ object ClockEngine {
         b.addAction(
             0,
             c.getString(if (t.running) R.string.timer_pause else R.string.timer_resume),
-            broadcast(c, ACTION_TIMER_TOGGLE, 0, 800001),
+            broadcast(c, ACTION_TIMER_TOGGLE, t.id, 800001),
         )
-        b.addAction(0, c.getString(R.string.timer_cancel), broadcast(c, ACTION_TIMER_CANCEL, 0, 800002))
-        // Android 16 shows an ongoing notification as a live update: a chip in the status bar and a
-        // bar on the lock screen. It needs the POST_PROMOTED_NOTIFICATIONS permission (manifest) and
-        // this request. While running, the system counts down by itself; while paused the chip
-        // shows the time that is left. Older versions ignore all of this.
+        b.addAction(0, c.getString(R.string.timer_cancel), broadcast(c, ACTION_TIMER_CANCEL, t.id, 800002))
+        // Android 16 shows an ongoing notification as a live update (a chip in the status bar) on
+        // phones that support it. Older versions ignore this.
         b.addExtras(
             Bundle().apply {
                 putBoolean("android.requestPromotedOngoing", true)
@@ -440,33 +560,23 @@ object ClockEngine {
         nm.notify(NOTE_TIMER, b.build())
     }
 
-    /** What Android 16 says about the timer's live update. Read by reflection: we compile against an older SDK. */
-    class LiveInfo(val sdk: Int, val allowed: Boolean?, val qualifies: Boolean?, val promoted: Boolean?)
+    /** Is battery optimization off for this app? When it is on, some phones may stop alarms. */
+    fun batteryUnrestricted(c: Context): Boolean =
+        c.getSystemService(android.os.PowerManager::class.java)?.isIgnoringBatteryOptimizations(c.packageName) ?: false
 
-    fun liveInfo(c: Context): LiveInfo {
-        val nm = notes(c)
-        val allowed = try {
-            nm.javaClass.getMethod("canPostPromotedNotifications").invoke(nm) as? Boolean
+    fun openBatterySettings(c: Context) {
+        try {
+            c.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         } catch (e: Throwable) {
-            null
+            try {
+                c.startActivity(
+                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:" + c.packageName))
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
+            } catch (e2: Throwable) {
+                Diag.error(c, "openBatterySettings", e2)
+            }
         }
-        val posted = try {
-            nm.activeNotifications.firstOrNull { it.id == NOTE_TIMER }?.notification
-        } catch (e: Throwable) {
-            null
-        }
-        val qualifies = try {
-            posted?.javaClass?.getMethod("hasPromotableCharacteristics")?.invoke(posted) as? Boolean
-        } catch (e: Throwable) {
-            null
-        }
-        val promoted = try {
-            val flag = Notification::class.java.getField("FLAG_PROMOTED_ONGOING").getInt(null)
-            posted?.let { (it.flags and flag) != 0 }
-        } catch (e: Throwable) {
-            null
-        }
-        return LiveInfo(Build.VERSION.SDK_INT, allowed, qualifies, promoted)
     }
 
     /** Android 14+ asks the user to allow full-screen alarms. Older versions always allow. */
@@ -480,40 +590,25 @@ object ClockEngine {
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
             )
         } catch (e: Throwable) {
-            openLiveSettings(c)
-        }
-    }
-
-    /** Opens the "Live updates" switch of this app, or the normal notification settings. */
-    fun openLiveSettings(c: Context) {
-        val pkg = c.packageName
-        try {
-            c.startActivity(
-                Intent("android.settings.APP_NOTIFICATION_PROMOTION_SETTINGS")
-                    .putExtra(Settings.EXTRA_APP_PACKAGE, pkg).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-            )
-        } catch (e: Throwable) {
             try {
                 c.startActivity(
                     Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-                        .putExtra(Settings.EXTRA_APP_PACKAGE, pkg).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                        .putExtra(Settings.EXTRA_APP_PACKAGE, c.packageName).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                 )
             } catch (e2: Throwable) {
-                Diag.error(c, "openLiveSettings", e2)
+                Diag.error(c, "openFullScreenSettings", e2)
             }
         }
     }
 
-    /** After a reboot: put the alarms and the timer back. */
+    /** After a reboot: put the alarms and the timers back. */
     fun restore(c: Context) {
         rescheduleAll(c)
-        val t = ClockStore.timer(c)
-        if (t.active && t.running) {
-            if (t.endAt <= System.currentTimeMillis()) onTimerEnd(c) else {
-                scheduleTimerEnd(c, t.endAt)
-                updateTimerNote(c)
-            }
+        val now = System.currentTimeMillis()
+        ClockStore.timers(c).filter { it.running }.forEach { t ->
+            if (t.endAt <= now) onTimerEnd(c, t.id) else scheduleTimerEnd(c, t.id, t.endAt)
         }
+        updateTimerNote(c)
     }
 }
 
@@ -534,9 +629,9 @@ class ClockReceiver : BroadcastReceiver() {
                 ClockEngine.ACTION_ALARM -> ClockEngine.onAlarmFired(context, id)
                 ClockEngine.ACTION_SNOOZE -> ClockEngine.snooze(context, id)
                 ClockEngine.ACTION_DISMISS -> ClockEngine.dismiss(context, id)
-                ClockEngine.ACTION_TIMER_END -> ClockEngine.onTimerEnd(context)
-                ClockEngine.ACTION_TIMER_TOGGLE -> ClockEngine.timerToggle(context)
-                ClockEngine.ACTION_TIMER_CANCEL -> ClockEngine.timerCancel(context)
+                ClockEngine.ACTION_TIMER_END -> ClockEngine.onTimerEnd(context, id)
+                ClockEngine.ACTION_TIMER_TOGGLE -> ClockEngine.timerToggle(context, id)
+                ClockEngine.ACTION_TIMER_CANCEL -> ClockEngine.timerCancel(context, id)
                 Intent.ACTION_BOOT_COMPLETED -> ClockEngine.restore(context)
             }
         } catch (e: Throwable) {

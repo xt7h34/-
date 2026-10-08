@@ -1878,7 +1878,7 @@ class MainActivity : ComponentActivity() {
             var page by rememberSaveable { mutableStateOf(startPage) }
             val parent = when (page) {
                 PAGE_PANEL, PAGE_BEHAVIOR, PAGE_STATION, PAGE_APPS -> PAGE_VOLUME
-                PAGE_CLOCK_TIME, PAGE_ALARMS, PAGE_TIMER, PAGE_SLEEP -> PAGE_CLOCK
+                PAGE_CLOCK_TIME, PAGE_ALARMS, PAGE_TIMER, PAGE_STOPWATCH, PAGE_SLEEP -> PAGE_CLOCK
                 else -> PAGE_HOME
             }
             BackHandler(enabled = page != PAGE_HOME) { page = parent }
@@ -1895,6 +1895,7 @@ class MainActivity : ComponentActivity() {
                 PAGE_CLOCK_TIME -> WorldClockPage(goBack)
                 PAGE_ALARMS -> AlarmsPage(goBack)
                 PAGE_TIMER -> TimerPage(goBack)
+                PAGE_STOPWATCH -> StopwatchPage(goBack)
                 PAGE_SLEEP -> SleepPage(goBack)
                 else -> HomePage(serviceEnabled) { page = it }
             }

@@ -90,6 +90,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.random.Random
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
@@ -102,6 +103,7 @@ import kotlin.math.roundToInt
 const val DISMISS_DRAG = 0
 const val DISMISS_TAP = 1
 const val DISMISS_HOLD = 2
+const val DISMISS_MATH = 3
 
 private const val CH_RING = "kanade_ring"
 private const val CH_RING_DND = "kanade_ring_dnd"
@@ -144,6 +146,15 @@ class AlarmRingService : Service() {
     private var noteId = 0
 
     private val timeout = Runnable { ClockEngine.dismiss(this, noteId) }
+
+    private var ramp = 1f
+    private val rampTick = object : Runnable {
+        override fun run() {
+            ramp = (ramp + 0.1f).coerceAtMost(1f)
+            player?.setVolume(ramp, ramp)
+            if (ramp < 1f) handler.postDelayed(this, 2000)
+        }
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -306,6 +317,12 @@ class AlarmRingService : Service() {
         }
         player = mp
         mp?.start()
+        handler.removeCallbacks(rampTick)
+        if (mp != null && ClockStore.ringRamp(this)) {
+            ramp = 0.15f
+            mp.setVolume(ramp, ramp)
+            handler.postDelayed(rampTick, 2000)
+        }
     }
 
     private fun stopSound() {
@@ -332,6 +349,7 @@ class AlarmRingService : Service() {
 
     override fun onDestroy() {
         handler.removeCallbacks(timeout)
+        handler.removeCallbacks(rampTick)
         stopSound()
         try {
             getSystemService(Vibrator::class.java).cancel()
@@ -379,6 +397,7 @@ class AlarmRingActivity : ComponentActivity() {
         val alarmId = intent.getIntExtra(AlarmRingService.EXTRA_ID, 0)
         val noteId = intent.getIntExtra(AlarmRingService.EXTRA_NOTE, 0)
         val title = intent.getStringExtra(AlarmRingService.EXTRA_TITLE) ?: getString(R.string.alarm_title)
+        val snoozeMin = ClockStore.alarms(this).firstOrNull { it.id == alarmId }?.snooze ?: 0
         setContent {
             KanadeTheme(THEME_DARK, false) {
                 // If the alarm was stopped some other way (the notification), close this screen.
@@ -392,13 +411,15 @@ class AlarmRingActivity : ComponentActivity() {
                 AlarmRingScreen(
                     editing = false,
                     title = title,
-                    showSnooze = alarmId > 0,
+                    showSnooze = alarmId != 0,
+                    snoozeMinutes = snoozeMin,
                     onDismiss = {
                         ClockEngine.dismiss(this, noteId)
                         finish()
                     },
                     onSnooze = {
-                        ClockEngine.snooze(this, alarmId)
+                        // A test ring (id -1) has nothing to snooze: it just stops.
+                        if (alarmId > 0) ClockEngine.snooze(this, alarmId) else ClockEngine.dismiss(this, noteId)
                         finish()
                     },
                     onDone = {},
@@ -469,8 +490,10 @@ fun AlarmRingScreen(
     onDismiss: () -> Unit,
     onSnooze: () -> Unit,
     onDone: () -> Unit,
+    snoozeMinutes: Int = 0,
 ) {
     val ctx = LocalContext.current
+    var solving by remember { mutableStateOf(false) }
     var bg by remember { mutableStateOf(ClockStore.ringBg(ctx)) }
     var bgVer by remember { mutableLongStateOf(ClockStore.ringBgVersion(ctx)) }
     var clockStyle by remember { mutableIntStateOf(ClockStore.ringClock(ctx)) }
@@ -494,13 +517,15 @@ fun AlarmRingScreen(
 
     val cal = Calendar.getInstance().apply { timeInMillis = now }
     val hour24 = cal.get(Calendar.HOUR_OF_DAY)
+    val loc = remember { ClockStore.ringLocale(ctx) }
     val hourText = if (DateFormat.is24HourFormat(ctx)) {
-        "%02d".format(hour24)
+        String.format(loc, "%02d", hour24)
     } else {
-        (if (hour24 % 12 == 0) 12 else hour24 % 12).toString()
+        String.format(loc, "%d", if (hour24 % 12 == 0) 12 else hour24 % 12)
     }
-    val minText = "%02d".format(cal.get(Calendar.MINUTE))
-    val dateText = SimpleDateFormat("EEE, MMMM d", Locale.getDefault()).format(Date(now))
+    val minText = String.format(loc, "%02d", cal.get(Calendar.MINUTE))
+    val dateText = SimpleDateFormat("EEE, MMMM d", loc).format(Date(now))
+    val shownSnooze = if (!editing && snoozeMinutes > 0) snoozeMinutes else snooze
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         RingBackground(bg, bgVer, Modifier.fillMaxSize())
@@ -551,6 +576,10 @@ fun AlarmRingScreen(
                         dismissMode = DISMISS_HOLD
                         ClockStore.setRingDismiss(ctx, DISMISS_HOLD)
                     }
+                    GlassChip(stringResource(R.string.dismiss_math), dismissMode == DISMISS_MATH) {
+                        dismissMode = DISMISS_MATH
+                        ClockStore.setRingDismiss(ctx, DISMISS_MATH)
+                    }
                 }
             } else {
                 Text(
@@ -558,6 +587,7 @@ fun AlarmRingScreen(
                         when (dismissMode) {
                             DISMISS_TAP -> R.string.ring_hint_tap
                             DISMISS_HOLD -> R.string.ring_hint_hold
+                            DISMISS_MATH -> R.string.ring_hint_math
                             else -> R.string.ring_hint_drag
                         },
                     ),
@@ -566,8 +596,11 @@ fun AlarmRingScreen(
                 )
             }
             Spacer(Modifier.height(14.dp))
-            DismissButton(dismissMode, enabled = !editing, onDismiss = onDismiss)
-            Spacer(Modifier.height(40.dp))
+            DismissButton(
+                dismissMode,
+                enabled = !editing,
+                onDismiss = { if (dismissMode == DISMISS_MATH) solving = true else onDismiss() },
+            )            Spacer(Modifier.height(40.dp))
             if (showSnooze || editing) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     if (editing) {
@@ -586,7 +619,7 @@ fun AlarmRingScreen(
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            stringResource(R.string.ring_snooze_mins, snooze),
+                            stringResource(R.string.ring_snooze_mins, String.format(loc, "%d", shownSnooze)),
                             color = Color.White,
                             fontSize = 20.sp,
                             fontWeight = FontWeight.SemiBold,
@@ -600,6 +633,10 @@ fun AlarmRingScreen(
                     }
                 }
             }
+        }
+
+        if (solving && !editing) {
+            MathChallenge(loc, onSolved = onDismiss, onCancel = { solving = false })
         }
 
         if (editing && sheet != 0) {
@@ -731,7 +768,7 @@ private fun DismissButton(mode: Int, enabled: Boolean, onDismiss: () -> Unit) {
         Modifier
     } else {
         when (mode) {
-            DISMISS_TAP -> Modifier.pointerInput(Unit) {
+            DISMISS_TAP, DISMISS_MATH -> Modifier.pointerInput(Unit) {
                 detectTapGestures(onTap = { dismissNow() })
             }
             DISMISS_HOLD -> Modifier.pointerInput(Unit) {
@@ -893,5 +930,94 @@ private fun BgThumb(id: String, version: Long, selected: Boolean, onClick: () ->
             .clickable { onClick() },
     ) {
         RingBackground(id, version, Modifier.fillMaxSize())
+    }
+}
+
+/** A small sum to solve before the alarm stops. Own keypad, so no keyboard is needed on the lock screen. */
+@Composable
+private fun MathChallenge(loc: Locale, onSolved: () -> Unit, onCancel: () -> Unit) {
+    var round by remember { mutableIntStateOf(0) }
+    val problem = remember(round) {
+        if (Random.nextBoolean()) {
+            val a = Random.nextInt(12, 40)
+            val b = Random.nextInt(12, 40)
+            String.format(loc, "%d + %d", a, b) to (a + b)
+        } else {
+            val a = Random.nextInt(4, 10)
+            val b = Random.nextInt(6, 13)
+            String.format(loc, "%d \u00D7 %d", a, b) to (a * b)
+        }
+    }
+    var typed by remember(round) { mutableStateOf("") }
+    var wrong by remember { mutableStateOf(false) }
+    val ltr = androidx.compose.ui.text.TextStyle(textDirection = androidx.compose.ui.text.style.TextDirection.Ltr)
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Color(0xEB000000))
+            .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {},
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            Modifier.statusBarsPadding().navigationBarsPadding().padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(stringResource(R.string.math_title), color = Color(0xCCFFFFFF), fontSize = 16.sp)
+            Spacer(Modifier.height(18.dp))
+            Text(problem.first + " = ?", color = Color.White, fontSize = 44.sp, fontWeight = FontWeight.SemiBold, style = ltr)
+            Spacer(Modifier.height(10.dp))
+            Text(
+                typed.toIntOrNull()?.let { String.format(loc, "%d", it) } ?: " ",
+                color = Color.White, fontSize = 36.sp, style = ltr,
+            )
+            Text(if (wrong) stringResource(R.string.math_wrong) else " ", color = Color(0xFFFF8A80), fontSize = 14.sp)
+            Spacer(Modifier.height(16.dp))
+            listOf(
+                listOf("1", "2", "3"),
+                listOf("4", "5", "6"),
+                listOf("7", "8", "9"),
+                listOf("<", "0", "OK"),
+            ).forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    row.forEach { key ->
+                        Box(
+                            Modifier
+                                .size(70.dp)
+                                .clip(CircleShape)
+                                .background(Color(0x33FFFFFF))
+                                .clickable {
+                                    when (key) {
+                                        "<" -> typed = typed.dropLast(1)
+                                        "OK" -> if (typed.toIntOrNull() == problem.second) {
+                                            onSolved()
+                                        } else {
+                                            wrong = true
+                                            round++
+                                        }
+                                        else -> {
+                                            wrong = false
+                                            if (typed.length < 4) typed += key
+                                        }
+                                    }
+                                },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                when (key) {
+                                    "<" -> "\u232B"
+                                    "OK" -> "\u2713"
+                                    else -> String.format(loc, "%d", key.toInt())
+                                },
+                                color = Color.White,
+                                fontSize = 26.sp,
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(14.dp))
+            }
+            Spacer(Modifier.height(6.dp))
+            GlassPill(stringResource(R.string.ring_back)) { onCancel() }
+        }
     }
 }

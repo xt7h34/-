@@ -31,6 +31,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -151,6 +154,11 @@ fun ClockHubPage(onOpen: (String) -> Unit, onBack: () -> Unit) {
                     Glyph.TIMER, ICON_PINK,
                     stringResource(R.string.clock_tab_timer), stringResource(R.string.clock_tab_timer_sum),
                 ) { onOpen(PAGE_TIMER) }
+                ItemDivider()
+                SettingsItem(
+                    Glyph.STOPWATCH, ICON_GREEN,
+                    stringResource(R.string.clock_tab_stopwatch), stringResource(R.string.clock_tab_stopwatch_sum),
+                ) { onOpen(PAGE_STOPWATCH) }
                 ItemDivider()
                 SettingsItem(
                     Glyph.SLEEP, ICON_PURPLE,
@@ -615,6 +623,7 @@ fun AlarmsPage(onBack: () -> Unit) {
 
     PageScaffold(stringResource(R.string.clock_tab_alarms), onBack) { padding ->
         PageColumn(padding) {
+            ReliabilityNotice()
             FullScreenNotice()
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Button(
@@ -663,11 +672,26 @@ fun AlarmsPage(onBack: () -> Unit) {
                                 val days = if (a.days == 0) ctx.getString(R.string.alarm_once)
                                 else (0..6).filter { ((a.days shr it) and 1) == 1 }
                                     .joinToString(" ") { ctx.getString(DAY_NAMES[it]) }
+                                val skipping = a.enabled && a.days != 0 && a.skipUntil > System.currentTimeMillis()
                                 Text(
-                                    listOf(a.label, days).filter { it.isNotBlank() }.joinToString(" • "),
+                                    listOf(a.label, days, if (skipping) ctx.getString(R.string.alarm_skipped) else "")
+                                        .filter { it.isNotBlank() }.joinToString(" • "),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
+                                if (a.enabled && a.days != 0) {
+                                    TextButton(
+                                        onClick = {
+                                            val updated = if (skipping) a.copy(skipUntil = 0L) else a.copy(skipUntil = nextTrigger(a))
+                                            store(alarms.map { if (it.id == a.id) updated else it })
+                                        },
+                                    ) {
+                                        Text(
+                                            stringResource(if (skipping) R.string.alarm_skip_undo else R.string.alarm_skip_next),
+                                            style = MaterialTheme.typography.labelMedium,
+                                        )
+                                    }
+                                }
                             }
                             KanadeSwitch(a.enabled) { on ->
                                 askNotifications()
@@ -695,6 +719,7 @@ private fun AlarmEditor(
     var label by remember { mutableStateOf(initial.label) }
     var days by remember { mutableIntStateOf(initial.days) }
     var tone by remember { mutableStateOf(initial.ringtone) }
+    var snz by remember { mutableIntStateOf(initial.snooze) }
     val ctx = LocalContext.current
     val pickTone = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         val uri: Uri? = if (Build.VERSION.SDK_INT >= 33) {
@@ -758,6 +783,20 @@ private fun AlarmEditor(
             )
         }
         Spacer(Modifier.height(12.dp))
+        Text(stringResource(R.string.alarm_snooze_title), style = MaterialTheme.typography.labelLarge)
+        Spacer(Modifier.height(8.dp))
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(0, 3, 5, 10, 15).forEach { m ->
+                FilterChip(
+                    selected = snz == m,
+                    onClick = { snz = m },
+                    label = {
+                        Text(if (m == 0) stringResource(R.string.alarm_snooze_default) else stringResource(R.string.alarm_snooze_n, m))
+                    },
+                )
+            }
+        }
+        Spacer(Modifier.height(12.dp))
         Text(stringResource(R.string.alarm_repeat), style = MaterialTheme.typography.labelLarge)
         Spacer(Modifier.height(8.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -787,7 +826,7 @@ private fun AlarmEditor(
             }
             Button(
                 onClick = {
-                    onSave(initial.copy(hour = h, minute = m, label = label.trim(), enabled = true, days = days, ringtone = tone))
+                    onSave(initial.copy(hour = h, minute = m, label = label.trim(), enabled = true, days = days, ringtone = tone, snooze = snz, skipUntil = 0L))
                 },
                 modifier = Modifier.weight(1f),
             ) { Text(stringResource(R.string.alarm_save)) }
@@ -802,12 +841,15 @@ private fun AlarmSettingsDialog(onClose: () -> Unit, onCustomize: () -> Unit) {
     var inDnd by remember { mutableStateOf(ClockStore.ringInDnd(ctx)) }
     var inSilent by remember { mutableStateOf(ClockStore.ringInSilent(ctx)) }
     var inVibrate by remember { mutableStateOf(ClockStore.ringInVibrate(ctx)) }
+    var ramp by remember { mutableStateOf(ClockStore.ringRamp(ctx)) }
+    var digits by remember { mutableIntStateOf(ClockStore.ringDigits(ctx)) }
     var dismissMode by remember { mutableIntStateOf(ClockStore.ringDismiss(ctx)) }
     Dialog(onDismissRequest = onClose) {
         Column(
             Modifier
                 .clip(RoundedCornerShape(28.dp))
                 .background(MaterialTheme.colorScheme.surfaceContainer)
+                .verticalScroll(rememberScrollState())
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -831,12 +873,17 @@ private fun AlarmSettingsDialog(onClose: () -> Unit, onCustomize: () -> Unit) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            SwitchRow(stringResource(R.string.alarm_ramp), ramp) {
+                ramp = it
+                ClockStore.setRingRamp(ctx, it)
+            }
             Text(stringResource(R.string.alarm_dismiss_method), style = MaterialTheme.typography.labelLarge)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(
                     DISMISS_DRAG to R.string.dismiss_drag,
                     DISMISS_TAP to R.string.dismiss_tap,
                     DISMISS_HOLD to R.string.dismiss_hold,
+                    DISMISS_MATH to R.string.dismiss_math,
                 ).forEach { (mode, label) ->
                     FilterChip(
                         selected = dismissMode == mode,
@@ -848,11 +895,77 @@ private fun AlarmSettingsDialog(onClose: () -> Unit, onCustomize: () -> Unit) {
                     )
                 }
             }
+            Text(stringResource(R.string.digits_title), style = MaterialTheme.typography.labelLarge)
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(
+                    0 to R.string.digits_auto,
+                    1 to R.string.digits_western,
+                    2 to R.string.digits_arabic,
+                ).forEach { (mode, label) ->
+                    FilterChip(
+                        selected = digits == mode,
+                        onClick = {
+                            digits = mode
+                            ClockStore.setRingDigits(ctx, mode)
+                        },
+                        label = { Text(stringResource(label)) },
+                    )
+                }
+            }
             Button(onClick = onCustomize, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.alarm_customize))
             }
+            OutlinedButton(
+                onClick = {
+                    onClose()
+                    ClockEngine.testRing(ctx)
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.alarm_test))
+            }
             TextButton(onClick = onClose, modifier = Modifier.align(Alignment.End)) {
                 Text(stringResource(R.string.ring_done))
+            }
+        }
+    }
+}
+
+/** Some phones stop apps in the background. If battery optimization is on for Kanade, say so. */
+@Composable
+private fun ReliabilityNotice() {
+    val ctx = LocalContext.current
+    var ok by remember { mutableStateOf(ClockEngine.batteryUnrestricted(ctx)) }
+    var hiddenAt by remember { mutableStateOf(ClockStore.relDismissedAt(ctx)) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            ok = ClockEngine.batteryUnrestricted(ctx)
+            delay(1000)
+        }
+    }
+    val later = System.currentTimeMillis() - hiddenAt < 7L * 24L * 3_600_000L
+    if (!ok && !later) {
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    stringResource(R.string.rel_title),
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                )
+                Text(
+                    stringResource(R.string.rel_body),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { ClockEngine.openBatterySettings(ctx) }) { Text(stringResource(R.string.rel_open)) }
+                    TextButton(
+                        onClick = {
+                            hiddenAt = System.currentTimeMillis()
+                            ClockStore.setRelDismissedAt(ctx, hiddenAt)
+                        },
+                    ) { Text(stringResource(R.string.rel_later)) }
+                }
             }
         }
     }

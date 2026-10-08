@@ -132,83 +132,115 @@ private fun SmallPill(text: String, onClick: () -> Unit) {
 fun TimerPage(onBack: () -> Unit) {
     val ctx = LocalContext.current
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    var state by remember { mutableStateOf(ClockStore.timer(ctx)) }
+    var timers by remember { mutableStateOf(ClockStore.timers(ctx)) }
     LaunchedEffect(Unit) {
         while (true) {
             now = System.currentTimeMillis()
-            state = ClockStore.timer(ctx)
+            timers = ClockStore.timers(ctx)
             delay(100)
         }
     }
     var setMs by remember { mutableLongStateOf(5 * 60_000L) }
-    var fullView by remember { mutableStateOf(true) }
+    var openId by remember { mutableIntStateOf(0) }
     var floating by remember { mutableStateOf(ClockStore.floatingEnabled(ctx)) }
     val askNotifications = rememberNotifPermission()
 
-    if (state.active && fullView) {
-        BackHandler { fullView = false }
+    // The big view of one timer. The x leaves it only: the timer keeps going.
+    val opened = timers.firstOrNull { it.id == openId }
+    if (opened != null) {
+        BackHandler { openId = 0 }
         TimerRunningView(
-            state = state,
+            state = opened,
             now = now,
-            onClose = { fullView = false },
-            onToggle = { ClockEngine.timerToggle(ctx) },
-            onCancel = { ClockEngine.timerCancel(ctx) },
+            onClose = { openId = 0 },
+            onToggle = { ClockEngine.timerToggle(ctx, opened.id) },
+            onCancel = {
+                ClockEngine.timerCancel(ctx, opened.id)
+                openId = 0
+            },
         )
         return
     }
 
     PageScaffold(stringResource(R.string.clock_tab_timer), onBack) { padding ->
         PageColumn(padding) {
-            if (state.active) {
+            if (timers.isNotEmpty()) {
                 Section(stringResource(R.string.timer_running_card)) {
-                    Text(
-                        formatMs(state.remaining(now)),
-                        style = MaterialTheme.typography.displaySmall,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = { fullView = true }) { Text(stringResource(R.string.timer_open)) }
-                        OutlinedButton(onClick = { ClockEngine.timerToggle(ctx) }) {
-                            Text(stringResource(if (state.running) R.string.timer_pause else R.string.timer_resume))
-                        }
-                        TextButton(onClick = { ClockEngine.timerCancel(ctx) }) {
-                            Text(stringResource(R.string.timer_cancel))
+                    timers.forEach { t ->
+                        Row(
+                            Modifier.fillMaxWidth().clickable { openId = t.id }.padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    formatMs(t.remaining(now)),
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                                Text(
+                                    formatMs(t.total),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Box(
+                                Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primaryContainer)
+                                    .clickable { ClockEngine.timerToggle(ctx, t.id) },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                PathIcon(
+                                    (if (t.running) Glyph.PAUSE else Glyph.PLAY).pathData,
+                                    MaterialTheme.colorScheme.onPrimaryContainer, 20.dp,
+                                )
+                            }
+                            Spacer(Modifier.width(8.dp))
+                            Box(
+                                Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .clickable { ClockEngine.timerCancel(ctx, t.id) },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                PathIcon(Glyph.CLOSE.pathData, MaterialTheme.colorScheme.onSurfaceVariant, 20.dp)
+                            }
                         }
                     }
                 }
-            } else {
-                Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                    TimerDial(setMs, { setMs = it }, Modifier.size(280.dp))
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        stringResource(R.string.timer_set_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                    )
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    listOf(-60_000L, 30_000L, 60_000L, 300_000L).forEach { d ->
-                        SmallPill((if (d < 0) "−" else "+") + formatMs(abs(d))) {
-                            setMs = (setMs + d).coerceIn(0L, 24 * 3_600_000L)
-                        }
-                    }
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    listOf(1, 5, 10, 15, 30).forEach { m ->
-                        SmallPill(formatDuration(ctx, m)) { setMs = m * 60_000L }
-                    }
-                }
-                Button(
-                    onClick = {
-                        askNotifications()
-                        ClockEngine.timerStart(ctx, setMs)
-                        fullView = true
-                    },
-                    enabled = setMs > 0,
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text(stringResource(R.string.timer_start)) }
             }
+            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                TimerDial(setMs, { setMs = it }, Modifier.size(280.dp))
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    stringResource(R.string.timer_set_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                listOf(-60_000L, 30_000L, 60_000L, 300_000L).forEach { d ->
+                    SmallPill((if (d < 0) "\u2212" else "+") + formatMs(abs(d))) {
+                        setMs = (setMs + d).coerceIn(0L, 24 * 3_600_000L)
+                    }
+                }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                listOf(1, 5, 10, 15, 30).forEach { m ->
+                    SmallPill(formatDuration(ctx, m)) { setMs = m * 60_000L }
+                }
+            }
+            Button(
+                onClick = {
+                    askNotifications()
+                    val id = ClockEngine.timerStart(ctx, setMs)
+                    if (id > 0) openId = id
+                },
+                enabled = setMs > 0 && timers.size < ClockEngine.MAX_TIMERS,
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text(stringResource(R.string.timer_start)) }
             Section(stringResource(R.string.timer_floating)) {
                 SwitchRow(stringResource(R.string.timer_floating), floating) {
                     floating = it
@@ -221,41 +253,6 @@ fun TimerPage(onBack: () -> Unit) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-            }
-            Section(stringResource(R.string.live_title)) {
-                var info by remember { mutableStateOf(ClockEngine.liveInfo(ctx)) }
-                LaunchedEffect(state.active, state.running) {
-                    delay(700)
-                    info = ClockEngine.liveInfo(ctx)
-                }
-                fun yn(b: Boolean?): String = when (b) {
-                    true -> ctx.getString(R.string.live_yes)
-                    false -> ctx.getString(R.string.live_no)
-                    null -> "?"
-                }
-                val summary = if (info.sdk < 36) {
-                    stringResource(R.string.live_old_android, info.sdk)
-                } else {
-                    ctx.getString(R.string.live_allowed, yn(info.allowed)) + "\n" +
-                        ctx.getString(R.string.live_qualifies, yn(info.qualifies)) + "\n" +
-                        ctx.getString(R.string.live_promoted, yn(info.promoted))
-                }
-                Text(summary, style = MaterialTheme.typography.bodySmall)
-                Text(
-                    stringResource(R.string.live_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                if (android.os.Build.MANUFACTURER.equals("samsung", ignoreCase = true)) {
-                    Text(
-                        stringResource(R.string.live_samsung),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                OutlinedButton(onClick = { ClockEngine.openLiveSettings(ctx) }) {
-                    Text(stringResource(R.string.live_open))
-                }
             }
         }
     }
