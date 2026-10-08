@@ -600,7 +600,8 @@ fun AlarmRingScreen(
                 dismissMode,
                 enabled = !editing,
                 onDismiss = { if (dismissMode == DISMISS_MATH) solving = true else onDismiss() },
-            )            Spacer(Modifier.height(40.dp))
+            )
+            Spacer(Modifier.height(40.dp))
             if (showSnooze || editing) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     if (editing) {
