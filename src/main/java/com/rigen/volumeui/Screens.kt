@@ -660,11 +660,15 @@ private fun PositionPicker(
 // ───────────────────────────── Pages ─────────────────────────────
 
 @Composable
-private fun AccountCard() {
+private fun AccountCard(onClick: () -> Unit) {
+    val ctx = LocalContext.current
+    val profile = remember { AccountStore.load(ctx)?.profile }
+    val signedName = profile?.optString("name").orEmpty().ifBlank { profile?.optString("hash").orEmpty() }
     SettingsGroup {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .clickable { onClick() }
                 .padding(20.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -684,9 +688,12 @@ private fun AccountCard() {
             }
             Spacer(Modifier.width(16.dp))
             Column {
-                Text(stringResource(R.string.account_title), style = MaterialTheme.typography.titleLarge)
                 Text(
-                    stringResource(R.string.account_summary),
+                    if (profile != null && signedName.isNotBlank()) signedName else stringResource(R.string.account_title),
+                    style = MaterialTheme.typography.titleLarge,
+                )
+                Text(
+                    if (profile != null) profile.optString("hash") else stringResource(R.string.account_summary),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -704,7 +711,7 @@ private fun HomePage(serviceEnabled: Boolean, onOpen: (String) -> Unit) {
     PageScaffold(stringResource(R.string.app_title), null) { padding ->
         Box(Modifier.fillMaxSize()) {
             PageColumn(padding) {
-                AccountCard()
+                AccountCard { onOpen(PAGE_ACCOUNT) }
 
                 SettingsGroup {
                     SettingsItem(
@@ -1896,6 +1903,7 @@ class MainActivity : ComponentActivity() {
                 PAGE_ALARMS -> AlarmsPage(goBack)
                 PAGE_TIMER -> TimerPage(goBack)
                 PAGE_STOPWATCH -> StopwatchPage(goBack)
+                PAGE_ACCOUNT -> AccountPage(goBack)
                 PAGE_SLEEP -> SleepPage(goBack)
                 else -> HomePage(serviceEnabled) { page = it }
             }

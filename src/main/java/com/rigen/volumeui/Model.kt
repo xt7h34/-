@@ -41,6 +41,7 @@ const val OUTPUT_WIRED = 2
 // Pages of the app. The service opens PAGE_VOLUME from the Volume Station's gear icon.
 const val EXTRA_PAGE = "page"
 const val PAGE_HOME = "home"
+const val PAGE_ACCOUNT = "account"
 const val PAGE_VOLUME = "volume"
 const val PAGE_PANEL = "panel"
 const val PAGE_BEHAVIOR = "behavior"
