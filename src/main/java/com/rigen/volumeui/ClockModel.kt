@@ -616,6 +616,7 @@ object ClockEngine {
         }
         updateTimerNote(c)
         ClockWidgets.updateAll(c)
+        KanadeReminders.onBoot(c)
     }
 }
 

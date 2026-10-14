@@ -7,6 +7,7 @@ import android.security.keystore.KeyProperties
 import android.util.Base64
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
@@ -15,6 +16,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -24,6 +26,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -32,6 +35,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -170,6 +174,14 @@ fun AccountPage(onBack: () -> Unit) {
     var requestId by remember { mutableStateOf("") }
     var code by remember { mutableStateOf("") }
 
+    // What the bot says about the rewards and the prayer times, and which reminders are on.
+    var rewards by remember { mutableStateOf<List<RewardState>>(emptyList()) }
+    var prayers by remember { mutableStateOf<List<PrayerTime>>(emptyList()) }
+    var prayerState by remember { mutableStateOf("") } // "" = loading, "none" = no location, "ok", "off"
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    var enabledSet by remember { mutableStateOf(KanadeReminders.enabled(ctx)) }
+    val askNotifications = rememberNotifPermission()
+
     fun finish(r: ApiResult) {
         val token = r.body?.optString("token").orEmpty()
         val profile = r.body?.optJSONObject("profile")
@@ -192,6 +204,7 @@ fun AccountPage(onBack: () -> Unit) {
         val r = KanadeApi.call("/auth/me", token = s.token)
         if (r.status == 401) {
             AccountStore.clear(ctx)
+            KanadeReminders.reset(ctx)
             session = null
             step = Step.Start
         } else if (r.ok) {
@@ -204,8 +217,50 @@ fun AccountPage(onBack: () -> Unit) {
         }
     }
 
+    suspend fun loadTimers() {
+        val s = session ?: return
+        val t = KanadeApi.call("/me/timers", token = s.token)
+        if (t.ok) {
+            rewards = KanadeReminders.parseRewards(t.body)
+            if (enabledSet.isNotEmpty()) KanadeReminders.scheduleRewards(ctx, rewards)
+        }
+        val p = KanadeApi.call("/me/prayer", token = s.token)
+        if (p.ok) {
+            prayers = KanadeReminders.parsePrayers(p.body)
+            prayerState = when {
+                p.body?.optBoolean("configured") != true -> "none"
+                prayers.isEmpty() -> "off"
+                else -> "ok"
+            }
+            if ("prayer" in enabledSet) KanadeReminders.schedulePrayers(ctx, prayers)
+        }
+        if (enabledSet.isNotEmpty()) KanadeReminders.scheduleSync(ctx)
+    }
+
+    fun toggle(id: String, on: Boolean) {
+        KanadeReminders.setEnabled(ctx, id, on)
+        enabledSet = KanadeReminders.enabled(ctx)
+        if (on) {
+            askNotifications()
+            scope.launch { loadTimers() }
+        } else {
+            KanadeReminders.cancelItem(ctx, id)
+            if (enabledSet.isEmpty()) KanadeReminders.cancelAll(ctx)
+        }
+    }
+
     LaunchedEffect(step) {
-        if (step == Step.Done) refresh()
+        if (step == Step.Done) {
+            refresh()
+            loadTimers()
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            now = System.currentTimeMillis()
+            delay(1000)
+        }
     }
 
     BackHandler(enabled = step == Step.Login || step == Step.Register || step == Step.Code) {
@@ -394,6 +449,35 @@ fun AccountPage(onBack: () -> Unit) {
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     }
+                    Section(stringResource(R.string.rem_section)) {
+                        val labels = mapOf(
+                            "daily" to R.string.rem_daily,
+                            "treasure" to R.string.rem_treasure,
+                            "weekly" to R.string.rem_weekly,
+                            "monthly" to R.string.rem_monthly,
+                        )
+                        KanadeReminders.REWARD_IDS.forEach { id ->
+                            val r = rewards.firstOrNull { it.id == id }
+                            val status = when {
+                                r == null -> "\u2026"
+                                r.readyAt <= now -> stringResource(R.string.rem_ready)
+                                else -> stringResource(R.string.rem_in, leftText(ctx, r.readyAt - now))
+                            }
+                            ReminderRow(stringResource(labels.getValue(id)), status, id in enabledSet) { toggle(id, it) }
+                        }
+                        val next = prayers.firstOrNull { it.at > now }
+                        val prayerStatus = when {
+                            prayerState == "" -> "\u2026"
+                            prayerState == "none" -> stringResource(R.string.rem_prayer_setup)
+                            next == null -> stringResource(R.string.rem_prayer_unavailable)
+                            else -> next.name + " \u2022 " +
+                                DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(next.at)) + " \u2022 " +
+                                stringResource(R.string.rem_in, leftText(ctx, next.at - now))
+                        }
+                        ReminderRow(stringResource(R.string.rem_prayer), prayerStatus, "prayer" in enabledSet) {
+                            toggle("prayer", it)
+                        }
+                    }
                     ErrorText(error)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(
@@ -411,6 +495,8 @@ fun AccountPage(onBack: () -> Unit) {
                                 scope.launch {
                                     session?.let { KanadeApi.call("/auth/logout", JSONObject(), it.token) }
                                     AccountStore.clear(ctx)
+                                    KanadeReminders.reset(ctx)
+                                    enabledSet = emptySet()
                                     session = null
                                     step = Step.Start
                                 }
@@ -447,5 +533,29 @@ private fun Field(
 private fun ErrorText(error: String) {
     if (error.isNotBlank()) {
         Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+/** "2d 5h" or "5h 20m" for what is left. */
+private fun leftText(c: Context, ms: Long): String {
+    val minutes = (ms / 60_000L).coerceAtLeast(0L)
+    val d = (minutes / 1440L).toInt()
+    val h = ((minutes % 1440L) / 60L).toInt()
+    val m = (minutes % 60L).toInt()
+    return if (d > 0) c.getString(R.string.rem_dh, d, h) else c.getString(R.string.widget_hm, h, m)
+}
+
+@Composable
+private fun ReminderRow(title: String, status: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                status,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(checked = checked, onCheckedChange = onChange)
     }
 }

@@ -45,6 +45,10 @@
         </activity>
 
         <receiver
+            android:name=".KanadeReminderReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".NextAlarmWidget"
             android:exported="false"
             android:label="@string/widget_next_alarm_label">

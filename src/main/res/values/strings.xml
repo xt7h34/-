@@ -336,4 +336,22 @@
     <string name="acc_pass_until">%1$s, until %2$s</string>
     <string name="acc_refresh">Refresh</string>
     <string name="acc_logout">Sign out</string>
+    <string name="rem_section">Reminders from Kanade</string>
+    <string name="rem_daily">Daily gift</string>
+    <string name="rem_treasure">Treasure hunt</string>
+    <string name="rem_weekly">Weekly gift</string>
+    <string name="rem_monthly">Monthly gift</string>
+    <string name="rem_prayer">Prayer times</string>
+    <string name="rem_ready">Ready now</string>
+    <string name="rem_in">In %1$s</string>
+    <string name="rem_dh">%1$dd %2$dh</string>
+    <string name="rem_prayer_setup">Set your location with the bot first (the prayer command)</string>
+    <string name="rem_prayer_unavailable">Prayer times are not available right now</string>
+    <string name="rem_channel">Kanade reminders</string>
+    <string name="rem_title">Kanade</string>
+    <string name="rem_daily_ready">Your daily gift is ready</string>
+    <string name="rem_treasure_ready">Your treasure hunt is ready</string>
+    <string name="rem_weekly_ready">Your weekly gift is ready</string>
+    <string name="rem_monthly_ready">Your monthly gift is ready</string>
+    <string name="rem_prayer_now">%1$s prayer time</string>
 </resources>

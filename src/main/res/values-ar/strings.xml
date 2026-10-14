@@ -335,4 +335,22 @@
     <string name="acc_pass_until">%1$s، لحد %2$s</string>
     <string name="acc_refresh">تحديث</string>
     <string name="acc_logout">تسجيل الخروج</string>
+    <string name="rem_section">تذكيرات كندا</string>
+    <string name="rem_daily">الهدية اليومية</string>
+    <string name="rem_treasure">صيد الكنز</string>
+    <string name="rem_weekly">الهدية الأسبوعية</string>
+    <string name="rem_monthly">الهدية الشهرية</string>
+    <string name="rem_prayer">مواقيت الصلاة</string>
+    <string name="rem_ready">جاهزة الآن</string>
+    <string name="rem_in">بعد %1$s</string>
+    <string name="rem_dh">%1$d ي %2$d س</string>
+    <string name="rem_prayer_setup">حدد موقعك من البوت الأول (أمر الصلاة)</string>
+    <string name="rem_prayer_unavailable">مواقيت الصلاة مش متاحة دلوقتي</string>
+    <string name="rem_channel">تذكيرات كندا</string>
+    <string name="rem_title">كندا</string>
+    <string name="rem_daily_ready">هديتك اليومية جاهزة</string>
+    <string name="rem_treasure_ready">صيد الكنز جاهز</string>
+    <string name="rem_weekly_ready">هديتك الأسبوعية جاهزة</string>
+    <string name="rem_monthly_ready">هديتك الشهرية جاهزة</string>
+    <string name="rem_prayer_now">حان وقت صلاة %1$s</string>
 </resources>
