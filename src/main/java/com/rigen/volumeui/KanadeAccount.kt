@@ -173,6 +173,16 @@ fun AccountPage(onBack: () -> Unit) {
     var newPass by remember { mutableStateOf("") }
     var requestId by remember { mutableStateOf("") }
     var code by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+    var emailCode by remember { mutableStateOf("") }
+    var emailRequired by remember { mutableStateOf(false) }
+
+    // Changing the email of an account that is already signed in
+    var mailStep by remember { mutableStateOf(0) } // 0 closed, 1 new email + password, 2 code, 3 remove
+    var mailError by remember { mutableStateOf("") }
+    var chEmail by remember { mutableStateOf("") }
+    var chPass by remember { mutableStateOf("") }
+    var chCode by remember { mutableStateOf("") }
 
     // What the bot says about the rewards and the prayer times, and which reminders are on.
     var rewards by remember { mutableStateOf<List<RewardState>>(emptyList()) }
@@ -192,7 +202,13 @@ fun AccountPage(onBack: () -> Unit) {
             pass = ""
             newPass = ""
             code = ""
+            emailCode = ""
             error = ""
+            mailStep = 0
+            chEmail = ""
+            chPass = ""
+            chCode = ""
+            ClockWidgets.updateAll(ctx)
             step = Step.Done
         } else {
             error = r.message(ctx)
@@ -222,6 +238,8 @@ fun AccountPage(onBack: () -> Unit) {
         val t = KanadeApi.call("/me/timers", token = s.token)
         if (t.ok) {
             rewards = KanadeReminders.parseRewards(t.body)
+            KanadeReminders.cacheRewards(ctx, rewards)
+            ClockWidgets.updateAll(ctx)
             if (enabledSet.isNotEmpty()) KanadeReminders.scheduleRewards(ctx, rewards)
         }
         val p = KanadeApi.call("/me/prayer", token = s.token)
@@ -247,6 +265,28 @@ fun AccountPage(onBack: () -> Unit) {
             KanadeReminders.cancelItem(ctx, id)
             if (enabledSet.isEmpty()) KanadeReminders.cancelAll(ctx)
         }
+    }
+
+    fun applyProfile(r: ApiResult): Boolean {
+        val pr = r.body?.optJSONObject("profile")
+        val s = session
+        if (r.ok && pr != null && s != null) {
+            val ns = Session(s.token, pr)
+            AccountStore.save(ctx, ns)
+            session = ns
+            return true
+        }
+        return false
+    }
+
+    // 401 = the bot no longer knows this session: back to the start.
+    fun sessionExpired(r: ApiResult): Boolean {
+        if (r.status != 401) return false
+        AccountStore.clear(ctx)
+        KanadeReminders.reset(ctx)
+        session = null
+        step = Step.Start
+        return true
     }
 
     LaunchedEffect(step) {
@@ -339,6 +379,12 @@ fun AccountPage(onBack: () -> Unit) {
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    Field(stringResource(R.string.acc_email), email, { email = it }, KeyboardType.Email)
+                    Text(
+                        stringResource(R.string.acc_email_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                     Field(stringResource(R.string.acc_pass_new), newPass, { newPass = it }, secret = true)
                     ErrorText(error)
                     Button(
@@ -352,17 +398,18 @@ fun AccountPage(onBack: () -> Unit) {
                                 } else {
                                     cc.filter { it.isDigit() } + phone.filter { it.isDigit() }.trimStart('0')
                                 }
-                                val r = KanadeApi.call(
-                                    "/auth/register/start",
-                                    JSONObject().put("name", name.trim()).put("birthdate", birth.trim())
-                                        .put("hash", hash.trim()).put("phone", digits)
-                                        .put("password", newPass).put("device", Build.MODEL),
-                                )
+                                val payload = JSONObject().put("name", name.trim()).put("birthdate", birth.trim())
+                                    .put("hash", hash.trim()).put("phone", digits)
+                                    .put("password", newPass).put("device", Build.MODEL)
+                                if (email.isNotBlank()) payload.put("email", email.trim())
+                                val r = KanadeApi.call("/auth/register/start", payload)
                                 busy = false
                                 val id = r.body?.optString("requestId").orEmpty()
                                 if (r.ok && id.isNotEmpty()) {
                                     requestId = id
+                                    emailRequired = r.body?.optBoolean("emailRequired") == true
                                     code = ""
+                                    emailCode = ""
                                     step = Step.Code
                                 } else {
                                     error = r.message(ctx)
@@ -384,7 +431,7 @@ fun AccountPage(onBack: () -> Unit) {
                 Step.Code -> {
                     Text(stringResource(R.string.acc_code_title), style = MaterialTheme.typography.titleMedium)
                     Text(
-                        stringResource(R.string.acc_code_hint),
+                        stringResource(if (emailRequired) R.string.acc_code_hint_both else R.string.acc_code_hint),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -392,21 +439,26 @@ fun AccountPage(onBack: () -> Unit) {
                         stringResource(R.string.acc_code_title), code,
                         { code = it.filter { c -> c.isDigit() }.take(6) }, KeyboardType.Number,
                     )
+                    if (emailRequired) {
+                        Field(
+                            stringResource(R.string.acc_email_code), emailCode,
+                            { emailCode = it.filter { c -> c.isDigit() }.take(6) }, KeyboardType.Number,
+                        )
+                    }
                     ErrorText(error)
                     Button(
                         onClick = {
                             scope.launch {
                                 busy = true
                                 error = ""
-                                val r = KanadeApi.call(
-                                    "/auth/register/confirm",
-                                    JSONObject().put("requestId", requestId).put("code", code),
-                                )
+                                val payload = JSONObject().put("requestId", requestId).put("code", code)
+                                if (emailRequired) payload.put("emailCode", emailCode)
+                                val r = KanadeApi.call("/auth/register/confirm", payload)
                                 busy = false
                                 finish(r)
                             }
                         },
-                        enabled = !busy && code.length == 6,
+                        enabled = !busy && code.length == 6 && (!emailRequired || emailCode.length == 6),
                         modifier = Modifier.fillMaxWidth(),
                     ) { Text(stringResource(R.string.acc_confirm)) }
                     TextButton(
@@ -476,6 +528,156 @@ fun AccountPage(onBack: () -> Unit) {
                         }
                         ReminderRow(stringResource(R.string.rem_prayer), prayerStatus, "prayer" in enabledSet) {
                             toggle("prayer", it)
+                        }
+                    }
+                    Section(stringResource(R.string.acc_email_section)) {
+                        val masked = session?.profile?.optString("email").orEmpty()
+                        Text(
+                            if (masked.isNotBlank()) masked else stringResource(R.string.acc_email_none),
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                        when (mailStep) {
+                            0 -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(
+                                    onClick = {
+                                        mailError = ""
+                                        mailStep = 1
+                                    },
+                                ) {
+                                    Text(stringResource(if (masked.isBlank()) R.string.acc_email_add else R.string.acc_email_change))
+                                }
+                                if (masked.isNotBlank()) {
+                                    TextButton(
+                                        onClick = {
+                                            mailError = ""
+                                            mailStep = 3
+                                        },
+                                    ) { Text(stringResource(R.string.acc_email_remove)) }
+                                }
+                            }
+
+                            1 -> {
+                                Field(stringResource(R.string.acc_email_new), chEmail, { chEmail = it }, KeyboardType.Email)
+                                Field(stringResource(R.string.acc_pass_confirm), chPass, { chPass = it }, secret = true)
+                                Text(
+                                    stringResource(R.string.acc_email_change_hint),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                ErrorText(mailError)
+                                Button(
+                                    onClick = {
+                                        scope.launch {
+                                            busy = true
+                                            mailError = ""
+                                            val r = KanadeApi.call(
+                                                "/me/email/start",
+                                                JSONObject().put("email", chEmail.trim()).put("password", chPass),
+                                                session?.token,
+                                            )
+                                            busy = false
+                                            if (sessionExpired(r)) return@launch
+                                            if (r.ok) {
+                                                chCode = ""
+                                                mailStep = 2
+                                            } else {
+                                                mailError = r.message(ctx)
+                                            }
+                                        }
+                                    },
+                                    enabled = !busy && chEmail.isNotBlank() && chPass.isNotEmpty(),
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) { Text(stringResource(R.string.acc_email_send)) }
+                                TextButton(
+                                    onClick = {
+                                        mailStep = 0
+                                        chPass = ""
+                                    },
+                                ) { Text(stringResource(R.string.acc_cancel)) }
+                            }
+
+                            2 -> {
+                                Text(
+                                    stringResource(R.string.acc_email_code_hint),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Field(
+                                    stringResource(R.string.acc_email_code), chCode,
+                                    { chCode = it.filter { c -> c.isDigit() }.take(6) }, KeyboardType.Number,
+                                )
+                                ErrorText(mailError)
+                                Button(
+                                    onClick = {
+                                        scope.launch {
+                                            busy = true
+                                            mailError = ""
+                                            val r = KanadeApi.call(
+                                                "/me/email/confirm",
+                                                JSONObject().put("code", chCode),
+                                                session?.token,
+                                            )
+                                            busy = false
+                                            if (sessionExpired(r)) return@launch
+                                            if (applyProfile(r)) {
+                                                mailStep = 0
+                                                chEmail = ""
+                                                chPass = ""
+                                                chCode = ""
+                                            } else {
+                                                mailError = r.message(ctx)
+                                            }
+                                        }
+                                    },
+                                    enabled = !busy && chCode.length == 6,
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) { Text(stringResource(R.string.acc_confirm)) }
+                                TextButton(
+                                    onClick = {
+                                        mailStep = 0
+                                        chPass = ""
+                                    },
+                                ) { Text(stringResource(R.string.acc_cancel)) }
+                            }
+
+                            else -> {
+                                Text(
+                                    stringResource(R.string.acc_email_remove_hint),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Field(stringResource(R.string.acc_pass_confirm), chPass, { chPass = it }, secret = true)
+                                ErrorText(mailError)
+                                Button(
+                                    onClick = {
+                                        scope.launch {
+                                            busy = true
+                                            mailError = ""
+                                            val r = KanadeApi.call(
+                                                "/me/email/remove",
+                                                JSONObject().put("password", chPass),
+                                                session?.token,
+                                            )
+                                            busy = false
+                                            if (sessionExpired(r)) return@launch
+                                            if (applyProfile(r)) {
+                                                mailStep = 0
+                                                chPass = ""
+                                            } else {
+                                                mailError = r.message(ctx)
+                                            }
+                                        }
+                                    },
+                                    enabled = !busy && chPass.isNotEmpty(),
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) { Text(stringResource(R.string.acc_email_remove)) }
+                                TextButton(
+                                    onClick = {
+                                        mailStep = 0
+                                        chPass = ""
+                                    },
+                                ) { Text(stringResource(R.string.acc_cancel)) }
+                            }
                         }
                     }
                     ErrorText(error)

@@ -325,7 +325,7 @@
     <string name="acc_pass_new">Choose a password (4+ characters)</string>
     <string name="acc_send_code">Send me the code on WhatsApp</string>
     <string name="acc_code_title">Enter the code</string>
-    <string name="acc_code_hint">We sent a 6-digit code to your WhatsApp. It works for 5 minutes.</string>
+    <string name="acc_code_hint">We sent a 6-digit code to your WhatsApp. It works for 10 minutes.</string>
     <string name="acc_confirm">Confirm</string>
     <string name="acc_offline">Kanade is not reachable. Open Termux and make sure the bot is running.</string>
     <string name="acc_error">Something went wrong, try again.</string>
@@ -354,4 +354,25 @@
     <string name="rem_weekly_ready">Your weekly gift is ready</string>
     <string name="rem_monthly_ready">Your monthly gift is ready</string>
     <string name="rem_prayer_now">%1$s prayer time</string>
+    <string name="widget_rewards_label">Kanade rewards</string>
+    <string name="widget_rewards_desc">Which Kanade rewards are ready, and when the others will be.</string>
+    <string name="widget_rewards_title">Kanade rewards</string>
+    <string name="widget_rewards_ready">%1$d ready</string>
+    <string name="widget_rewards_signin">Open Kanade to sign in</string>
+    <string name="acc_email">Email (optional)</string>
+    <string name="acc_email_hint">We confirm it with a code. It is also your recovery email in Kanade: account recovery codes go to it.</string>
+    <string name="acc_email_code">Email code</string>
+    <string name="acc_code_hint_both">We sent a 6-digit code to your WhatsApp and another to your email. They work for 10 minutes.</string>
+    <string name="acc_email_section">Email</string>
+    <string name="acc_email_none">No email yet</string>
+    <string name="acc_email_add">Add email</string>
+    <string name="acc_email_change">Change email</string>
+    <string name="acc_email_remove">Remove email</string>
+    <string name="acc_email_new">New email</string>
+    <string name="acc_pass_confirm">Your password (to confirm)</string>
+    <string name="acc_email_change_hint">A code goes to the new email. A security alert goes to your WhatsApp, and to the old email if there is one.</string>
+    <string name="acc_email_code_hint">We sent a 6-digit code to the new email. It works for 10 minutes.</string>
+    <string name="acc_email_send">Send the code to this email</string>
+    <string name="acc_email_remove_hint">Account recovery codes will stop reaching this email. Enter your password to confirm.</string>
+    <string name="acc_cancel">Cancel</string>
 </resources>

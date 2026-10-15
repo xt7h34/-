@@ -324,7 +324,7 @@
     <string name="acc_pass_new">اختار باسوورد (4 حروف على الأقل)</string>
     <string name="acc_send_code">ابعتلي الكود على واتساب</string>
     <string name="acc_code_title">اكتب الكود</string>
-    <string name="acc_code_hint">بعتنا كود من 6 أرقام على واتساب. صالح 5 دقايق.</string>
+    <string name="acc_code_hint">بعتنا كود من 6 أرقام على واتساب. صالح 10 دقايق.</string>
     <string name="acc_confirm">تأكيد</string>
     <string name="acc_offline">كندا مش متصل. افتح Termux وتأكد إن البوت شغّال.</string>
     <string name="acc_error">حصل خطأ، جرّب تاني.</string>
@@ -353,4 +353,25 @@
     <string name="rem_weekly_ready">هديتك الأسبوعية جاهزة</string>
     <string name="rem_monthly_ready">هديتك الشهرية جاهزة</string>
     <string name="rem_prayer_now">حان وقت صلاة %1$s</string>
+    <string name="widget_rewards_label">مكافآت كندا</string>
+    <string name="widget_rewards_desc">المكافآت الجاهزة من كندا، ومتى هتجهز الباقي.</string>
+    <string name="widget_rewards_title">مكافآت كندا</string>
+    <string name="widget_rewards_ready">%1$d جاهزة</string>
+    <string name="widget_rewards_signin">افتح كندا وسجّل دخولك</string>
+    <string name="acc_email">الإيميل (اختياري)</string>
+    <string name="acc_email_hint">هنأكده بكود. وهو كمان إيميل استعادة حسابك في كندا: أكواد استعادة الحساب بتوصله.</string>
+    <string name="acc_email_code">كود الإيميل</string>
+    <string name="acc_code_hint_both">بعتنا كود من 6 أرقام على واتساب وكود تاني على الإيميل. صالحين 10 دقايق.</string>
+    <string name="acc_email_section">الإيميل</string>
+    <string name="acc_email_none">مفيش إيميل لسه</string>
+    <string name="acc_email_add">إضافة إيميل</string>
+    <string name="acc_email_change">تغيير الإيميل</string>
+    <string name="acc_email_remove">حذف الإيميل</string>
+    <string name="acc_email_new">الإيميل الجديد</string>
+    <string name="acc_pass_confirm">الباسوورد بتاعك (للتأكيد)</string>
+    <string name="acc_email_change_hint">هيوصل كود على الإيميل الجديد. وتنبيه أمني هيوصل على واتساب بتاعك، وعلى الإيميل القديم لو فيه.</string>
+    <string name="acc_email_code_hint">بعتنا كود من 6 أرقام على الإيميل الجديد. صالح 10 دقايق.</string>
+    <string name="acc_email_send">ابعت الكود للإيميل ده</string>
+    <string name="acc_email_remove_hint">أكواد استعادة الحساب هتبطل توصل للإيميل ده. اكتب الباسوورد للتأكيد.</string>
+    <string name="acc_cancel">إلغاء</string>
 </resources>

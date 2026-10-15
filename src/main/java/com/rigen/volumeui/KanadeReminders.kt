@@ -10,6 +10,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import kotlinx.coroutines.runBlocking
+import org.json.JSONArray
 import org.json.JSONObject
 
 class RewardState(val id: String, val readyAt: Long)
@@ -140,10 +141,25 @@ object KanadeReminders {
         saveRcSet(c, "rcs_p", emptySet())
     }
 
-    /** Signing out: no alarms, and nothing stays switched on. */
+    /** Signing out: no alarms, nothing stays switched on, and the widget forgets the account. */
     fun reset(c: Context) {
         cancelAll(c)
-        sp(c).edit().remove("on").apply()
+        sp(c).edit().remove("on").remove("rw").apply()
+        ClockWidgets.updateAll(c)
+    }
+
+    // ── The last reward times the bot gave. The widget draws from this, so it works offline. ──
+    fun cacheRewards(c: Context, list: List<RewardState>) {
+        val arr = JSONArray()
+        list.forEach { arr.put(JSONObject().put("id", it.id).put("at", it.readyAt)) }
+        sp(c).edit().putString("rw", arr.toString()).apply()
+    }
+
+    fun cachedRewards(c: Context): List<RewardState> = try {
+        val a = JSONArray(sp(c).getString("rw", "[]"))
+        (0 until a.length()).map { RewardState(a.getJSONObject(it).getString("id"), a.getJSONObject(it).getLong("at")) }
+    } catch (e: Exception) {
+        emptyList()
     }
 
     fun scheduleSync(c: Context, delayMs: Long = SYNC_EVERY_MS) {
@@ -189,7 +205,12 @@ object KanadeReminders {
             reset(c)
             return
         }
-        if (t.ok) scheduleRewards(c, parseRewards(t.body))
+        if (t.ok) {
+            val list = parseRewards(t.body)
+            cacheRewards(c, list)
+            scheduleRewards(c, list)
+            ClockWidgets.updateAll(c)
+        }
         val p = KanadeApi.call("/me/prayer", token = s.token)
         if (p.ok) schedulePrayers(c, parsePrayers(p.body))
     }
@@ -222,6 +243,7 @@ object KanadeReminders {
             .setContentIntent(open)
             .build()
         nm.notify(3000 + ((id + name).hashCode() and 0xFFFF), n)
+        ClockWidgets.updateAll(c) // the widget shows "ready" now
     }
 }
 

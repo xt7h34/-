@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.text.format.DateFormat
 import android.widget.RemoteViews
+import kotlinx.coroutines.runBlocking
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -26,6 +27,34 @@ class SleepWidget : AppWidgetProvider() {
     }
 }
 
+/** Home screen widget: the Kanade rewards (daily, treasure, weekly, monthly) and when each is ready. */
+class RewardsWidget : AppWidgetProvider() {
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        // Draw what we know right away, then ask the bot for fresh times in the background.
+        appWidgetIds.forEach { appWidgetManager.updateAppWidget(it, ClockWidgets.rewardsViews(context)) }
+        val pending = goAsync()
+        Thread {
+            try {
+                val session = AccountStore.load(context)
+                if (session != null) {
+                    val r = runBlocking { KanadeApi.call("/me/timers", token = session.token) }
+                    if (r.ok) {
+                        KanadeReminders.cacheRewards(context, KanadeReminders.parseRewards(r.body))
+                    } else if (r.status == 401) {
+                        AccountStore.clear(context)
+                        KanadeReminders.reset(context)
+                    }
+                    appWidgetIds.forEach { appWidgetManager.updateAppWidget(it, ClockWidgets.rewardsViews(context)) }
+                }
+            } catch (e: Throwable) {
+                Diag.error(context, "RewardsWidget", e)
+            } finally {
+                pending.finish()
+            }
+        }.start()
+    }
+}
+
 object ClockWidgets {
 
     /** Redraws every widget that is on a home screen. Called whenever alarms or sleep data change. */
@@ -36,6 +65,8 @@ object ClockWidgets {
                 .forEach { m.updateAppWidget(it, nextAlarmViews(c)) }
             m.getAppWidgetIds(ComponentName(c, SleepWidget::class.java))
                 .forEach { m.updateAppWidget(it, sleepViews(c)) }
+            m.getAppWidgetIds(ComponentName(c, RewardsWidget::class.java))
+                .forEach { m.updateAppWidget(it, rewardsViews(c)) }
         } catch (e: Throwable) {
             Diag.error(c, "widgets", e)
         }
@@ -114,6 +145,43 @@ object ClockWidgets {
         }
         rv.setTextViewText(R.id.w_bed, bedText)
         rv.setOnClickPendingIntent(R.id.w_root, openPage(c, PAGE_SLEEP, 32))
+        return rv
+    }
+
+    private fun rewardName(id: String): Int = when (id) {
+        "daily" -> R.string.rem_daily
+        "treasure" -> R.string.rem_treasure
+        "weekly" -> R.string.rem_weekly
+        else -> R.string.rem_monthly
+    }
+
+    /** Drawn from the last times the bot gave. A time of day is shown, not a countdown, so it never goes stale. */
+    fun rewardsViews(c: Context): RemoteViews {
+        val rv = RemoteViews(c.packageName, R.layout.widget_rewards)
+        val rows = listOf(R.id.w_r1, R.id.w_r2, R.id.w_r3, R.id.w_r4)
+        val now = System.currentTimeMillis()
+        rv.setTextViewText(R.id.w_title, c.getString(R.string.widget_rewards_title))
+        if (AccountStore.load(c) == null) {
+            rv.setTextViewText(R.id.w_count, c.getString(R.string.widget_rewards_signin))
+            rows.forEach { rv.setTextViewText(it, "") }
+        } else {
+            val list = KanadeReminders.cachedRewards(c)
+            val ready = list.count { it.readyAt <= now }
+            rv.setTextViewText(
+                R.id.w_count,
+                if (list.isEmpty()) "\u2014" else c.getString(R.string.widget_rewards_ready, ready),
+            )
+            KanadeReminders.REWARD_IDS.forEachIndexed { i, id ->
+                val r = list.firstOrNull { it.id == id }
+                val status = when {
+                    r == null -> "\u2014"
+                    r.readyAt <= now -> c.getString(R.string.rem_ready)
+                    else -> dayLabel(c, r.readyAt, now) + " " + DateFormat.getTimeFormat(c).format(Date(r.readyAt))
+                }
+                rv.setTextViewText(rows[i], c.getString(rewardName(id)) + ": " + status)
+            }
+        }
+        rv.setOnClickPendingIntent(R.id.w_root, openPage(c, PAGE_ACCOUNT, 33))
         return rv
     }
 }
