@@ -7,6 +7,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.text.format.DateFormat
+import android.view.View
 import android.widget.RemoteViews
 import kotlinx.coroutines.runBlocking
 import java.text.SimpleDateFormat
@@ -24,6 +25,64 @@ class NextAlarmWidget : AppWidgetProvider() {
 class SleepWidget : AppWidgetProvider() {
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         appWidgetIds.forEach { appWidgetManager.updateAppWidget(it, ClockWidgets.sleepViews(context)) }
+    }
+}
+
+/** Draws what we know right away (the caller did), then asks the bot in the background and draws again. */
+private fun syncWidget(
+    context: Context,
+    manager: AppWidgetManager,
+    ids: IntArray,
+    pending: android.content.BroadcastReceiver.PendingResult,
+    path: String,
+    save: (ApiResult) -> Unit,
+    draw: () -> RemoteViews,
+) {
+    Thread {
+        try {
+            val session = AccountStore.load(context)
+            if (session != null) {
+                val r = runBlocking { KanadeApi.call(path, token = session.token) }
+                if (r.ok) {
+                    save(r)
+                } else if (r.status == 401) {
+                    AccountStore.clear(context)
+                    KanadeReminders.reset(context)
+                }
+                ids.forEach { manager.updateAppWidget(it, draw()) }
+            }
+        } catch (e: Throwable) {
+            Diag.error(context, "widget sync $path", e)
+        } finally {
+            pending.finish()
+        }
+    }.start()
+}
+
+/** Home screen widget: the next prayer. */
+class PrayerWidget : AppWidgetProvider() {
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        appWidgetIds.forEach { appWidgetManager.updateAppWidget(it, ClockWidgets.prayerViews(context)) }
+        syncWidget(
+            context, appWidgetManager, appWidgetIds, goAsync(), "/me/prayer",
+            save = { r ->
+                val list = KanadeReminders.parsePrayers(r.body)
+                KanadeReminders.cachePrayers(context, KanadeReminders.prayerState(r.body, list), list)
+            },
+            draw = { ClockWidgets.prayerViews(context) },
+        )
+    }
+}
+
+/** Home screen widget: today's habits, each with a check button. */
+class HabitsWidget : AppWidgetProvider() {
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        appWidgetIds.forEach { appWidgetManager.updateAppWidget(it, ClockWidgets.habitsViews(context)) }
+        syncWidget(
+            context, appWidgetManager, appWidgetIds, goAsync(), "/me/habits",
+            save = { r -> KanadeReminders.cacheHabits(context, KanadeReminders.parseHabits(r.body)) },
+            draw = { ClockWidgets.habitsViews(context) },
+        )
     }
 }
 
@@ -67,6 +126,10 @@ object ClockWidgets {
                 .forEach { m.updateAppWidget(it, sleepViews(c)) }
             m.getAppWidgetIds(ComponentName(c, RewardsWidget::class.java))
                 .forEach { m.updateAppWidget(it, rewardsViews(c)) }
+            m.getAppWidgetIds(ComponentName(c, PrayerWidget::class.java))
+                .forEach { m.updateAppWidget(it, prayerViews(c)) }
+            m.getAppWidgetIds(ComponentName(c, HabitsWidget::class.java))
+                .forEach { m.updateAppWidget(it, habitsViews(c)) }
         } catch (e: Throwable) {
             Diag.error(c, "widgets", e)
         }
@@ -182,6 +245,98 @@ object ClockWidgets {
             }
         }
         rv.setOnClickPendingIntent(R.id.w_root, openPage(c, PAGE_ACCOUNT, 33))
+        return rv
+    }
+
+    /** The next prayer, from the last times the bot gave. It redraws itself when that prayer passes. */
+    fun prayerViews(c: Context): RemoteViews {
+        val rv = RemoteViews(c.packageName, R.layout.widget_prayer)
+        val now = System.currentTimeMillis()
+        rv.setTextViewText(R.id.w_title, c.getString(R.string.widget_prayer_title))
+        rv.setTextViewText(R.id.w_time, "")
+        rv.setTextViewText(R.id.w_next, "")
+        if (AccountStore.load(c) == null) {
+            rv.setTextViewText(R.id.w_name, c.getString(R.string.widget_rewards_signin))
+        } else {
+            val cached = KanadeReminders.cachedPrayers(c)
+            val future = cached.second.filter { it.at > now }
+            if (cached.first == "none") {
+                rv.setTextViewText(R.id.w_name, c.getString(R.string.widget_prayer_setup))
+            } else if (future.isEmpty()) {
+                rv.setTextViewText(R.id.w_name, "\u2014")
+            } else {
+                val next = future[0]
+                val clock = DateFormat.getTimeFormat(c).format(Date(next.at))
+                rv.setTextViewText(R.id.w_name, next.name)
+                rv.setTextViewText(
+                    R.id.w_time,
+                    if (dayKey(next.at) == dayKey(now)) clock else dayLabel(c, next.at, now) + " " + clock,
+                )
+                if (future.size > 1) {
+                    rv.setTextViewText(
+                        R.id.w_next,
+                        c.getString(R.string.widget_prayer_then, future[1].name, DateFormat.getTimeFormat(c).format(Date(future[1].at))),
+                    )
+                }
+                KanadeReminders.scheduleWidgetRefresh(c, next.at + 30_000L)
+            }
+        }
+        rv.setOnClickPendingIntent(R.id.w_root, openPage(c, PAGE_ACCOUNT, 34))
+        return rv
+    }
+
+    private fun habitIntent(c: Context, requestCode: Int, name: String): PendingIntent =
+        PendingIntent.getBroadcast(
+            c, requestCode,
+            Intent(c, KanadeReminderReceiver::class.java).setAction(KanadeReminders.ACTION_HABIT).putExtra("name", name),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+
+    /** Up to three habits that are due today (not done first), each with a check button. */
+    fun habitsViews(c: Context): RemoteViews {
+        val rv = RemoteViews(c.packageName, R.layout.widget_habits)
+        val rows = listOf(
+            Triple(R.id.w_h1, R.id.w_h1_text, R.id.w_h1_btn),
+            Triple(R.id.w_h2, R.id.w_h2_text, R.id.w_h2_btn),
+            Triple(R.id.w_h3, R.id.w_h3_text, R.id.w_h3_btn),
+        )
+        val signedIn = AccountStore.load(c) != null
+        val all = if (signedIn) KanadeReminders.cachedHabits(c) else emptyList()
+        val due = all.filter { it.due && !it.frozen }.sortedBy { it.done }
+        val shown = due.take(3)
+        rv.setTextViewText(
+            R.id.w_title,
+            when {
+                !signedIn -> c.getString(R.string.widget_rewards_signin)
+                due.isEmpty() -> c.getString(R.string.widget_habits_plain)
+                else -> c.getString(R.string.widget_habits_title, due.count { it.done }, due.size)
+            },
+        )
+        rows.forEachIndexed { i, ids ->
+            val h = shown.getOrNull(i)
+            if (h == null) {
+                rv.setViewVisibility(ids.first, View.GONE)
+            } else {
+                rv.setViewVisibility(ids.first, View.VISIBLE)
+                val streak = if (h.streak > 0) "  \uD83D\uDD25" + h.streak else ""
+                rv.setTextViewText(ids.second, (if (h.done) "\u2713 " else "") + h.name + streak)
+                if (h.done) {
+                    rv.setViewVisibility(ids.third, View.GONE)
+                } else {
+                    rv.setViewVisibility(ids.third, View.VISIBLE)
+                    rv.setOnClickPendingIntent(ids.third, habitIntent(c, 950000 + i, h.name))
+                }
+            }
+        }
+        val empty = when {
+            !signedIn -> ""
+            all.isEmpty() -> c.getString(R.string.widget_habits_none)
+            due.isEmpty() -> c.getString(R.string.widget_habits_nodue)
+            else -> ""
+        }
+        rv.setTextViewText(R.id.w_empty, empty)
+        rv.setViewVisibility(R.id.w_empty, if (empty.isEmpty()) View.GONE else View.VISIBLE)
+        rv.setOnClickPendingIntent(R.id.w_root, openPage(c, PAGE_ACCOUNT, 35))
         return rv
     }
 }

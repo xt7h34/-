@@ -375,4 +375,21 @@
     <string name="acc_email_send">Send the code to this email</string>
     <string name="acc_email_remove_hint">Account recovery codes will stop reaching this email. Enter your password to confirm.</string>
     <string name="acc_cancel">Cancel</string>
+    <string name="widget_prayer_label">Next prayer</string>
+    <string name="widget_prayer_desc">The next prayer time, from your location in Kanade.</string>
+    <string name="widget_prayer_title">Next prayer</string>
+    <string name="widget_prayer_setup">Set your location with the bot first</string>
+    <string name="widget_prayer_then">Then %1$s %2$s</string>
+    <string name="widget_habits_label">Kanade habits</string>
+    <string name="widget_habits_desc">Today\'s habits, with a button to check each one.</string>
+    <string name="widget_habits_title">Habits today %1$d/%2$d</string>
+    <string name="widget_habits_plain">Habits</string>
+    <string name="widget_habits_none">No habits yet. Add one with the bot.</string>
+    <string name="widget_habits_nodue">Nothing due today</string>
+    <string name="habit_checked">Done! Streak: %1$d days</string>
+    <string name="acc_devices_section">Connected devices</string>
+    <string name="acc_device_this">this device</string>
+    <string name="acc_device_unknown">Unknown device</string>
+    <string name="acc_device_disconnect">Disconnect</string>
+    <string name="acc_devices_disconnect_all">Disconnect all other devices</string>
 </resources>

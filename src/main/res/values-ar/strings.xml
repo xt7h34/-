@@ -374,4 +374,21 @@
     <string name="acc_email_send">ابعت الكود للإيميل ده</string>
     <string name="acc_email_remove_hint">أكواد استعادة الحساب هتبطل توصل للإيميل ده. اكتب الباسوورد للتأكيد.</string>
     <string name="acc_cancel">إلغاء</string>
+    <string name="widget_prayer_label">الصلاة الجاية</string>
+    <string name="widget_prayer_desc">وقت الصلاة الجاية من موقعك في كندا.</string>
+    <string name="widget_prayer_title">الصلاة الجاية</string>
+    <string name="widget_prayer_setup">حدد موقعك من البوت الأول</string>
+    <string name="widget_prayer_then">بعدها %1$s %2$s</string>
+    <string name="widget_habits_label">عادات كندا</string>
+    <string name="widget_habits_desc">عادات النهارده، وزر تشك لكل واحدة.</string>
+    <string name="widget_habits_title">عادات النهارده %1$d/%2$d</string>
+    <string name="widget_habits_plain">العادات</string>
+    <string name="widget_habits_none">لسه مفيش عادات. ضيف واحدة من البوت.</string>
+    <string name="widget_habits_nodue">مفيش عادات مطلوبة النهارده</string>
+    <string name="habit_checked">تم! الستريك: %1$d يوم</string>
+    <string name="acc_devices_section">الأجهزة المربوطة</string>
+    <string name="acc_device_this">الجهاز ده</string>
+    <string name="acc_device_unknown">جهاز غير معروف</string>
+    <string name="acc_device_disconnect">فصل</string>
+    <string name="acc_devices_disconnect_all">فصل كل الأجهزة التانية</string>
 </resources>

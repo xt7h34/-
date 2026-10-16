@@ -61,6 +61,30 @@
         </receiver>
 
         <receiver
+            android:name=".PrayerWidget"
+            android:exported="false"
+            android:label="@string/widget_prayer_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_prayer" />
+        </receiver>
+
+        <receiver
+            android:name=".HabitsWidget"
+            android:exported="false"
+            android:label="@string/widget_habits_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_habits" />
+        </receiver>
+
+        <receiver
             android:name=".RewardsWidget"
             android:exported="false"
             android:label="@string/widget_rewards_label">

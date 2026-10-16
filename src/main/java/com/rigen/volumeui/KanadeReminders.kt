@@ -9,6 +9,9 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.widget.Toast
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
 import org.json.JSONObject
@@ -16,6 +19,8 @@ import org.json.JSONObject
 class RewardState(val id: String, val readyAt: Long)
 
 class PrayerTime(val key: String, val name: String, val at: Long)
+
+class HabitState(val name: String, val streak: Int, val done: Boolean, val due: Boolean, val frozen: Boolean)
 
 /**
  * Reminders for the things the Kanade bot hands out (daily, treasure, weekly, monthly) and for the
@@ -25,12 +30,15 @@ class PrayerTime(val key: String, val name: String, val at: Long)
 object KanadeReminders {
     const val ACTION_NOTIFY = "com.kanade.reminder.NOTIFY"
     const val ACTION_SYNC = "com.kanade.reminder.SYNC"
+    const val ACTION_HABIT = "com.kanade.reminder.HABIT"
+    const val ACTION_REFRESH = "com.kanade.reminder.REFRESH"
 
     val REWARD_IDS = listOf("daily", "treasure", "weekly", "monthly")
 
     private const val PREF = "kanade_reminders"
     private const val CHANNEL = "kanade_reminders"
     private const val RC_SYNC = 940001
+    private const val RC_REFRESH = 940002
     private const val RC_REWARD = 940010 // + the reward's index
     private const val RC_PRAYER = 940100 // + the prayer's position
     private const val SYNC_EVERY_MS = 3 * 3_600_000L
@@ -144,7 +152,8 @@ object KanadeReminders {
     /** Signing out: no alarms, nothing stays switched on, and the widget forgets the account. */
     fun reset(c: Context) {
         cancelAll(c)
-        sp(c).edit().remove("on").remove("rw").apply()
+        alarms(c).cancel(refreshIntent(c))
+        sp(c).edit().remove("on").remove("rw").remove("pr").remove("hb").apply()
         ClockWidgets.updateAll(c)
     }
 
@@ -173,6 +182,103 @@ object KanadeReminders {
     /** After a reboot the alarms are gone: sync again a minute later. */
     fun onBoot(c: Context) {
         if (enabled(c).isNotEmpty()) scheduleSync(c, 60_000L)
+    }
+
+    // ── Prayer times and habits as the bot last said. The widgets draw from these, so they work offline. ──
+    fun prayerState(body: JSONObject?, list: List<PrayerTime>): String = when {
+        body?.optBoolean("configured") != true -> "none"
+        list.isEmpty() -> "off"
+        else -> "ok"
+    }
+
+    fun cachePrayers(c: Context, state: String, list: List<PrayerTime>) {
+        val arr = JSONArray()
+        list.forEach { arr.put(JSONObject().put("k", it.key).put("n", it.name).put("a", it.at)) }
+        sp(c).edit().putString("pr", JSONObject().put("s", state).put("t", arr).toString()).apply()
+    }
+
+    fun cachedPrayers(c: Context): Pair<String, List<PrayerTime>> {
+        return try {
+            val raw = sp(c).getString("pr", null) ?: return Pair("", emptyList())
+            val o = JSONObject(raw)
+            val a = o.getJSONArray("t")
+            Pair(
+                o.optString("s"),
+                (0 until a.length()).map {
+                    val x = a.getJSONObject(it)
+                    PrayerTime(x.optString("k"), x.optString("n"), x.optLong("a"))
+                },
+            )
+        } catch (e: Exception) {
+            Pair("", emptyList())
+        }
+    }
+
+    fun parseHabits(b: JSONObject?): List<HabitState> {
+        val a = b?.optJSONArray("habits") ?: return emptyList()
+        return (0 until a.length()).map {
+            val o = a.getJSONObject(it)
+            HabitState(
+                o.optString("name"), o.optInt("streak"), o.optBoolean("done"),
+                o.optBoolean("due"), o.optBoolean("frozen"),
+            )
+        }
+    }
+
+    fun cacheHabits(c: Context, list: List<HabitState>) {
+        val arr = JSONArray()
+        list.forEach {
+            arr.put(
+                JSONObject().put("n", it.name).put("s", it.streak).put("d", it.done)
+                    .put("u", it.due).put("f", it.frozen),
+            )
+        }
+        sp(c).edit().putString("hb", arr.toString()).apply()
+    }
+
+    fun cachedHabits(c: Context): List<HabitState> = try {
+        val a = JSONArray(sp(c).getString("hb", "[]"))
+        (0 until a.length()).map {
+            val o = a.getJSONObject(it)
+            HabitState(o.getString("n"), o.optInt("s"), o.optBoolean("d"), o.optBoolean("u"), o.optBoolean("f"))
+        }
+    } catch (e: Exception) {
+        emptyList()
+    }
+
+    private fun refreshIntent(c: Context): PendingIntent =
+        PendingIntent.getBroadcast(
+            c, RC_REFRESH,
+            Intent(c, KanadeReminderReceiver::class.java).setAction(ACTION_REFRESH),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+
+    /** Redraws the widgets at [at] (a prayer time passing), even if the app is closed. */
+    fun scheduleWidgetRefresh(c: Context, at: Long) {
+        alarms(c).setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, refreshIntent(c))
+    }
+
+    private fun toast(c: Context, text: String) {
+        Handler(Looper.getMainLooper()).post {
+            Toast.makeText(c.applicationContext, text, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /** The check button of the habits widget: checks the habit in the bot, then redraws. */
+    suspend fun checkHabit(c: Context, name: String) {
+        val s = AccountStore.load(c) ?: return
+        val r = KanadeApi.call("/me/habits/check", JSONObject().put("name", name), s.token)
+        if (r.status == 401) {
+            AccountStore.clear(c)
+            reset(c)
+            return
+        }
+        if (r.body?.has("habits") == true) cacheHabits(c, parseHabits(r.body))
+        ClockWidgets.updateAll(c)
+        toast(
+            c,
+            if (r.ok) c.getString(R.string.habit_checked, r.body?.optInt("streak") ?: 0) else r.message(c),
+        )
     }
 
     // ── Reading what the bot says ──
@@ -212,7 +318,12 @@ object KanadeReminders {
             ClockWidgets.updateAll(c)
         }
         val p = KanadeApi.call("/me/prayer", token = s.token)
-        if (p.ok) schedulePrayers(c, parsePrayers(p.body))
+        if (p.ok) {
+            val list = parsePrayers(p.body)
+            schedulePrayers(c, list)
+            cachePrayers(c, prayerState(p.body, list), list)
+            ClockWidgets.updateAll(c)
+        }
     }
 
     // ── The notification ──
@@ -260,6 +371,20 @@ class KanadeReminderReceiver : BroadcastReceiver() {
                 } catch (e: Throwable) {
                     Diag.error(context, "KanadeReminderReceiver notify", e)
                 }
+            }
+            KanadeReminders.ACTION_REFRESH -> ClockWidgets.updateAll(context)
+            KanadeReminders.ACTION_HABIT -> {
+                val name = intent.getStringExtra("name").orEmpty()
+                val pending = goAsync()
+                Thread {
+                    try {
+                        runBlocking { KanadeReminders.checkHabit(context, name) }
+                    } catch (e: Throwable) {
+                        Diag.error(context, "KanadeReminderReceiver habit", e)
+                    } finally {
+                        pending.finish()
+                    }
+                }.start()
             }
             KanadeReminders.ACTION_SYNC -> {
                 val pending = goAsync()

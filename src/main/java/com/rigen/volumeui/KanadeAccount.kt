@@ -154,6 +154,16 @@ object AccountStore {
 
 private enum class Step { Start, Login, Register, Code, Done }
 
+private class DeviceItem(val id: String, val device: String, val created: Long, val current: Boolean)
+
+private fun parseDevices(b: JSONObject?): List<DeviceItem> {
+    val a = b?.optJSONArray("sessions") ?: return emptyList()
+    return (0 until a.length()).map {
+        val o = a.getJSONObject(it)
+        DeviceItem(o.optString("id"), o.optString("device"), o.optLong("created"), o.optBoolean("current"))
+    }
+}
+
 @Composable
 fun AccountPage(onBack: () -> Unit) {
     val ctx = LocalContext.current
@@ -176,6 +186,8 @@ fun AccountPage(onBack: () -> Unit) {
     var email by remember { mutableStateOf("") }
     var emailCode by remember { mutableStateOf("") }
     var emailRequired by remember { mutableStateOf(false) }
+
+    var devices by remember { mutableStateOf<List<DeviceItem>>(emptyList()) }
 
     // Changing the email of an account that is already signed in
     var mailStep by remember { mutableStateOf(0) } // 0 closed, 1 new email + password, 2 code, 3 remove
@@ -245,13 +257,13 @@ fun AccountPage(onBack: () -> Unit) {
         val p = KanadeApi.call("/me/prayer", token = s.token)
         if (p.ok) {
             prayers = KanadeReminders.parsePrayers(p.body)
-            prayerState = when {
-                p.body?.optBoolean("configured") != true -> "none"
-                prayers.isEmpty() -> "off"
-                else -> "ok"
-            }
+            prayerState = KanadeReminders.prayerState(p.body, prayers)
+            KanadeReminders.cachePrayers(ctx, prayerState, prayers)
             if ("prayer" in enabledSet) KanadeReminders.schedulePrayers(ctx, prayers)
         }
+        val h = KanadeApi.call("/me/habits", token = s.token)
+        if (h.ok) KanadeReminders.cacheHabits(ctx, KanadeReminders.parseHabits(h.body))
+        ClockWidgets.updateAll(ctx)
         if (enabledSet.isNotEmpty()) KanadeReminders.scheduleSync(ctx)
     }
 
@@ -289,10 +301,16 @@ fun AccountPage(onBack: () -> Unit) {
         return true
     }
 
+    suspend fun loadDevices() {
+        val r = KanadeApi.call("/me/sessions", token = session?.token)
+        if (!sessionExpired(r) && r.ok) devices = parseDevices(r.body)
+    }
+
     LaunchedEffect(step) {
         if (step == Step.Done) {
             refresh()
             loadTimers()
+            loadDevices()
         }
     }
 
@@ -678,6 +696,51 @@ fun AccountPage(onBack: () -> Unit) {
                                     },
                                 ) { Text(stringResource(R.string.acc_cancel)) }
                             }
+                        }
+                    }
+                    Section(stringResource(R.string.acc_devices_section)) {
+                        devices.forEach { d ->
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        d.device.ifBlank { stringResource(R.string.acc_device_unknown) } +
+                                            if (d.current) " \u2022 " + stringResource(R.string.acc_device_this) else "",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                    )
+                                    Text(
+                                        DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(d.created)),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                if (!d.current) {
+                                    TextButton(
+                                        onClick = {
+                                            scope.launch {
+                                                val r = KanadeApi.call(
+                                                    "/me/sessions/revoke",
+                                                    JSONObject().put("id", d.id),
+                                                    session?.token,
+                                                )
+                                                if (sessionExpired(r)) return@launch
+                                                if (r.ok) devices = parseDevices(r.body) else error = r.message(ctx)
+                                            }
+                                        },
+                                    ) { Text(stringResource(R.string.acc_device_disconnect)) }
+                                }
+                            }
+                        }
+                        if (devices.size > 1) {
+                            OutlinedButton(
+                                onClick = {
+                                    scope.launch {
+                                        val r = KanadeApi.call("/me/sessions/revoke-others", JSONObject(), session?.token)
+                                        if (sessionExpired(r)) return@launch
+                                        if (r.ok) devices = parseDevices(r.body) else error = r.message(ctx)
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) { Text(stringResource(R.string.acc_devices_disconnect_all)) }
                         }
                     }
                     ErrorText(error)
