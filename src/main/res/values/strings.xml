@@ -92,6 +92,13 @@
     <string name="blocks_new_best">New best!</string>
     <string name="blocks_play_again">Play again</string>
     <string name="blocks_restart">Restart</string>
+    <string name="blocks_nero_earned">+%1$s Nero</string>
+    <string name="blocks_nero_guest">Sign in to Kanade to earn Nero</string>
+    <string name="blocks_nero_low">Reach 1000 points to earn Nero</string>
+    <string name="blocks_nero_offline">No Nero this time: the bot was not reachable while you played</string>
+    <string name="blocks_nero_sending">Sending your score…</string>
+    <string name="blocks_nero_pending">The bot is not reachable. Your Nero will be added next time you open the game</string>
+    <string name="blocks_nero_capped">daily limit reached</string>
     <string name="dnd_perm_title">Do Not Disturb access</string>
     <string name="section_language">Language</string>
     <string name="lang_system">System</string>

@@ -753,16 +753,18 @@ private fun HomePage(serviceEnabled: Boolean, onOpen: (String) -> Unit) {
 
                 SettingsGroup {
                     SettingsItem(
+                        Glyph.BLOCKS, ICON_PURPLE,
+                        stringResource(R.string.blocks_title),
+                        stringResource(R.string.blocks_summary),
+                    ) { onOpen(PAGE_BLOCKS) }
+                }
+
+                SettingsGroup {
+                    SettingsItem(
                         Glyph.PALETTE, ICON_PINK,
                         stringResource(R.string.item_app_title),
                         stringResource(R.string.item_app_summary),
                     ) { onOpen(PAGE_APP) }
-                    ItemDivider()
-                    SettingsItem(
-                        Glyph.PALETTE, ICON_BLUE,
-                        stringResource(R.string.blocks_title),
-                        stringResource(R.string.blocks_summary),
-                    ) { onOpen(PAGE_BLOCKS) }
                 }
 
                 // Room for the floating search bar.
@@ -817,6 +819,7 @@ private fun searchIndex(): List<SearchEntry> {
         SearchEntry(stringResource(R.string.section_language), appPage, PAGE_APP),
         SearchEntry(stringResource(R.string.section_diag), appPage, PAGE_APP),
         SearchEntry(stringResource(R.string.keepalive_title), keepPage, PAGE_KEEPALIVE),
+        SearchEntry(stringResource(R.string.blocks_title), stringResource(R.string.app_title), PAGE_BLOCKS),
     )
 }
 

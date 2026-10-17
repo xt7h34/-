@@ -92,6 +92,13 @@
     <string name="blocks_new_best">رقم قياسي جديد!</string>
     <string name="blocks_play_again">العب مجددًا</string>
     <string name="blocks_restart">إعادة اللعب</string>
+    <string name="blocks_nero_earned">+%1$s نيرو</string>
+    <string name="blocks_nero_guest">سجّل دخولك في كندا عشان تاخد نيرو</string>
+    <string name="blocks_nero_low">اوصل 1000 نقطة عشان تاخد نيرو</string>
+    <string name="blocks_nero_offline">مفيش نيرو المرة دي: البوت ماكانش شغال وانت بتلعب</string>
+    <string name="blocks_nero_sending">بنبعت نتيجتك…</string>
+    <string name="blocks_nero_pending">البوت مش متاح دلوقتي. النيرو هتتضاف أول ما تفتح اللعبة تاني</string>
+    <string name="blocks_nero_capped">وصلت للحد اليومي</string>
     <string name="dnd_perm_title">صلاحية عدم الإزعاج</string>
     <string name="section_language">اللغة</string>
     <string name="lang_system">تلقائي</string>

@@ -27,6 +27,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
@@ -51,6 +52,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
+import org.json.JSONObject
 
 // Rules and geometry live in BlocksEngine.kt. This file only draws the game and forwards touches.
 
@@ -60,6 +63,16 @@ private val blockColors = listOf(
 )
 private val floorColor = Color(0xFF2A3354)
 private const val FLASH_NANOS = 420_000_000f
+
+// What the game-over card says about Nero.
+private const val N_NONE = 0
+private const val N_GUEST = 1     // not signed in: points only
+private const val N_LOW = 2       // under 1000 points
+private const val N_OFFLINE = 3   // the bot was never reachable during this game
+private const val N_SENDING = 4
+private const val N_PENDING = 5   // the bot could not be reached; the score is kept and sent again later
+private const val N_REJECTED = 6
+private const val N_DONE = 7
 
 private fun BPoint.o() = Offset(x, y)
 
@@ -84,6 +97,71 @@ internal fun BlocksGamePage(onBack: () -> Unit) {
     val score = rev.let { engine.score }
     val over = rev.let { engine.over }
 
+    // Nero: one per 1000 points of a finished game, only for a signed-in account. The bot does the counting.
+    val scope = rememberCoroutineScope()
+    val signedIn = remember { AccountStore.load(context) != null }
+    var gid by remember { mutableStateOf(prefs.getString("gid", null)) }
+    var starting by remember { mutableStateOf(false) }
+    var neroState by remember { mutableIntStateOf(N_NONE) }
+    var neroAmount by remember { mutableIntStateOf(0) }
+    var neroCapped by remember { mutableStateOf(false) }
+    var neroMsg by remember { mutableStateOf("") }
+
+    suspend fun startGame() {
+        val token = AccountStore.load(context)?.token ?: return
+        val r = KanadeApi.call("/me/game/start", JSONObject(), token)
+        val id = r.body?.optString("gameId").orEmpty()
+        if (r.ok && id.isNotEmpty()) {
+            gid = id
+            prefs.edit().putString("gid", id).apply()
+        }
+    }
+
+    suspend fun sendPending() {
+        val id = prefs.getString("pend_gid", null) ?: return
+        val token = AccountStore.load(context)?.token ?: return
+        val sc = prefs.getInt("pend_score", 0)
+        neroState = N_SENDING
+        val r = KanadeApi.call("/me/game/finish", JSONObject().put("gameId", id).put("score", sc), token)
+        when {
+            r.ok -> {
+                prefs.edit().remove("pend_gid").remove("pend_score").apply()
+                neroAmount = r.body?.optInt("nero", 0) ?: 0
+                neroCapped = r.body?.optBoolean("capped", false) ?: false
+                neroState = N_DONE
+            }
+            r.status == 0 || r.status >= 500 -> neroState = N_PENDING
+            else -> {
+                prefs.edit().remove("pend_gid").remove("pend_score").apply()
+                neroMsg = r.message(context)
+                neroState = N_REJECTED
+            }
+        }
+    }
+
+    fun onGameOver() {
+        if (!signedIn) {
+            neroState = N_GUEST
+            return
+        }
+        val id = gid
+        gid = null
+        prefs.edit().remove("gid").apply()
+        when {
+            engine.score < 1000 -> neroState = N_LOW
+            id == null -> neroState = N_OFFLINE
+            else -> {
+                prefs.edit().putString("pend_gid", id).putInt("pend_score", engine.score).apply()
+                scope.launch { sendPending() }
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        // A score that could not be sent last time is sent now.
+        if (signedIn && prefs.getString("pend_gid", null) != null) sendPending()
+    }
+
     fun save() {
         prefs.edit().putString("state", engine.encode()).putInt("best", best).apply()
     }
@@ -101,9 +179,17 @@ internal fun BlocksGamePage(onBack: () -> Unit) {
         }
         rev++
         save()
+        if (gid == null && signedIn && !starting && !engine.over) {
+            starting = true
+            scope.launch { startGame(); starting = false }
+        }
+        if (engine.over) onGameOver()
     }
 
     fun restart() {
+        gid = null
+        prefs.edit().remove("gid").apply()
+        neroState = N_NONE
         engine.reset()
         selected = -1
         dragSlot = -1
@@ -213,6 +299,31 @@ internal fun BlocksGamePage(onBack: () -> Unit) {
                             if (score > 0 && score >= best) {
                                 Spacer(Modifier.height(4.dp))
                                 Text(stringResource(R.string.blocks_new_best), color = Color(0xFFFFD66B), fontSize = 14.sp)
+                            }
+                            val neroLine = when (neroState) {
+                                N_GUEST -> stringResource(R.string.blocks_nero_guest)
+                                N_LOW -> stringResource(R.string.blocks_nero_low)
+                                N_OFFLINE -> stringResource(R.string.blocks_nero_offline)
+                                N_SENDING -> stringResource(R.string.blocks_nero_sending)
+                                N_PENDING -> stringResource(R.string.blocks_nero_pending)
+                                N_REJECTED -> neroMsg
+                                N_DONE -> when {
+                                    neroAmount > 0 && neroCapped ->
+                                        stringResource(R.string.blocks_nero_earned, neroAmount.toString()) + " · " + stringResource(R.string.blocks_nero_capped)
+                                    neroAmount > 0 -> stringResource(R.string.blocks_nero_earned, neroAmount.toString())
+                                    neroCapped -> stringResource(R.string.blocks_nero_capped)
+                                    else -> stringResource(R.string.blocks_nero_low)
+                                }
+                                else -> ""
+                            }
+                            if (neroLine.isNotEmpty()) {
+                                Spacer(Modifier.height(10.dp))
+                                Text(
+                                    neroLine,
+                                    color = if (neroState == N_DONE && neroAmount > 0) Color(0xFF8BE9B5) else Color(0xFFBFC8FF),
+                                    fontSize = 14.sp,
+                                    fontWeight = if (neroState == N_DONE && neroAmount > 0) FontWeight.Bold else FontWeight.Normal,
+                                )
                             }
                             Spacer(Modifier.height(16.dp))
                             Button(onClick = { restart() }) { Text(stringResource(R.string.blocks_play_again)) }
