@@ -749,6 +749,12 @@ private fun HomePage(serviceEnabled: Boolean, onOpen: (String) -> Unit) {
                         stringResource(R.string.clock_title),
                         stringResource(R.string.clock_summary),
                     ) { onOpen(PAGE_CLOCK) }
+                    ItemDivider()
+                    SettingsItem(
+                        Glyph.KEYBOARD, ICON_GREEN,
+                        stringResource(R.string.kb_title),
+                        stringResource(R.string.kb_summary),
+                    ) { onOpen(PAGE_KEYBOARD) }
                 }
 
                 SettingsGroup {
@@ -824,6 +830,11 @@ private fun searchIndex(): List<SearchEntry> {
         SearchEntry(stringResource(R.string.g2048_title), stringResource(R.string.games_title), PAGE_2048),
         SearchEntry(stringResource(R.string.memory_title), stringResource(R.string.games_title), PAGE_MEMORY),
         SearchEntry(stringResource(R.string.stack_title), stringResource(R.string.games_title), PAGE_STACK),
+        SearchEntry(stringResource(R.string.kb_title), stringResource(R.string.app_title), PAGE_KEYBOARD),
+        SearchEntry(stringResource(R.string.kb_suggest), stringResource(R.string.kb_title), PAGE_KEYBOARD),
+        SearchEntry(stringResource(R.string.kb_learn), stringResource(R.string.kb_title), PAGE_KEYBOARD),
+        SearchEntry(stringResource(R.string.kb_theme), stringResource(R.string.kb_title), PAGE_KEYBOARD),
+        SearchEntry(stringResource(R.string.kb_clear), stringResource(R.string.kb_title), PAGE_KEYBOARD),
     )
 }
 
@@ -1920,6 +1931,7 @@ class MainActivity : ComponentActivity() {
                 PAGE_TIMER -> TimerPage(goBack)
                 PAGE_STOPWATCH -> StopwatchPage(goBack)
                 PAGE_ACCOUNT -> AccountPage(goBack)
+                PAGE_KEYBOARD -> KeyboardPage(goBack)
                 PAGE_SLEEP -> SleepPage(goBack)
                 PAGE_GAMES -> GameHubPage({ page = it }, goBack)
                 PAGE_BLOCKS -> BlocksGamePage(goBack)

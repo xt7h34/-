@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="kb_name">Kanade Keyboard</string>
+    <string name="kb_title">لوحة المفاتيح</string>
+    <string name="kb_summary">لوحة مفاتيح كاناد، تتعلّم من طريقة كتابتك</string>
+
+    <string name="kb_step_enable">تفعيل لوحة مفاتيح كاناد</string>
+    <string name="kb_enabled_on">مفعّلة في النظام</string>
+    <string name="kb_enabled_off">غير مفعّلة بعد. اضغط لفتح قائمة لوحات المفاتيح</string>
+    <string name="kb_step_choose">استخدام لوحة مفاتيح كاناد</string>
+    <string name="kb_chosen_on">هي لوحة المفاتيح الحالية</string>
+    <string name="kb_chosen_off">اضغط للتبديل إليها</string>
+
+    <string name="kb_try_title">جرّبها</string>
+    <string name="kb_try_hint">اكتب هنا</string>
+
+    <string name="kb_learn_title">الاقتراحات والتعلّم</string>
+    <string name="kb_learn_off">الاقتراحات متوقفة</string>
+    <string name="kb_learn_early">الاقتراحات تعمل مبكراً (وضع التجربة)</string>
+    <string name="kb_learn_notstarted">يبدأ التعلّم عند كتابة أول كلماتك. تبدأ الاقتراحات بعد 7 أيام.</string>
+    <string name="kb_learn_days">يتعلّم من كتابتك، باقي %1$d يوم قبل بدء الاقتراحات</string>
+    <string name="kb_learn_active">الاقتراحات تعمل الآن، وهي من كتابتك أنت فقط.</string>
+    <string name="kb_learn_words">الكلمات المتعلَّمة: %1$d</string>
+    <string name="kb_suggest">عرض الاقتراحات</string>
+    <string name="kb_learn">التعلّم من كتابتي</string>
+    <string name="kb_hint">إظهار ملاحظة التعلّم فوق المفاتيح</string>
+    <string name="kb_early">عرض الاقتراحات قبل انتهاء الأسبوع</string>
+    <string name="kb_early_note">للتجربة فقط. الاقتراحات تكون ضعيفة في الأيام الأولى.</string>
+    <string name="kb_clear">مسح الكلمات المتعلَّمة والبدء من جديد</string>
+    <string name="kb_clear_confirm">اضغط مرة أخرى لمسح كل ما تم تعلّمه</string>
+
+    <string name="kb_look_title">الشكل والإحساس</string>
+    <string name="kb_theme">السمة</string>
+    <string name="kb_theme_auto">تلقائي</string>
+    <string name="kb_theme_light">فاتح</string>
+    <string name="kb_theme_dark">داكن</string>
+    <string name="kb_theme_kanade">كاناد</string>
+    <string name="kb_height">ارتفاع المفاتيح: %1$d%%</string>
+    <string name="kb_number_row">صف الأرقام</string>
+    <string name="kb_haptics">اهتزاز عند الضغط</string>
+    <string name="kb_sound">صوت عند الضغط</string>
+
+    <string name="kb_privacy_title">الخصوصية</string>
+    <string name="kb_privacy">كل ما تتعلّمه لوحة المفاتيح يبقى على هذا الهاتف ومشفّر بمفتاح لا يغادره. لا تتصل لوحة المفاتيح بالإنترنت أبداً، ولا تتعلّم من حقول كلمات المرور أو العناوين أو الحقول التي تطلب كتابة خاصة.</string>
+
+    <string name="kb_hint_start">اكتب كالمعتاد. تبدأ الاقتراحات بعد 7 أيام من التعلّم.</string>
+    <string name="kb_hint_days">يتعلّم من كتابتك · باقي %1$d يوم</string>
+
+    <string name="kb_enter_go">اذهب</string>
+    <string name="kb_enter_search">بحث</string>
+    <string name="kb_enter_send">إرسال</string>
+    <string name="kb_enter_next">التالي</string>
+    <string name="kb_enter_done">تم</string>
+</resources>

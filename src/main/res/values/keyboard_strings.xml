@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="kb_name">Kanade Keyboard</string>
+    <string name="kb_title">Keyboard</string>
+    <string name="kb_summary">Kanade Keyboard, learns from how you write</string>
+
+    <string name="kb_step_enable">Turn on Kanade Keyboard</string>
+    <string name="kb_enabled_on">Turned on in the system</string>
+    <string name="kb_enabled_off">Not turned on yet. Tap to open the system keyboard list</string>
+    <string name="kb_step_choose">Use Kanade Keyboard</string>
+    <string name="kb_chosen_on">It is your current keyboard</string>
+    <string name="kb_chosen_off">Tap to switch to it</string>
+
+    <string name="kb_try_title">Try it</string>
+    <string name="kb_try_hint">Type here</string>
+
+    <string name="kb_learn_title">Suggestions and learning</string>
+    <string name="kb_learn_off">Suggestions are off</string>
+    <string name="kb_learn_early">Showing suggestions early (test mode)</string>
+    <string name="kb_learn_notstarted">Learning starts when you type your first words. Suggestions begin after 7 days.</string>
+    <string name="kb_learn_days">Learning from your writing: %1$d days left before suggestions start</string>
+    <string name="kb_learn_active">Suggestions are active. They come only from your own writing.</string>
+    <string name="kb_learn_words">Words learned: %1$d</string>
+    <string name="kb_suggest">Show suggestions</string>
+    <string name="kb_learn">Learn from my typing</string>
+    <string name="kb_hint">Show the learning note above the keys</string>
+    <string name="kb_early">Show suggestions before the week ends</string>
+    <string name="kb_early_note">For testing only. Suggestions are weak in the first days.</string>
+    <string name="kb_clear">Erase learned words and start over</string>
+    <string name="kb_clear_confirm">Tap again to erase everything learned</string>
+
+    <string name="kb_look_title">Look and feel</string>
+    <string name="kb_theme">Theme</string>
+    <string name="kb_theme_auto">Auto</string>
+    <string name="kb_theme_light">Light</string>
+    <string name="kb_theme_dark">Dark</string>
+    <string name="kb_theme_kanade">Kanade</string>
+    <string name="kb_height">Key height: %1$d%%</string>
+    <string name="kb_number_row">Number row</string>
+    <string name="kb_haptics">Vibrate on key press</string>
+    <string name="kb_sound">Sound on key press</string>
+
+    <string name="kb_privacy_title">Privacy</string>
+    <string name="kb_privacy">Everything the keyboard learns stays on this phone, encrypted with a key that never leaves it. The keyboard never connects to the internet, and it never learns from password fields, address fields or fields that ask for private typing.</string>
+
+    <string name="kb_hint_start">Type as usual. Suggestions start after 7 days of learning.</string>
+    <string name="kb_hint_days">Learning from your writing · %1$d days left</string>
+
+    <string name="kb_enter_go">Go</string>
+    <string name="kb_enter_search">Search</string>
+    <string name="kb_enter_send">Send</string>
+    <string name="kb_enter_next">Next</string>
+    <string name="kb_enter_done">Done</string>
+</resources>
