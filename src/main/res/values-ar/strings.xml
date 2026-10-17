@@ -84,6 +84,14 @@
     <string name="item_app_summary">الثيم والألوان واللغة</string>
     <string name="blocks_title">Kanade Blocks</string>
     <string name="blocks_summary">لعبة تركيب مكعبات بمنظور إيزومتري</string>
+    <string name="blocks_score">النقاط</string>
+    <string name="blocks_best">أفضل نتيجة</string>
+    <string name="blocks_hint">اسحب القطعة إلى اللوح، أو اختر قطعة ثم المس مكان وضعها</string>
+    <string name="blocks_over">انتهت الجولة</string>
+    <string name="blocks_final_score">نتيجتك: %1$s</string>
+    <string name="blocks_new_best">رقم قياسي جديد!</string>
+    <string name="blocks_play_again">العب مجددًا</string>
+    <string name="blocks_restart">إعادة اللعب</string>
     <string name="dnd_perm_title">صلاحية عدم الإزعاج</string>
     <string name="section_language">اللغة</string>
     <string name="lang_system">تلقائي</string>

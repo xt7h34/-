@@ -235,7 +235,7 @@ private fun HeaderSpacer() {
  * smaller, and scrolling further makes it fade away, like in the system Settings app.
  */
 @Composable
-private fun CollapsingTitle(title: String, startPad: Dp, scrollPx: () -> Int) {
+private fun CollapsingTitle(title: String, startPad: Dp, pinned: Boolean = false, scrollPx: () -> Int) {
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     val screenW = LocalConfiguration.current.screenWidthDp.dp
     val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -253,7 +253,8 @@ private fun CollapsingTitle(title: String, startPad: Dp, scrollPx: () -> Int) {
                 val collapsedPx = HEADER_COLLAPSED.toPx()
                 val status = statusTop.toPx()
                 val range = (expandedPx - collapsedPx).coerceAtLeast(1f)
-                val s = scrollPx().toFloat()
+                // A pinned title stays in its small, collapsed place (for pages that do not scroll).
+                val s = if (pinned) range else scrollPx().toFloat()
                 val p = (s / range).coerceIn(0f, 1f)
 
                 val scale = 1f + (0.62f - 1f) * p
@@ -303,6 +304,7 @@ internal fun PageScaffold(
     title: String,
     onBack: (() -> Unit)?,
     lazy: Boolean = false,
+    pinTitle: Boolean = false,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val scroll = rememberScrollState()
@@ -320,7 +322,7 @@ internal fun PageScaffold(
                 Spacer(Modifier.fillMaxWidth().statusBarsPadding().background(bg))
                 Spacer(Modifier.fillMaxWidth().height(14.dp).background(Brush.verticalGradient(listOf(bg, bg.copy(alpha = 0f)))))
             }
-            CollapsingTitle(title, if (onBack != null) 64.dp else 24.dp) {
+            CollapsingTitle(title, if (onBack != null) 64.dp else 24.dp, pinTitle) {
                 if (lazy) {
                     if (list.firstVisibleItemIndex == 0) list.firstVisibleItemScrollOffset else Int.MAX_VALUE / 4
                 } else {
