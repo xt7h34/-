@@ -49,7 +49,11 @@ const val PAGE_STATION = "station"
 const val PAGE_APPS = "apps"
 const val PAGE_APP = "app"
 const val PAGE_KEEPALIVE = "keepalive"
+const val PAGE_GAMES = "games"
 const val PAGE_BLOCKS = "blocks"
+const val PAGE_2048 = "g2048"
+const val PAGE_MEMORY = "memory"
+const val PAGE_STACK = "stack"
 
 // Looks of the volume panel.
 const val STYLE_CLASSIC = 0
@@ -110,6 +114,10 @@ enum class Glyph(val pathData: String) {
     HEADSET("M12,1c-4.97,0 -9,4.03 -9,9v7c0,1.66 1.34,3 3,3h3v-8H5v-2c0,-3.87 3.13,-7 7,-7s7,3.13 7,7v2h-4v8h3c1.66,0 3,-1.34 3,-3v-7c0,-4.97 -4.03,-9 -9,-9z"),
     PALETTE("M12,3c-4.97,0 -9,4.03 -9,9s4.03,9 9,9c0.83,0 1.5,-0.67 1.5,-1.5 0,-0.39 -0.15,-0.74 -0.39,-1.01 -0.23,-0.26 -0.38,-0.61 -0.38,-0.99 0,-0.83 0.67,-1.5 1.5,-1.5H16c2.76,0 5,-2.24 5,-5 0,-4.42 -4.03,-8 -9,-8zM6.5,12c-0.83,0 -1.5,-0.67 -1.5,-1.5S5.67,9 6.5,9 8,9.67 8,10.5 7.33,12 6.5,12zM9.5,8C8.67,8 8,7.33 8,6.5S8.67,5 9.5,5s1.5,0.67 1.5,1.5S10.33,8 9.5,8zM14.5,8c-0.83,0 -1.5,-0.67 -1.5,-1.5S13.67,5 14.5,5s1.5,0.67 1.5,1.5S15.33,8 14.5,8zM17.5,12c-0.83,0 -1.5,-0.67 -1.5,-1.5S16.67,9 17.5,9s1.5,0.67 1.5,1.5 -0.67,1.5 -1.5,1.5z"),
     BLOCKS("M12,2.5L19.5,6.8L12,11L4.5,6.8zM4,8.5L11.2,12.6V21L4,16.9zM20,8.5L12.8,12.6V21L20,16.9z"),
+    GAMES("M15,7.5V2H9v5.5l3,3 3,-3zM7.5,9H2v6h5.5l3,-3 -3,-3zM9,16.5V22h6v-5.5l-3,-3 -3,3zM16.5,9l-3,3 3,3H22V9h-5.5z"),
+    TILES("M4,4h7v7H4zM13,4h7v7h-7zM4,13h7v7H4zM13,13h7v7h-7z"),
+    CARDS("M4,7h10v13H4zM10,4h10v13h-2V6h-8z"),
+    LAYERS("M6,4h12v4H6zM3,10h12v4H3zM9,16h12v4H9z"),
 }
 
 class StreamInfo(val stream: Int, val glyph: Glyph, val labelRes: Int)
