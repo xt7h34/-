@@ -82,6 +82,8 @@
     <string name="apps_summary">إخفاء اللوحة أو نقلها جوه تطبيقات معيّنة</string>
     <string name="item_app_title">المظهر واللغة</string>
     <string name="item_app_summary">الثيم والألوان واللغة</string>
+    <string name="blocks_title">Kanade Blocks</string>
+    <string name="blocks_summary">لعبة تركيب مكعبات بمنظور إيزومتري</string>
     <string name="dnd_perm_title">صلاحية عدم الإزعاج</string>
     <string name="section_language">اللغة</string>
     <string name="lang_system">تلقائي</string>

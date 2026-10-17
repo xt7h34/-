@@ -49,6 +49,7 @@ const val PAGE_STATION = "station"
 const val PAGE_APPS = "apps"
 const val PAGE_APP = "app"
 const val PAGE_KEEPALIVE = "keepalive"
+const val PAGE_BLOCKS = "blocks"
 
 // Looks of the volume panel.
 const val STYLE_CLASSIC = 0

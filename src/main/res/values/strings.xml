@@ -82,6 +82,8 @@
     <string name="apps_summary">Hide or move the panel inside specific apps</string>
     <string name="item_app_title">Appearance and language</string>
     <string name="item_app_summary">Theme, colors and language</string>
+    <string name="blocks_title">Kanade Blocks</string>
+    <string name="blocks_summary">Isometric block puzzle game</string>
     <string name="dnd_perm_title">Do Not Disturb access</string>
     <string name="section_language">Language</string>
     <string name="lang_system">System</string>

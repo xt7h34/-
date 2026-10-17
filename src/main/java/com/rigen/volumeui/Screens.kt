@@ -755,6 +755,12 @@ private fun HomePage(serviceEnabled: Boolean, onOpen: (String) -> Unit) {
                         stringResource(R.string.item_app_title),
                         stringResource(R.string.item_app_summary),
                     ) { onOpen(PAGE_APP) }
+                    ItemDivider()
+                    SettingsItem(
+                        Glyph.PALETTE, ICON_BLUE,
+                        stringResource(R.string.blocks_title),
+                        stringResource(R.string.blocks_summary),
+                    ) { onOpen(PAGE_BLOCKS) }
                 }
 
                 // Room for the floating search bar.
@@ -1905,6 +1911,7 @@ class MainActivity : ComponentActivity() {
                 PAGE_STOPWATCH -> StopwatchPage(goBack)
                 PAGE_ACCOUNT -> AccountPage(goBack)
                 PAGE_SLEEP -> SleepPage(goBack)
+                PAGE_BLOCKS -> BlocksGamePage(goBack)
                 else -> HomePage(serviceEnabled) { page = it }
             }
         }
