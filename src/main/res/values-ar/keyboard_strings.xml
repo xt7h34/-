@@ -101,4 +101,74 @@
     <string name="kb_symbols_hint">اكتب الرموز التي تريدها، حتى 27 رمزاً. تظهر في صفحة خاصة بها، وتصل إليها بزر النجمة في صفحة الرموز.</string>
     <string name="kb_symbols_field">الرموز</string>
     <string name="kb_symbols_count">الرموز المضافة: %1$d من 27</string>
+
+    <string name="kb_tab_general">عام</string>
+    <string name="kb_tab_design">التصميم</string>
+    <string name="kb_tab_effects">التأثيرات</string>
+    <string name="kb_tab_layout">التخطيط</string>
+    <string name="kb_preview_note">هذه لوحة المفاتيح الحقيقية. اضغط على أزرارها لترى ألوانك وتأثيراتك وحركتها.</string>
+    <string name="kb_feedback_title">أثناء الكتابة</string>
+
+    <string name="kb_borders_title">حدود الأزرار</string>
+    <string name="kb_borders_note">لكل نوع من الأزرار حدّ مستقل بلونه وسُمكه. السُّمك 0 يعني بدون حدّ.</string>
+    <string name="kb_border_width">سُمك الحدّ: %1$s</string>
+    <string name="kb_borders_reset">إزالة كل الحدود</string>
+    <string name="kb_g_letters">أزرار الحروف</string>
+    <string name="kb_g_numbers">أزرار الأرقام</string>
+    <string name="kb_g_space">زر المسافة</string>
+    <string name="kb_g_delete">زر الحذف</string>
+    <string name="kb_g_shift">زر Shift</string>
+    <string name="kb_g_lang">زر اللغة</string>
+    <string name="kb_g_emoji">زر الإيموجي</string>
+    <string name="kb_g_enter">زر الإرسال</string>
+    <string name="kb_g_symbols">أزرار الرموز</string>
+
+    <string name="kb_sizes_title">حجم الأزرار وشكلها</string>
+    <string name="kb_numheight">ارتفاع صف الأرقام: %1$d%%</string>
+    <string name="kb_gap">المسافة بين الأزرار: %1$d</string>
+    <string name="kb_radius">استدارة الزوايا: %1$d</string>
+    <string name="kb_textsize">حجم الحروف: %1$d%%</string>
+
+    <string name="kb_fx_title">تأثير لوحة المفاتيح</string>
+    <string name="kb_fx_note">ضوء يظهر خلف الأزرار في مكان الضغط.</string>
+    <string name="kb_fx_none">بدون</string>
+    <string name="kb_fx_splash">بقعة</string>
+    <string name="kb_fx_glow">توهّج</string>
+    <string name="kb_fx_ripple">موجة</string>
+    <string name="kb_fx_dot">نقطة</string>
+    <string name="kb_fx_cross">صليب</string>
+    <string name="kb_fx_color">لون التأثير</string>
+    <string name="kb_fx_size">حجم التأثير: %1$d%%</string>
+
+    <string name="kb_keyfx_title">لون الزر المضغوط</string>
+    <string name="kb_keyfx_default">عادي</string>
+    <string name="kb_keyfx_solid">ممتلئ</string>
+    <string name="kb_keyfx_soft">ناعم</string>
+    <string name="kb_keyfx_ring">إطار</string>
+    <string name="kb_keyfx_gradient">تدرّج</string>
+    <string name="kb_keyfx_glow">إطار متوهج</string>
+    <string name="kb_keyfx_color">لون تأثير الزر المضغوط</string>
+
+    <string name="kb_motion_title">حركة الزر</string>
+    <string name="kb_motion_none">بدون</string>
+    <string name="kb_motion_tilt">ميلان</string>
+    <string name="kb_motion_shrink">تصغير</string>
+    <string name="kb_motion_grow">تكبير</string>
+    <string name="kb_motion_lift">ارتفاع</string>
+    <string name="kb_motion_bounce">ارتداد</string>
+
+    <string name="kb_pic_color">لون الصورة (الافتراضي يُبقي ألوانها الأصلية)</string>
+    <string name="kb_pic_inside">إبقاء الصورة داخل الزر</string>
+    <string name="kb_pic_motion">حركة الصورة</string>
+    <string name="kb_pic_fade">تلاشي</string>
+    <string name="kb_pic_rise">صعود</string>
+    <string name="kb_pic_pop">ظهور مفاجئ</string>
+    <string name="kb_pic_spin">دوران</string>
+
+    <string name="kb_hints_title">التلميحات والحروف الإضافية وزر الإيموجي</string>
+    <string name="kb_hints_show">إظهار تلميحات صغيرة على الأزرار (الحرف الإضافي في الزاوية)</string>
+    <string name="kb_alts_bubble">إظهار الحروف الإضافية في فقاعة فوق الزر</string>
+    <string name="kb_alts_note">اضغط مطولاً على الزر ثم اسحب إلى الحرف وارفع إصبعك، أو اضغط عليه. وعند إيقافها تظهر في الشريط العلوي.</string>
+    <string name="kb_emoji_bar">وضع زر الإيموجي في الشريط العلوي</string>
+    <string name="kb_emoji_bar_note">يغادر الصف السفلي ويستقر بجانب زر الإعدادات في الشريط العلوي.</string>
 </resources>

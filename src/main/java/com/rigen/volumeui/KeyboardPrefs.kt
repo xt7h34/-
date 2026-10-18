@@ -23,6 +23,48 @@ internal const val KB_SHAPE_HEXAGON = 4
 internal const val KB_SHAPE_STAR = 5
 internal const val KB_SHAPE_HEART = 6
 
+// Key groups, each with its own border.
+internal const val KB_GROUPS = 9
+internal const val KB_G_LETTERS = 0
+internal const val KB_G_NUMBERS = 1
+internal const val KB_G_SPACE = 2
+internal const val KB_G_DELETE = 3
+internal const val KB_G_SHIFT = 4
+internal const val KB_G_LANG = 5
+internal const val KB_G_EMOJI = 6
+internal const val KB_G_ENTER = 7
+internal const val KB_G_SYMBOLS = 8
+
+// Light that appears behind the keys.
+internal const val KB_FX_NONE = 0
+internal const val KB_FX_SPLASH = 1
+internal const val KB_FX_GLOW = 2
+internal const val KB_FX_RIPPLE = 3
+internal const val KB_FX_DOT = 4
+internal const val KB_FX_CROSS = 5
+
+// How the pressed key itself is colored.
+internal const val KB_KEYFX_DEFAULT = 0
+internal const val KB_KEYFX_SOLID = 1
+internal const val KB_KEYFX_SOFT = 2
+internal const val KB_KEYFX_RING = 3
+internal const val KB_KEYFX_GRADIENT = 4
+internal const val KB_KEYFX_GLOW = 5
+
+// How the pressed key moves.
+internal const val KB_MOTION_NONE = 0
+internal const val KB_MOTION_TILT = 1
+internal const val KB_MOTION_SHRINK = 2
+internal const val KB_MOTION_GROW = 3
+internal const val KB_MOTION_LIFT = 4
+internal const val KB_MOTION_BOUNCE = 5
+
+// How the picture on a key moves.
+internal const val KB_PIC_FADE = 0
+internal const val KB_PIC_RISE = 1
+internal const val KB_PIC_POP = 2
+internal const val KB_PIC_SPIN = 3
+
 /** Suggestions start only after the keyboard has learned from the person for this many days. */
 internal const val KB_LEARN_DAYS = 7
 
@@ -56,6 +98,28 @@ internal data class KbConfig(
     val layoutAr: String = "",
     val layoutEn: String = "",
     val symbols: String = "",
+    // Borders: one color and one thickness (in tenths of a dp) for each key group.
+    val borderColor: List<Int> = List(KB_GROUPS) { 0 },
+    val borderWidth: List<Int> = List(KB_GROUPS) { 0 },
+    // Key size and shape.
+    val numHeightPct: Int = 85,
+    val keyGap: Int = 2,
+    val keyRadius: Int = 8,
+    val textPct: Int = 100,
+    // Hints and extra letters.
+    val showHints: Boolean = true,
+    val altsInBubble: Boolean = false,
+    val emojiInBar: Boolean = false,
+    // Effects.
+    val fxStyle: Int = KB_FX_NONE,
+    val colFx: Int = 0,
+    val fxSize: Int = 100,
+    val keyFxStyle: Int = KB_KEYFX_DEFAULT,
+    val colKeyFx: Int = 0,
+    val keyMotion: Int = KB_MOTION_NONE,
+    val colPicture: Int = 0,
+    val pictureInside: Boolean = true,
+    val pictureMotion: Int = KB_PIC_FADE,
 )
 
 internal object KbPrefs {
@@ -96,6 +160,24 @@ internal object KbPrefs {
             layoutAr = p.getString("layout_ar", "") ?: "",
             layoutEn = p.getString("layout_en", "") ?: "",
             symbols = p.getString("symbols", "") ?: "",
+            borderColor = readList(p.getString("border_c", ""), 0),
+            borderWidth = readList(p.getString("border_w", ""), 0).map { it.coerceIn(0, 60) },
+            numHeightPct = p.getInt("num_height", d.numHeightPct).coerceIn(50, 120),
+            keyGap = p.getInt("key_gap", d.keyGap).coerceIn(0, 8),
+            keyRadius = p.getInt("key_radius", d.keyRadius).coerceIn(0, 24),
+            textPct = p.getInt("text_pct", d.textPct).coerceIn(70, 140),
+            showHints = p.getBoolean("show_hints", d.showHints),
+            altsInBubble = p.getBoolean("alts_bubble", d.altsInBubble),
+            emojiInBar = p.getBoolean("emoji_bar", d.emojiInBar),
+            fxStyle = p.getInt("fx_style", d.fxStyle).coerceIn(0, 5),
+            colFx = p.getInt("c_fx", 0),
+            fxSize = p.getInt("fx_size", d.fxSize).coerceIn(50, 160),
+            keyFxStyle = p.getInt("keyfx_style", d.keyFxStyle).coerceIn(0, 5),
+            colKeyFx = p.getInt("c_keyfx", 0),
+            keyMotion = p.getInt("key_motion", d.keyMotion).coerceIn(0, 5),
+            colPicture = p.getInt("c_picture", 0),
+            pictureInside = p.getBoolean("pic_inside", d.pictureInside),
+            pictureMotion = p.getInt("pic_motion", d.pictureMotion).coerceIn(0, 3),
         )
     }
 
@@ -129,7 +211,31 @@ internal object KbPrefs {
             .putString("layout_ar", k.layoutAr)
             .putString("layout_en", k.layoutEn)
             .putString("symbols", k.symbols)
+            .putString("border_c", k.borderColor.joinToString(","))
+            .putString("border_w", k.borderWidth.joinToString(","))
+            .putInt("num_height", k.numHeightPct)
+            .putInt("key_gap", k.keyGap)
+            .putInt("key_radius", k.keyRadius)
+            .putInt("text_pct", k.textPct)
+            .putBoolean("show_hints", k.showHints)
+            .putBoolean("alts_bubble", k.altsInBubble)
+            .putBoolean("emoji_bar", k.emojiInBar)
+            .putInt("fx_style", k.fxStyle)
+            .putInt("c_fx", k.colFx)
+            .putInt("fx_size", k.fxSize)
+            .putInt("keyfx_style", k.keyFxStyle)
+            .putInt("c_keyfx", k.colKeyFx)
+            .putInt("key_motion", k.keyMotion)
+            .putInt("c_picture", k.colPicture)
+            .putBoolean("pic_inside", k.pictureInside)
+            .putInt("pic_motion", k.pictureMotion)
             .apply()
+    }
+
+    /** A saved list of numbers, always [KB_GROUPS] long. */
+    private fun readList(raw: String?, fill: Int): List<Int> {
+        val parts = (raw ?: "").split(",").map { it.trim().toIntOrNull() ?: fill }
+        return List(KB_GROUPS) { parts.getOrNull(it) ?: fill }
     }
 
     fun saveLang(c: Context, lang: String) {
@@ -195,7 +301,12 @@ internal class KbPalette(
     val accent: Color,
     val onAccent: Color,
     val preview: Color,
+    val fx: Color,
+    val keyFx: Color,
+    val picture: Color?,
 )
+
+private val KB_YELLOW = Color(0xFFFFE600)
 
 private class KbBase(
     val bg: Color, val key: Color, val keyDown: Color, val special: Color, val specialDown: Color,
@@ -246,5 +357,8 @@ internal fun kbPalette(cfg: KbConfig, systemDark: Boolean): KbPalette {
         accent = pick(cfg.colAccent, b.accent),
         onAccent = pick(cfg.colIcon, b.onAccent),
         preview = pick(cfg.colPreview, key),
+        fx = pick(cfg.colFx, KB_YELLOW),
+        keyFx = pick(cfg.colKeyFx, KB_YELLOW),
+        picture = if (cfg.colPicture != 0) Color(cfg.colPicture) else null,
     )
 }

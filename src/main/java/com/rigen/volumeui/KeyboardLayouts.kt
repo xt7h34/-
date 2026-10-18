@@ -150,13 +150,16 @@ internal fun kbSymbolRows(page: Int, custom: List<String>): List<List<KbKey>> =
         }
     }
 
-/** The bottom row: symbols or letters switch, language, comma, space, period, emoji, enter. */
-internal fun kbBottomRow(lang: String, symbols: Boolean): List<KbKey> {
-    val comma = if (lang == "ar" && !symbols) "،" else ","
-    val commaKey = if (lang == "ar" && !symbols) {
-        KbKey(comma, KeyKind.CHAR, 1f, listOf("؛", "؟", "◌َ", "◌ُ", "◌ِ", "◌ً", "◌ٌ", "◌ٍ", "◌ّ", "◌ْ"))
+/**
+ * The bottom row: symbols or letters switch, language, comma, space, period, emoji, enter.
+ * When [emojiInBar] is on, the emoji key lives in the top bar instead.
+ */
+internal fun kbBottomRow(lang: String, symbols: Boolean, emojiInBar: Boolean): List<KbKey> {
+    val arabicComma = lang == "ar" && !symbols
+    val commaKey = if (arabicComma) {
+        KbKey("،", KeyKind.CHAR, 1f, listOf("؛", "؟", "◌َ", "◌ُ", "◌ِ", "◌ً", "◌ٌ", "◌ٍ", "◌ّ", "◌ْ"))
     } else {
-        KbKey(comma, KeyKind.CHAR, 1f, listOf(";", ":", "!", "?"))
+        KbKey(",", KeyKind.CHAR, 1f, listOf(";", ":", "!", "?"))
     }
     val first = if (symbols) {
         KbKey(if (lang == "ar") "أب" else "ABC", KeyKind.LETTERS, 1.4f)
@@ -164,14 +167,16 @@ internal fun kbBottomRow(lang: String, symbols: Boolean): List<KbKey> {
         KbKey("?123", KeyKind.SYMBOLS, 1.4f)
     }
     val dot = KbKey(".", KeyKind.CHAR, 1f, listOf("؟", "!", "…"))
-    val space = KbKey("", KeyKind.SPACE, 4f)
+    val space = KbKey("", KeyKind.SPACE, if (emojiInBar) 4.5f else 4f)
     val emoji = KbKey("", KeyKind.EMOJI, 1f)
     val enter = KbKey("", KeyKind.ENTER, 1.5f)
-    return if (symbols) {
+    val lang1 = KbKey(if (lang == "ar") "EN" else "ع", KeyKind.LANG, 1f)
+    val row = if (symbols) {
         listOf(first, commaKey, emoji, space, dot, enter)
     } else {
-        listOf(first, KbKey(if (lang == "ar") "EN" else "ع", KeyKind.LANG, 1f), commaKey, space, dot, emoji, enter)
+        listOf(first, lang1, commaKey, space, dot, emoji, enter)
     }
+    return if (emojiInBar) row.filter { it.kind != KeyKind.EMOJI } else row
 }
 
 // ───────────────────────── Emoji ─────────────────────────

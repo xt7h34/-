@@ -15,11 +15,8 @@ import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputMethodManager
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.ComposeView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
@@ -29,7 +26,6 @@ import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
-import kotlin.random.Random
 
 /*
  * Kanade Keyboard. A real system keyboard that lives inside the Kanade app.
@@ -44,12 +40,6 @@ internal const val PG_SYM1 = 1
 internal const val PG_SYM2 = 2
 internal const val PG_EMOJI = 3
 internal const val PG_SYM3 = 4 // the person's own symbols
-
-/** The key being pressed, so the keyboard can draw the bubble above it. */
-internal class PressInfo(val label: String, val rect: Rect)
-
-/** One picture (a paw, a heart...) that appears where a key was pressed and fades away. */
-internal class TapEffect(val id: Long, val symbol: String, val x: Float, val y: Float, val rot: Float)
 
 class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner {
 
@@ -74,9 +64,10 @@ class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRe
     internal var hint by mutableStateOf<String?>(null)
     internal var enterLabel by mutableStateOf("")
     internal var recentVersion by mutableIntStateOf(0)
-    internal var press by mutableStateOf<PressInfo?>(null)
-    internal val effects = mutableStateListOf<TapEffect>()
     internal var customSymbols by mutableStateOf<List<String>>(emptyList())
+
+    /** Everything that appears briefly while keys are pressed (bubbles, pictures, lights). */
+    internal val fx = KbFx()
 
     // What the current text field asked for.
     private var secure = false
@@ -86,12 +77,44 @@ class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRe
     private var noEnterAction = false
     private var lastShiftTap = 0L
     private var pageBeforeEmoji = PG_LETTERS
-    private var effectSymbols: List<String> = emptyList()
-    private var effectId = 0L
 
     private val refreshRunnable = Runnable { refreshNow() }
     private val saveRunnable = Runnable { learner.save() }
-    private val clearPressRunnable = Runnable { press = null }
+
+    /** What the drawing code sees. It only forwards to this service. */
+    internal val host: KbHost = object : KbHost() {
+        private val svc: KanadeKeyboardService get() = this@KanadeKeyboardService
+        override val cfg: KbConfig get() = svc.cfg
+        override val page: Int get() = svc.page
+        override val lang: String get() = svc.lang
+        override val shift: Int get() = svc.shift
+        override val suggestions: List<String> get() = svc.suggestions
+        override val alts: List<String> get() = svc.alts
+        override val hint: String? get() = svc.hint
+        override val enterLabel: String get() = svc.enterLabel
+        override val recentVersion: Int get() = svc.recentVersion
+        override val customSymbols: List<String> get() = svc.customSymbols
+        override val fx: KbFx get() = svc.fx
+
+        override fun feedback(kind: KeyKind) = svc.feedback(kind)
+        override fun typeChar(raw: String) = svc.typeChar(raw)
+        override fun typeAlt(s: String) = svc.typeAlt(s)
+        override fun showAlts(list: List<String>) = svc.showAlts(list)
+        override fun onSpace() = svc.onSpace()
+        override fun onBackspace() = svc.onBackspace()
+        override fun onEnter() = svc.onEnter()
+        override fun onShift() = svc.onShift()
+        override fun showSymbols() = svc.showSymbols()
+        override fun showLetters() = svc.showLetters()
+        override fun togglePage() = svc.togglePage()
+        override fun toggleLang() = svc.toggleLang()
+        override fun showEmoji() = svc.showEmoji()
+        override fun closeEmoji() = svc.closeEmoji()
+        override fun showPicker() = svc.showPicker()
+        override fun openSettings() = svc.openSettings()
+        override fun typeEmoji(e: String) = svc.typeEmoji(e)
+        override fun pickSuggestion(word: String) = svc.pickSuggestion(word)
+    }
 
     // ───────────────────────── Lifecycle ─────────────────────────
 
@@ -114,7 +137,7 @@ class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRe
         val compose = ComposeView(this).apply {
             setViewTreeLifecycleOwner(this@KanadeKeyboardService)
             setViewTreeSavedStateRegistryOwner(this@KanadeKeyboardService)
-            setContent { KeyboardRoot(this@KanadeKeyboardService) }
+            setContent { KeyboardRoot(host) }
         }
         val decor = window?.window?.decorView
         decor?.setViewTreeLifecycleOwner(this)
@@ -129,8 +152,7 @@ class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRe
         super.onStartInputView(info, restarting)
         cfg = KbPrefs.load(this)
         applyConfig()
-        press = null
-        effects.clear()
+        fx.clear()
         uiContext = Prefs.localized(this)
         if (KbPrefs.wipeGen(this) != seenWipe) {
             learner.clearAll()
@@ -188,8 +210,7 @@ class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRe
 
     override fun onFinishInput() {
         super.onFinishInput()
-        press = null
-        effects.clear()
+        fx.clear()
         handler.removeCallbacks(saveRunnable)
         learner.save()
         alts = emptyList()
@@ -223,7 +244,12 @@ class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRe
 
     /** A letter picked from the long-press strip. */
     internal fun typeAlt(s: String) {
+        fx.bubble = null
         typeChar(s.removePrefix("◌"))
+    }
+
+    internal fun showAlts(list: List<String>) {
+        alts = list
     }
 
     internal fun onSpace() {
@@ -318,28 +344,7 @@ class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRe
 
     /** Things the keyboard works out from the settings once, instead of on every key press. */
     private fun applyConfig() {
-        effectSymbols = kbGraphemes(cfg.effectChars).take(12)
         customSymbols = kbGraphemes(cfg.symbols).take(27)
-    }
-
-    // ───────────────────────── Press bubble and picture ─────────────────────────
-
-    internal fun showPress(info: PressInfo) {
-        handler.removeCallbacks(clearPressRunnable)
-        press = info
-    }
-
-    /** The bubble stays a moment after the finger lifts, so a fast tap can still be seen. */
-    internal fun hidePress() {
-        handler.removeCallbacks(clearPressRunnable)
-        handler.postDelayed(clearPressRunnable, 90L)
-    }
-
-    internal fun spawnEffect(at: Offset) {
-        if (!cfg.effectOn || effectSymbols.isEmpty()) return
-        while (effects.size >= 12) effects.removeAt(0)
-        effectId++
-        effects.add(TapEffect(effectId, effectSymbols.random(), at.x, at.y, Random.nextFloat() * 40f - 20f))
     }
 
     internal fun toggleLang() {

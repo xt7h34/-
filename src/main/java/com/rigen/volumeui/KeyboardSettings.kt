@@ -70,6 +70,7 @@ internal fun KeyboardPage(onBack: () -> Unit) {
     var wipeCount by remember { mutableIntStateOf(0) }
     var confirmWipe by remember { mutableStateOf(false) }
     var test by remember { mutableStateOf("") }
+    var tab by remember { mutableIntStateOf(0) }
 
     // The system settings are a different screen: look again every second while this page is open.
     LaunchedEffect(Unit) {
@@ -94,13 +95,71 @@ internal fun KeyboardPage(onBack: () -> Unit) {
 
     PageScaffold(stringResource(R.string.kb_title), onBack) { padding ->
         PageColumn(padding) {
+            ChoiceRow(
+                listOf(
+                    stringResource(R.string.kb_tab_general),
+                    stringResource(R.string.kb_tab_design),
+                    stringResource(R.string.kb_tab_effects),
+                    stringResource(R.string.kb_tab_layout),
+                ),
+                tab,
+            ) { tab = it }
+            when (tab) {
+                1 -> KbDesignTab(cfg) { update(it) }
+                2 -> KbEffectsTab(cfg) { update(it) }
+                3 -> KbLayoutTab(cfg) { update(it) }
+                else -> KbGeneralTab(
+                    cfg = cfg,
+                    enabled = enabled,
+                    selected = selected,
+                    daysLeft = daysLeft,
+                    words = words,
+                    confirmWipe = confirmWipe,
+                    test = test,
+                    onTest = { test = it },
+                    onOpenSettings = { open(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)) },
+                    onWipe = {
+                        if (!confirmWipe) {
+                            confirmWipe = true
+                        } else {
+                            KbLearner.wipeFile(context)
+                            KbPrefs.resetLearning(context)
+                            KbPrefs.bumpWipe(context)
+                            confirmWipe = false
+                            wipeCount++
+                        }
+                    },
+                    update = { update(it) },
+                )
+            }
+        }
+    }
+}
+
+/** The first tab: turning the keyboard on, trying it, and how the learning is going. */
+@Composable
+private fun KbGeneralTab(
+    cfg: KbConfig,
+    enabled: Boolean,
+    selected: Boolean,
+    daysLeft: Int?,
+    words: Int,
+    confirmWipe: Boolean,
+    test: String,
+    onTest: (String) -> Unit,
+    onOpenSettings: () -> Unit,
+    onWipe: () -> Unit,
+    update: (KbConfig) -> Unit,
+) {
+    val context = LocalContext.current
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             SettingsGroup {
                 SettingsItem(
                     glyph = Glyph.KEYBOARD,
                     iconColor = if (enabled) ICON_GREEN else ICON_ORANGE,
                     title = stringResource(R.string.kb_step_enable),
                     summary = stringResource(if (enabled) R.string.kb_enabled_on else R.string.kb_enabled_off),
-                ) { open(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)) }
+                ) { onOpenSettings() }
                 ItemDivider()
                 SettingsItem(
                     glyph = Glyph.TUNE,
@@ -116,7 +175,7 @@ internal fun KeyboardPage(onBack: () -> Unit) {
             Section(stringResource(R.string.kb_try_title)) {
                 OutlinedTextField(
                     value = test,
-                    onValueChange = { test = it },
+                    onValueChange = { onTest(it) },
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = { Text(stringResource(R.string.kb_try_hint)) },
                 )
@@ -151,48 +210,17 @@ internal fun KeyboardPage(onBack: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 OutlinedButton(
-                    onClick = {
-                        if (!confirmWipe) {
-                            confirmWipe = true
-                        } else {
-                            KbLearner.wipeFile(context)
-                            KbPrefs.resetLearning(context)
-                            KbPrefs.bumpWipe(context)
-                            confirmWipe = false
-                            wipeCount++
-                        }
-                    },
+                    onClick = onWipe,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(stringResource(if (confirmWipe) R.string.kb_clear_confirm else R.string.kb_clear))
                 }
             }
 
-            Section(stringResource(R.string.kb_look_title)) {
-                Text(stringResource(R.string.kb_theme))
-                ChoiceRow(
-                    listOf(
-                        stringResource(R.string.kb_theme_auto),
-                        stringResource(R.string.kb_theme_light),
-                        stringResource(R.string.kb_theme_dark),
-                        stringResource(R.string.kb_theme_kanade),
-                    ),
-                    cfg.theme,
-                ) { update(cfg.copy(theme = it)) }
-                Column {
-                    Text(stringResource(R.string.kb_height, cfg.heightPct))
-                    Slider(
-                        value = cfg.heightPct.toFloat(),
-                        onValueChange = { update(cfg.copy(heightPct = it.roundToInt())) },
-                        valueRange = 80f..130f,
-                    )
-                }
-                SwitchRow(stringResource(R.string.kb_number_row), cfg.numberRow) { update(cfg.copy(numberRow = it)) }
+            Section(stringResource(R.string.kb_feedback_title)) {
                 SwitchRow(stringResource(R.string.kb_haptics), cfg.haptics) { update(cfg.copy(haptics = it)) }
                 SwitchRow(stringResource(R.string.kb_sound), cfg.sound) { update(cfg.copy(sound = it)) }
             }
-
-            KbStyleSections(cfg) { update(it) }
 
             Section(stringResource(R.string.kb_privacy_title)) {
                 Text(
@@ -201,7 +229,6 @@ internal fun KeyboardPage(onBack: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-        }
     }
 }
 

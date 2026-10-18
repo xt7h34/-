@@ -101,4 +101,74 @@
     <string name="kb_symbols_hint">Type the symbols you want, up to 27. They get their own page, reached with the star key on the symbols page.</string>
     <string name="kb_symbols_field">Symbols</string>
     <string name="kb_symbols_count">Symbols added: %1$d of 27</string>
+
+    <string name="kb_tab_general">General</string>
+    <string name="kb_tab_design">Design</string>
+    <string name="kb_tab_effects">Effects</string>
+    <string name="kb_tab_layout">Layout</string>
+    <string name="kb_preview_note">This is the real keyboard. Press its keys to see your colors, effects and motion.</string>
+    <string name="kb_feedback_title">When typing</string>
+
+    <string name="kb_borders_title">Key borders</string>
+    <string name="kb_borders_note">Every kind of key has its own border, with its own color and thickness. Thickness 0 means no border.</string>
+    <string name="kb_border_width">Border thickness: %1$s</string>
+    <string name="kb_borders_reset">Remove all borders</string>
+    <string name="kb_g_letters">Letter keys</string>
+    <string name="kb_g_numbers">Number keys</string>
+    <string name="kb_g_space">Space bar</string>
+    <string name="kb_g_delete">Delete key</string>
+    <string name="kb_g_shift">Shift key</string>
+    <string name="kb_g_lang">Language key</string>
+    <string name="kb_g_emoji">Emoji key</string>
+    <string name="kb_g_enter">Enter key</string>
+    <string name="kb_g_symbols">Symbols keys</string>
+
+    <string name="kb_sizes_title">Key size and shape</string>
+    <string name="kb_numheight">Number row height: %1$d%%</string>
+    <string name="kb_gap">Space between keys: %1$d</string>
+    <string name="kb_radius">Corner roundness: %1$d</string>
+    <string name="kb_textsize">Letter size: %1$d%%</string>
+
+    <string name="kb_fx_title">Keyboard effect</string>
+    <string name="kb_fx_note">A light that appears behind the keys where you press.</string>
+    <string name="kb_fx_none">None</string>
+    <string name="kb_fx_splash">Splash</string>
+    <string name="kb_fx_glow">Glow</string>
+    <string name="kb_fx_ripple">Ripple</string>
+    <string name="kb_fx_dot">Dot</string>
+    <string name="kb_fx_cross">Cross</string>
+    <string name="kb_fx_color">Effect color</string>
+    <string name="kb_fx_size">Effect size: %1$d%%</string>
+
+    <string name="kb_keyfx_title">Pressed key color</string>
+    <string name="kb_keyfx_default">Normal</string>
+    <string name="kb_keyfx_solid">Solid</string>
+    <string name="kb_keyfx_soft">Soft</string>
+    <string name="kb_keyfx_ring">Ring</string>
+    <string name="kb_keyfx_gradient">Gradient</string>
+    <string name="kb_keyfx_glow">Glow ring</string>
+    <string name="kb_keyfx_color">Pressed key effect color</string>
+
+    <string name="kb_motion_title">Key motion</string>
+    <string name="kb_motion_none">None</string>
+    <string name="kb_motion_tilt">Tilt</string>
+    <string name="kb_motion_shrink">Shrink</string>
+    <string name="kb_motion_grow">Grow</string>
+    <string name="kb_motion_lift">Lift</string>
+    <string name="kb_motion_bounce">Bounce</string>
+
+    <string name="kb_pic_color">Picture color (default keeps its own colors)</string>
+    <string name="kb_pic_inside">Keep the picture inside the key</string>
+    <string name="kb_pic_motion">Picture motion</string>
+    <string name="kb_pic_fade">Fade</string>
+    <string name="kb_pic_rise">Rise</string>
+    <string name="kb_pic_pop">Pop</string>
+    <string name="kb_pic_spin">Spin</string>
+
+    <string name="kb_hints_title">Hints, extra letters and the emoji button</string>
+    <string name="kb_hints_show">Show small hints on the keys (the extra letter in the corner)</string>
+    <string name="kb_alts_bubble">Show the extra letters in a bubble above the key</string>
+    <string name="kb_alts_note">Hold a key, then slide to a letter and let go, or tap it. Off means they show in the top bar instead.</string>
+    <string name="kb_emoji_bar">Put the emoji button in the top bar</string>
+    <string name="kb_emoji_bar_note">It leaves the bottom row, and sits next to the settings button in the top bar.</string>
 </resources>

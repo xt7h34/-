@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -34,7 +33,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -45,9 +43,74 @@ import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
 
 /*
- * Settings > Keyboard > the parts that make the keyboard look and behave the way the person
- * wants: every color, the bubble and picture on press, the letter positions and extra symbols.
+ * Settings > Keyboard: the parts that make the keyboard look and behave the way the person wants.
+ * They are split in tabs like the keyboard design apps: Design, Effects and Layout.
  */
+
+// ───────────────────────── Live preview ─────────────────────────
+
+/** The real keyboard, inside the settings. Press its keys to see the colors, effects and motion. */
+@Composable
+private fun LivePreview(cfg: KbConfig) {
+    val host = remember(cfg) { PreviewHost(cfg) }
+    Section(stringResource(R.string.kb_preview_title)) {
+        Text(
+            stringResource(R.string.kb_preview_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))) {
+            KeyboardRoot(host, withInsets = false)
+        }
+    }
+}
+
+// ───────────────────────── Tabs ─────────────────────────
+
+@Composable
+internal fun KbDesignTab(cfg: KbConfig, update: (KbConfig) -> Unit) {
+    LivePreview(cfg)
+    Section(stringResource(R.string.kb_theme)) {
+        ChoiceRow(
+            listOf(
+                stringResource(R.string.kb_theme_auto),
+                stringResource(R.string.kb_theme_light),
+                stringResource(R.string.kb_theme_dark),
+                stringResource(R.string.kb_theme_kanade),
+            ),
+            cfg.theme,
+        ) { update(cfg.copy(theme = it)) }
+    }
+    ColorsSection(cfg, update)
+    BordersSection(cfg, update)
+    SizesSection(cfg, update)
+}
+
+@Composable
+internal fun KbEffectsTab(cfg: KbConfig, update: (KbConfig) -> Unit) {
+    LivePreview(cfg)
+    KeyboardEffectSection(cfg, update)
+    KeyColorSection(cfg, update)
+    MotionSection(cfg, update)
+    PressSection(cfg, update)
+}
+
+@Composable
+internal fun KbLayoutTab(cfg: KbConfig, update: (KbConfig) -> Unit) {
+    LayoutEditor(cfg, update)
+    SymbolsSection(cfg, update)
+    HintsSection(cfg, update)
+}
+
+// ───────────────────────── Choosing one of several ─────────────────────────
+
+/** Chips, [perRow] to a line. [selected] is the index in the whole list. */
+@Composable
+private fun ChoiceGrid(options: List<String>, selected: Int, perRow: Int = 4, onPick: (Int) -> Unit) {
+    options.chunked(perRow).forEachIndexed { r, chunk ->
+        ChoiceRow(chunk, selected - r * perRow) { onPick(r * perRow + it) }
+    }
+}
 
 // ───────────────────────── Colors ─────────────────────────
 
@@ -72,23 +135,61 @@ private val COLOR_DEFS = listOf(
     ColorDef(R.string.kb_c_hint, { it.colHint }, { c, v -> c.copy(colHint = v) }, { it.sub }),
 )
 
-/** All the sections below, one after the other. Call this inside the page's column. */
+/** A row with a name and a color swatch. Tap it to pick a new color. 0 means the theme's color. */
 @Composable
-internal fun KbStyleSections(cfg: KbConfig, update: (KbConfig) -> Unit) {
-    Section(stringResource(R.string.kb_preview_title)) {
-        KbPreview(cfg)
+private fun ColorField(label: String, value: Int, fallback: Color, onChange: (Int) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable { open = true }
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(label)
+            if (value == 0) {
+                Text(
+                    stringResource(R.string.kb_color_default),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        Swatch(if (value != 0) Color(value) else fallback)
     }
-    ColorsSection(cfg, update)
-    PressSection(cfg, update)
-    LayoutEditor(cfg, update)
-    SymbolsSection(cfg, update)
+    if (open) {
+        ColorPickerDialog(
+            title = label,
+            initial = if (value != 0) Color(value) else fallback,
+            onDismiss = { open = false },
+            onPick = {
+                onChange(it)
+                open = false
+            },
+            onDefault = {
+                onChange(0)
+                open = false
+            },
+        )
+    }
+}
+
+@Composable
+private fun Swatch(color: Color) {
+    Box(
+        Modifier
+            .size(36.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+            .background(color)
+            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(10.dp)),
+    )
 }
 
 @Composable
 private fun ColorsSection(cfg: KbConfig, update: (KbConfig) -> Unit) {
     val pal = kbPalette(cfg, isSystemInDarkTheme())
-    var picking by remember { mutableStateOf<ColorDef?>(null) }
-
     Section(stringResource(R.string.kb_colors_title)) {
         Text(
             stringResource(R.string.kb_colors_note),
@@ -96,33 +197,7 @@ private fun ColorsSection(cfg: KbConfig, update: (KbConfig) -> Unit) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         COLOR_DEFS.forEach { def ->
-            val value = def.get(cfg)
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .clickable { picking = def }
-                    .padding(vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(def.label))
-                    if (value == 0) {
-                        Text(
-                            stringResource(R.string.kb_color_default),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-                Box(
-                    Modifier
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-                        .background(if (value != 0) Color(value) else def.fallback(pal))
-                        .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(10.dp)),
-                )
-            }
+            ColorField(stringResource(def.label), def.get(cfg), def.fallback(pal)) { update(def.set(cfg, it)) }
         }
         OutlinedButton(
             onClick = {
@@ -138,24 +213,6 @@ private fun ColorsSection(cfg: KbConfig, update: (KbConfig) -> Unit) {
             Text(stringResource(R.string.kb_colors_reset))
         }
     }
-
-    val def = picking
-    if (def != null) {
-        val current = def.get(cfg)
-        ColorPickerDialog(
-            title = stringResource(def.label),
-            initial = if (current != 0) Color(current) else def.fallback(pal),
-            onDismiss = { picking = null },
-            onPick = { argb ->
-                update(def.set(cfg, argb))
-                picking = null
-            },
-            onDefault = {
-                update(def.set(cfg, 0))
-                picking = null
-            },
-        )
-    }
 }
 
 private val PRESETS = listOf(
@@ -163,6 +220,7 @@ private val PRESETS = listOf(
     0xFF7B61FF, 0xFFE0558A, 0xFFDDB3FF, 0xFFFFFFFF, 0xFF808080, 0xFF000000,
 ).map { Color(it) }
 
+/** Pick any color: quick colors, sliders or a hex code, and how see-through it is. */
 @Composable
 private fun ColorPickerDialog(
     title: String,
@@ -170,6 +228,8 @@ private fun ColorPickerDialog(
     onDismiss: () -> Unit,
     onPick: (Int) -> Unit,
     onDefault: () -> Unit,
+    width: Int? = null,
+    onWidth: ((Int) -> Unit)? = null,
 ) {
     val start = remember { FloatArray(3).also { android.graphics.Color.colorToHSV(initial.toArgb(), it) } }
     var hue by remember { mutableFloatStateOf(start[0]) }
@@ -189,6 +249,17 @@ private fun ColorPickerDialog(
                 Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                if (width != null && onWidth != null) {
+                    Text(
+                        stringResource(R.string.kb_border_width, String.format("%.1f", width / 10f)),
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                    Slider(
+                        value = width.toFloat(),
+                        onValueChange = { onWidth(it.roundToInt()) },
+                        valueRange = 0f..60f,
+                    )
+                }
                 Box(
                     Modifier
                         .fillMaxWidth()
@@ -197,7 +268,6 @@ private fun ColorPickerDialog(
                         .background(MaterialTheme.colorScheme.surfaceContainerHighest)
                         .background(Color(argb())),
                 )
-                // Quick colors.
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     PRESETS.forEach { c ->
                         Box(
@@ -255,96 +325,223 @@ private fun ColorPickerDialog(
     )
 }
 
-// ───────────────────────── Preview ─────────────────────────
+// ───────────────────────── Borders ─────────────────────────
+
+private val GROUP_LABELS = listOf(
+    R.string.kb_g_letters, R.string.kb_g_numbers, R.string.kb_g_space, R.string.kb_g_delete,
+    R.string.kb_g_shift, R.string.kb_g_lang, R.string.kb_g_emoji, R.string.kb_g_enter, R.string.kb_g_symbols,
+)
+
+private fun <T> List<T>.setAt(index: Int, value: T): List<T> =
+    toMutableList().also { if (index in it.indices) it[index] = value }
 
 @Composable
-private fun KbPreview(cfg: KbConfig) {
+private fun BordersSection(cfg: KbConfig, update: (KbConfig) -> Unit) {
     val pal = kbPalette(cfg, isSystemInDarkTheme())
-    val brush = Brush.verticalGradient(listOf(pal.bg, pal.bg2 ?: pal.bg))
-    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(20.dp))
-                .background(brush)
-                .padding(10.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            // The bubble that appears above the pressed key.
-            Row(Modifier.fillMaxWidth().height(56.dp)) {
-                Spacer(Modifier.weight(1f))
-                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    if (cfg.previewShape != KB_SHAPE_NONE) {
-                        val shape = kbBubbleShape(cfg.previewShape)
-                        Box(
-                            Modifier
-                                .size(54.dp)
-                                .clip(shape)
-                                .background(pal.preview),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text("ا", color = pal.text, fontSize = 24.sp)
-                        }
-                    }
+    Section(stringResource(R.string.kb_borders_title)) {
+        Text(
+            stringResource(R.string.kb_borders_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        GROUP_LABELS.forEachIndexed { g, label ->
+            var open by remember { mutableStateOf(false) }
+            val color = cfg.borderColor.getOrElse(g) { 0 }
+            val w = cfg.borderWidth.getOrElse(g) { 0 }
+            val shown = if (color != 0) Color(color) else pal.text.copy(alpha = 0.5f)
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { open = true }
+                    .padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(label))
+                    Text(
+                        stringResource(R.string.kb_border_width, String.format("%.1f", w / 10f)),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
-                Spacer(Modifier.weight(2f))
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf("١", "٢", "٣", "٤", "٥").forEach { n ->
-                    PreviewKey(n, pal.numKey, pal.text, Modifier.weight(1f))
-                }
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                PreviewKey("ب", pal.key, pal.text, Modifier.weight(1f))
-                PreviewKey(
-                    "ا", pal.keyDown, pal.text, Modifier.weight(1f),
-                    if (cfg.effectOn) kbGraphemes(cfg.effectChars).firstOrNull() else null,
+                Box(
+                    Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(pal.key)
+                        .border(BorderStroke((if (w > 0) w / 10f else 1f).dp, if (w > 0) shown else Color.Gray), RoundedCornerShape(10.dp)),
                 )
-                PreviewKey("ت", pal.key, pal.text, Modifier.weight(1f))
-                PreviewKey("⌫", pal.special, pal.icon, Modifier.weight(1f))
-                PreviewKey("↵", pal.accent, pal.onAccent, Modifier.weight(1f))
+            }
+            if (open) {
+                ColorPickerDialog(
+                    title = stringResource(label),
+                    initial = shown,
+                    onDismiss = { open = false },
+                    onPick = {
+                        update(cfg.copy(borderColor = cfg.borderColor.setAt(g, it)))
+                        open = false
+                    },
+                    onDefault = {
+                        update(cfg.copy(borderColor = cfg.borderColor.setAt(g, 0)))
+                        open = false
+                    },
+                    width = w,
+                    onWidth = { update(cfg.copy(borderWidth = cfg.borderWidth.setAt(g, it))) },
+                )
+            }
+        }
+        OutlinedButton(
+            onClick = {
+                update(cfg.copy(borderColor = List(KB_GROUPS) { 0 }, borderWidth = List(KB_GROUPS) { 0 }))
+            },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(stringResource(R.string.kb_borders_reset))
+        }
+    }
+}
+
+// ───────────────────────── Size and shape ─────────────────────────
+
+@Composable
+private fun SizesSection(cfg: KbConfig, update: (KbConfig) -> Unit) {
+    Section(stringResource(R.string.kb_sizes_title)) {
+        Column {
+            Text(stringResource(R.string.kb_height, cfg.heightPct))
+            Slider(
+                value = cfg.heightPct.toFloat(),
+                onValueChange = { update(cfg.copy(heightPct = it.roundToInt())) },
+                valueRange = 80f..130f,
+            )
+        }
+        Column {
+            Text(stringResource(R.string.kb_numheight, cfg.numHeightPct))
+            Slider(
+                value = cfg.numHeightPct.toFloat(),
+                onValueChange = { update(cfg.copy(numHeightPct = it.roundToInt())) },
+                valueRange = 50f..120f,
+            )
+        }
+        Column {
+            Text(stringResource(R.string.kb_gap, cfg.keyGap))
+            Slider(
+                value = cfg.keyGap.toFloat(),
+                onValueChange = { update(cfg.copy(keyGap = it.roundToInt())) },
+                valueRange = 0f..8f,
+                steps = 7,
+            )
+        }
+        Column {
+            Text(stringResource(R.string.kb_radius, cfg.keyRadius))
+            Slider(
+                value = cfg.keyRadius.toFloat(),
+                onValueChange = { update(cfg.copy(keyRadius = it.roundToInt())) },
+                valueRange = 0f..24f,
+            )
+        }
+        Column {
+            Text(stringResource(R.string.kb_textsize, cfg.textPct))
+            Slider(
+                value = cfg.textPct.toFloat(),
+                onValueChange = { update(cfg.copy(textPct = it.roundToInt())) },
+                valueRange = 70f..140f,
+            )
+        }
+    }
+}
+
+// ───────────────────────── Effects ─────────────────────────
+
+@Composable
+private fun KeyboardEffectSection(cfg: KbConfig, update: (KbConfig) -> Unit) {
+    val pal = kbPalette(cfg, isSystemInDarkTheme())
+    Section(stringResource(R.string.kb_fx_title)) {
+        Text(
+            stringResource(R.string.kb_fx_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        ChoiceGrid(
+            listOf(
+                stringResource(R.string.kb_fx_none),
+                stringResource(R.string.kb_fx_splash),
+                stringResource(R.string.kb_fx_glow),
+                stringResource(R.string.kb_fx_ripple),
+                stringResource(R.string.kb_fx_dot),
+                stringResource(R.string.kb_fx_cross),
+            ),
+            cfg.fxStyle,
+        ) { update(cfg.copy(fxStyle = it)) }
+        if (cfg.fxStyle != KB_FX_NONE) {
+            ColorField(stringResource(R.string.kb_fx_color), cfg.colFx, pal.fx) { update(cfg.copy(colFx = it)) }
+            Column {
+                Text(stringResource(R.string.kb_fx_size, cfg.fxSize))
+                Slider(
+                    value = cfg.fxSize.toFloat(),
+                    onValueChange = { update(cfg.copy(fxSize = it.roundToInt())) },
+                    valueRange = 50f..160f,
+                )
             }
         }
     }
 }
 
 @Composable
-private fun PreviewKey(label: String, bg: Color, fg: Color, modifier: Modifier, stamp: String? = null) {
-    Box(
-        modifier
-            .height(40.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(bg),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(label, color = fg, fontSize = 18.sp)
-        if (stamp != null) Text(stamp, fontSize = 18.sp, modifier = Modifier.padding(start = 14.dp, top = 12.dp))
+private fun KeyColorSection(cfg: KbConfig, update: (KbConfig) -> Unit) {
+    val pal = kbPalette(cfg, isSystemInDarkTheme())
+    Section(stringResource(R.string.kb_keyfx_title)) {
+        ChoiceGrid(
+            listOf(
+                stringResource(R.string.kb_keyfx_default),
+                stringResource(R.string.kb_keyfx_solid),
+                stringResource(R.string.kb_keyfx_soft),
+                stringResource(R.string.kb_keyfx_ring),
+                stringResource(R.string.kb_keyfx_gradient),
+                stringResource(R.string.kb_keyfx_glow),
+            ),
+            cfg.keyFxStyle,
+        ) { update(cfg.copy(keyFxStyle = it)) }
+        if (cfg.keyFxStyle != KB_KEYFX_DEFAULT) {
+            ColorField(stringResource(R.string.kb_keyfx_color), cfg.colKeyFx, pal.keyFx) { update(cfg.copy(colKeyFx = it)) }
+        }
     }
 }
 
-// ───────────────────────── Bubble and picture ─────────────────────────
+@Composable
+private fun MotionSection(cfg: KbConfig, update: (KbConfig) -> Unit) {
+    Section(stringResource(R.string.kb_motion_title)) {
+        ChoiceGrid(
+            listOf(
+                stringResource(R.string.kb_motion_none),
+                stringResource(R.string.kb_motion_tilt),
+                stringResource(R.string.kb_motion_shrink),
+                stringResource(R.string.kb_motion_grow),
+                stringResource(R.string.kb_motion_lift),
+                stringResource(R.string.kb_motion_bounce),
+            ),
+            cfg.keyMotion,
+        ) { update(cfg.copy(keyMotion = it)) }
+    }
+}
 
+/** The bubble above a pressed key, and the picture that appears on it. */
 @Composable
 private fun PressSection(cfg: KbConfig, update: (KbConfig) -> Unit) {
+    val pal = kbPalette(cfg, isSystemInDarkTheme())
     Section(stringResource(R.string.kb_press_title)) {
         Text(stringResource(R.string.kb_shape))
-        ChoiceRow(
+        ChoiceGrid(
             listOf(
                 stringResource(R.string.kb_shape_none),
                 stringResource(R.string.kb_shape_rounded),
                 stringResource(R.string.kb_shape_circle),
                 stringResource(R.string.kb_shape_diamond),
-            ),
-            cfg.previewShape,
-        ) { update(cfg.copy(previewShape = it)) }
-        ChoiceRow(
-            listOf(
                 stringResource(R.string.kb_shape_hex),
                 stringResource(R.string.kb_shape_star),
                 stringResource(R.string.kb_shape_heart),
             ),
-            cfg.previewShape - KB_SHAPE_HEXAGON,
-        ) { update(cfg.copy(previewShape = KB_SHAPE_HEXAGON + it)) }
+            cfg.previewShape,
+        ) { update(cfg.copy(previewShape = it)) }
 
         SwitchRow(stringResource(R.string.kb_effect_on), cfg.effectOn) { update(cfg.copy(effectOn = it)) }
         if (cfg.effectOn) {
@@ -354,6 +551,11 @@ private fun PressSection(cfg: KbConfig, update: (KbConfig) -> Unit) {
                 label = { Text(stringResource(R.string.kb_effect_chars)) },
                 modifier = Modifier.fillMaxWidth(),
             )
+            ColorField(
+                stringResource(R.string.kb_pic_color),
+                cfg.colPicture,
+                pal.picture ?: Color(0xFFFFE600),
+            ) { update(cfg.copy(colPicture = it)) }
             Column {
                 Text(stringResource(R.string.kb_effect_size, cfg.effectSize))
                 Slider(
@@ -362,6 +564,17 @@ private fun PressSection(cfg: KbConfig, update: (KbConfig) -> Unit) {
                     valueRange = 14f..48f,
                 )
             }
+            SwitchRow(stringResource(R.string.kb_pic_inside), cfg.pictureInside) { update(cfg.copy(pictureInside = it)) }
+            Text(stringResource(R.string.kb_pic_motion))
+            ChoiceGrid(
+                listOf(
+                    stringResource(R.string.kb_pic_fade),
+                    stringResource(R.string.kb_pic_rise),
+                    stringResource(R.string.kb_pic_pop),
+                    stringResource(R.string.kb_pic_spin),
+                ),
+                cfg.pictureMotion,
+            ) { update(cfg.copy(pictureMotion = it)) }
         }
     }
 }
@@ -485,6 +698,28 @@ private fun SymbolsSection(cfg: KbConfig, update: (KbConfig) -> Unit) {
         )
         Text(
             stringResource(R.string.kb_symbols_count, minOf(27, kbGraphemes(cfg.symbols).size)),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+// ───────────────────────── Hints, extra letters and the emoji button ─────────────────────────
+
+@Composable
+private fun HintsSection(cfg: KbConfig, update: (KbConfig) -> Unit) {
+    Section(stringResource(R.string.kb_hints_title)) {
+        SwitchRow(stringResource(R.string.kb_number_row), cfg.numberRow) { update(cfg.copy(numberRow = it)) }
+        SwitchRow(stringResource(R.string.kb_hints_show), cfg.showHints) { update(cfg.copy(showHints = it)) }
+        SwitchRow(stringResource(R.string.kb_alts_bubble), cfg.altsInBubble) { update(cfg.copy(altsInBubble = it)) }
+        Text(
+            stringResource(R.string.kb_alts_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        SwitchRow(stringResource(R.string.kb_emoji_bar), cfg.emojiInBar) { update(cfg.copy(emojiInBar = it)) }
+        Text(
+            stringResource(R.string.kb_emoji_bar_note),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

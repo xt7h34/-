@@ -3,9 +3,11 @@ package com.rigen.volumeui
 import android.content.res.Configuration
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -40,25 +42,31 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -71,14 +79,19 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.sqrt
+import kotlin.random.Random
 
 /*
  * Kanade Keyboard: what is drawn. The keys always sit left to right, exactly as laid out in
  * KeyboardLayouts.kt, even when the phone language is Arabic.
+ *
+ * Layers, from the back: background, light behind the keys, the keys, then the bubble above a
+ * pressed key, the extra letters and the pictures.
  */
 
 private const val BACKSPACE_PATH =
@@ -135,38 +148,138 @@ private class RectHolder {
     var rect: Rect = Rect.Zero
 }
 
+/** Everything one key needs to look and move the way the person chose. */
+private class KeyStyle(
+    val base: Color,
+    val pressed: Color,
+    val radius: Dp,
+    val gapH: Dp,
+    val gapV: Dp,
+    val borderW: Dp,
+    val borderC: Color,
+    val fxStyle: Int,
+    val fxColor: Color,
+    val motion: Int,
+)
+
+private fun plainStyle(base: Color, pressed: Color, cfg: KbConfig) = KeyStyle(
+    base, pressed, cfg.keyRadius.dp, cfg.keyGap.dp, (cfg.keyGap * 1.5f).dp,
+    0.dp, Color.Transparent, KB_KEYFX_DEFAULT, Color.Transparent, KB_MOTION_NONE,
+)
+
 @Composable
-internal fun KeyboardRoot(s: KanadeKeyboardService) {
-    val cfg = s.cfg
+internal fun KeyboardRoot(h: KbHost, withInsets: Boolean = true) {
+    val cfg = h.cfg
+    val fx = h.fx
     val pal = kbPalette(cfg, isSystemInDarkTheme())
     val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val rowH = (48f * cfg.heightPct / 100f * (if (landscape) 0.8f else 1f)).dp
-    var rootW by remember { mutableIntStateOf(0) }
+    fx.density = LocalDensity.current.density
     val bgBrush = Brush.verticalGradient(listOf(pal.bg, pal.bg2 ?: pal.bg))
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-        Box(Modifier.fillMaxWidth().onSizeChanged { rootW = it.width }) {
+        Box(Modifier.fillMaxWidth().onSizeChanged { fx.rootW = it.width }) {
+            Box(Modifier.matchParentSize().background(bgBrush))
+            // The light behind the keys.
+            fx.bursts.forEach { b ->
+                key(b.id) { BurstItem(b, pal.fx, cfg.fxSize) { fx.bursts.remove(b) } }
+            }
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .background(bgBrush)
-                    .navigationBarsPadding()
+                    .then(if (withInsets) Modifier.navigationBarsPadding() else Modifier)
                     .padding(horizontal = 3.dp, vertical = 2.dp),
             ) {
-                SuggestionBar(s, pal)
-                if (s.page == PG_EMOJI) EmojiPanel(s, pal, rowH) else KeysPanel(s, pal, rowH)
+                SuggestionBar(h, pal)
+                if (h.page == PG_EMOJI) EmojiPanel(h, pal, rowH) else KeysPanel(h, pal, rowH)
             }
-            // Drawn above the keys; they never take touches.
-            val p = s.press
-            if (p != null && cfg.previewShape != KB_SHAPE_NONE) PressBubble(p, pal, cfg.previewShape, rootW)
-            s.effects.forEach { e ->
-                key(e.id) { EffectItem(e, cfg.effectSize) { s.effects.remove(e) } }
+            // Drawn above the keys; only the extra letters take touches.
+            val p = fx.press
+            if (p != null && cfg.previewShape != KB_SHAPE_NONE) PressBubble(p, pal, cfg.previewShape, fx.rootW)
+            val ab = fx.bubble
+            if (ab != null) AltBubbleView(h, ab, pal)
+            fx.taps.forEach { e ->
+                key(e.id) { TapItem(e, cfg, pal.picture) { fx.taps.remove(e) } }
             }
         }
     }
 }
 
-// ───────────────────────── Bubble and picture ─────────────────────────
+// ───────────────────────── Light behind the keys ─────────────────────────
+
+@Composable
+private fun BoxScope.BurstItem(b: FxBurst, color: Color, sizePct: Int, onDone: () -> Unit) {
+    val progress = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        progress.animateTo(1f, tween(durationMillis = if (b.style == KB_FX_GLOW) 950 else 720, easing = LinearEasing))
+        onDone()
+    }
+    Canvas(Modifier.matchParentSize()) {
+        val t = progress.value
+        val e = 1f - (1f - t) * (1f - t)
+        val a = (1f - t).coerceIn(0f, 1f)
+        val unit = b.rect.height.coerceAtLeast(40f) * (sizePct / 100f)
+        val c = Offset(b.x, b.y)
+        when (b.style) {
+            KB_FX_SPLASH -> {
+                val r = unit * (0.45f + 0.35f * e)
+                drawCircle(color.copy(alpha = color.alpha * 0.9f * a), r, c)
+                val rnd = Random(b.seed)
+                for (i in 0 until 9) {
+                    val ang = rnd.nextFloat() * 6.2832f
+                    val dist = r * (1.0f + rnd.nextFloat() * 0.9f) * (0.6f + 0.4f * e)
+                    val rr = r * (0.10f + rnd.nextFloat() * 0.18f)
+                    drawCircle(
+                        color.copy(alpha = color.alpha * 0.85f * a), rr,
+                        Offset(c.x + cos(ang) * dist, c.y + sin(ang) * dist),
+                    )
+                }
+            }
+            KB_FX_GLOW -> {
+                val radius = unit * 3.2f * (0.4f + 0.6f * e)
+                drawCircle(
+                    Brush.radialGradient(
+                        listOf(color.copy(alpha = color.alpha * 0.7f * a), Color.Transparent),
+                        center = c, radius = radius,
+                    ),
+                    radius, c,
+                )
+            }
+            KB_FX_RIPPLE -> {
+                val radius = unit * 2.2f * e
+                drawCircle(
+                    color.copy(alpha = color.alpha * 0.9f * a), radius, c,
+                    style = Stroke(width = (4.dp.toPx() * a) + 1.dp.toPx()),
+                )
+                drawCircle(color.copy(alpha = color.alpha * 0.18f * a), radius, c)
+            }
+            KB_FX_DOT -> {
+                drawCircle(color.copy(alpha = color.alpha * 0.95f * (1f - t * t)), unit * (0.5f + 0.8f * e), c)
+            }
+            KB_FX_CROSS -> {
+                val w = b.rect.width
+                val hh = b.rect.height
+                val grow = 1f + 0.12f * e
+                val col = color.copy(alpha = color.alpha * 0.85f * a)
+                val corner = CornerRadius(12f)
+                drawRoundRect(
+                    col,
+                    Offset(b.rect.center.x - 1.5f * w * grow, b.rect.top),
+                    Size(3f * w * grow, hh),
+                    corner,
+                )
+                drawRoundRect(
+                    col,
+                    Offset(b.rect.left, b.rect.center.y - 1.5f * hh * grow),
+                    Size(w, 3f * hh * grow),
+                    corner,
+                )
+            }
+        }
+    }
+}
+
+// ───────────────────────── Bubbles and pictures ─────────────────────────
 
 @Composable
 private fun PressBubble(info: PressInfo, pal: KbPalette, shapeId: Int, rootW: Int) {
@@ -189,27 +302,120 @@ private fun PressBubble(info: PressInfo, pal: KbPalette, shapeId: Int, rootW: In
     }
 }
 
+/** The extra letters of a key, in a bubble above it. Slide to one and let go, or tap one. */
 @Composable
-private fun EffectItem(e: TapEffect, sizeSp: Int, onDone: () -> Unit) {
+private fun AltBubbleView(h: KbHost, b: AltBubble, pal: KbPalette) {
+    val fx = h.fx
+    val density = LocalDensity.current
+    val l = kbAltLayout(b, fx.rootW, fx.density)
+    val shape = RoundedCornerShape(14.dp)
+    Row(
+        Modifier
+            .offset { IntOffset(l.x.roundToInt(), l.y.roundToInt()) }
+            .shadow(6.dp, shape)
+            .background(pal.preview, shape),
+    ) {
+        b.alts.forEachIndexed { i, a ->
+            Box(
+                Modifier
+                    .size(with(density) { l.cellW.toDp() }, with(density) { l.cellH.toDp() })
+                    .background(if (fx.hover == i) pal.accent.copy(alpha = 0.4f) else Color.Transparent)
+                    .clickable {
+                        h.typeAlt(a)
+                        fx.bubble = null
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(a, color = pal.text, fontSize = 22.sp, maxLines = 1)
+            }
+        }
+    }
+}
+
+/** The picture that appears on a pressed key. It can stay inside the key, change color and move. */
+@Composable
+private fun TapItem(e: TapEffect, cfg: KbConfig, tint: Color?, onDone: () -> Unit) {
     val progress = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
         progress.animateTo(1f, tween(durationMillis = 900, easing = LinearEasing))
         onDone()
     }
-    val half = with(LocalDensity.current) { sizeSp.sp.toPx() } * 0.6f
-    Text(
-        e.symbol,
-        fontSize = sizeSp.sp,
-        modifier = Modifier
-            .offset { IntOffset((e.x - half).roundToInt(), (e.y - half - progress.value * 14.dp.toPx()).roundToInt()) }
-            .graphicsLayer {
-                alpha = (1f - progress.value) * 0.9f
-                val sc = 0.8f + 0.4f * progress.value
-                scaleX = sc
-                scaleY = sc
-                rotationZ = e.rot
-            },
-    )
+    val density = LocalDensity.current
+    val inside = cfg.pictureInside
+    val wanted = with(density) { cfg.effectSize.sp.toPx() }
+    val fit = if (inside) minOf(wanted, e.rect.height * 0.62f) else wanted
+    val half = fit * 0.6f
+    val cx = if (inside) e.x.coerceIn(e.rect.left + half, maxOf(e.rect.left + half, e.rect.right - half)) else e.x
+    val cy = if (inside) e.y.coerceIn(e.rect.top + half, maxOf(e.rect.top + half, e.rect.bottom - half)) else e.y
+    val motion = cfg.pictureMotion
+
+    val glyph = Modifier
+        .graphicsLayer {
+            val t = progress.value
+            when (motion) {
+                KB_PIC_RISE -> {
+                    alpha = (1f - t) * 0.9f
+                    translationY = -t * 14.dp.toPx()
+                    val sc = 0.8f + 0.4f * t
+                    scaleX = sc
+                    scaleY = sc
+                    rotationZ = e.rot
+                }
+                KB_PIC_POP -> {
+                    val sc = if (t < 0.25f) 0.4f + (t / 0.25f) * 0.85f else 1.25f - (t - 0.25f) * 0.3f
+                    scaleX = sc
+                    scaleY = sc
+                    alpha = if (t < 0.5f) 0.95f else (1f - t) * 1.9f
+                    rotationZ = e.rot
+                }
+                KB_PIC_SPIN -> {
+                    alpha = (1f - t) * 0.9f
+                    val sc = 0.8f + 0.3f * t
+                    scaleX = sc
+                    scaleY = sc
+                    rotationZ = e.rot + t * 220f
+                }
+                else -> {
+                    alpha = (1f - t) * 0.95f
+                    val sc = 0.9f + 0.1f * t
+                    scaleX = sc
+                    scaleY = sc
+                    rotationZ = e.rot
+                }
+            }
+            compositingStrategy = CompositingStrategy.Offscreen
+        }
+        .drawWithContent {
+            drawContent()
+            // A chosen color paints the picture's shape, so any emoji can have the same color.
+            if (tint != null) drawRect(tint, blendMode = BlendMode.SrcIn)
+        }
+    val fitSp = with(density) { fit.toSp() }
+
+    if (inside) {
+        Box(
+            Modifier
+                .offset { IntOffset(e.rect.left.roundToInt(), e.rect.top.roundToInt()) }
+                .size(with(density) { e.rect.width.toDp() }, with(density) { e.rect.height.toDp() })
+                .clip(RoundedCornerShape(cfg.keyRadius.dp)),
+        ) {
+            Text(
+                e.symbol,
+                fontSize = fitSp,
+                modifier = Modifier
+                    .offset { IntOffset((cx - half - e.rect.left).roundToInt(), (cy - half - e.rect.top).roundToInt()) }
+                    .then(glyph),
+            )
+        }
+    } else {
+        Text(
+            e.symbol,
+            fontSize = fitSp,
+            modifier = Modifier
+                .offset { IntOffset((cx - half).roundToInt(), (cy - half).roundToInt()) }
+                .then(glyph),
+        )
+    }
 }
 
 // ───────────────────────── Icons ─────────────────────────
@@ -252,7 +458,7 @@ private fun SmileyIcon(color: Color, iconSize: Dp) {
 // ───────────────────────── Suggestions bar ─────────────────────────
 
 @Composable
-private fun SuggestionBar(s: KanadeKeyboardService, pal: KbPalette) {
+private fun SuggestionBar(h: KbHost, pal: KbPalette) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -262,10 +468,20 @@ private fun SuggestionBar(s: KanadeKeyboardService, pal: KbPalette) {
         Box(
             Modifier
                 .size(44.dp)
-                .clickable { s.openSettings() },
+                .clickable { h.openSettings() },
             contentAlignment = Alignment.Center,
         ) {
             PathIcon(Glyph.SETTINGS.pathData, pal.sub, 20.dp)
+        }
+        if (h.cfg.emojiInBar) {
+            Box(
+                Modifier
+                    .size(44.dp)
+                    .clickable { if (h.page == PG_EMOJI) h.closeEmoji() else h.showEmoji() },
+                contentAlignment = Alignment.Center,
+            ) {
+                SmileyIcon(pal.sub, 22.dp)
+            }
         }
         Box(
             Modifier
@@ -273,9 +489,9 @@ private fun SuggestionBar(s: KanadeKeyboardService, pal: KbPalette) {
                 .fillMaxHeight(),
             contentAlignment = Alignment.Center,
         ) {
-            val alts = s.alts
-            val sug = s.suggestions
-            val hint = s.hint
+            val alts = h.alts
+            val sug = h.suggestions
+            val hint = h.hint
             when {
                 alts.isNotEmpty() -> Row(Modifier.fillMaxSize()) {
                     alts.forEach { a ->
@@ -283,7 +499,7 @@ private fun SuggestionBar(s: KanadeKeyboardService, pal: KbPalette) {
                             Modifier
                                 .weight(1f)
                                 .fillMaxHeight()
-                                .clickable { s.typeAlt(a) },
+                                .clickable { h.typeAlt(a) },
                             contentAlignment = Alignment.Center,
                         ) {
                             Text(a, color = pal.text, fontSize = 22.sp, maxLines = 1)
@@ -304,7 +520,7 @@ private fun SuggestionBar(s: KanadeKeyboardService, pal: KbPalette) {
                             Modifier
                                 .weight(1f)
                                 .fillMaxHeight()
-                                .clickable { s.pickSuggestion(word) },
+                                .clickable { h.pickSuggestion(word) },
                             contentAlignment = Alignment.Center,
                         ) {
                             Text(
@@ -337,32 +553,33 @@ private fun SuggestionBar(s: KanadeKeyboardService, pal: KbPalette) {
 // ───────────────────────── Keys ─────────────────────────
 
 @Composable
-private fun KeysPanel(s: KanadeKeyboardService, pal: KbPalette, rowH: Dp) {
-    val symbols = s.page != PG_LETTERS
-    val raw = if (s.lang == "ar") s.cfg.layoutAr else s.cfg.layoutEn
-    val rows = remember(s.lang, s.page, raw, s.customSymbols) {
+private fun KeysPanel(h: KbHost, pal: KbPalette, rowH: Dp) {
+    val cfg = h.cfg
+    val symbols = h.page != PG_LETTERS
+    val raw = if (h.lang == "ar") cfg.layoutAr else cfg.layoutEn
+    val rows = remember(h.lang, h.page, raw, h.customSymbols) {
         if (symbols) {
-            val n = when (s.page) {
+            val n = when (h.page) {
                 PG_SYM2 -> 2
                 PG_SYM3 -> 3
                 else -> 1
             }
-            kbSymbolRows(n, s.customSymbols)
+            kbSymbolRows(n, h.customSymbols)
         } else {
-            kbLetterRows(s.lang, raw)
+            kbLetterRows(h.lang, raw)
         }
     }
-    val bottom = remember(s.lang, symbols) { kbBottomRow(s.lang, symbols) }
+    val bottom = remember(h.lang, symbols, cfg.emojiInBar) { kbBottomRow(h.lang, symbols, cfg.emojiInBar) }
     val numbers = remember { kbNumberRow() }
     Column {
-        if (s.cfg.numberRow) KeyRow(s, pal, numbers, rowH * 0.85f, true)
-        rows.forEach { KeyRow(s, pal, it, rowH, false) }
-        KeyRow(s, pal, bottom, rowH, false)
+        if (cfg.numberRow) KeyRow(h, pal, numbers, rowH * (cfg.numHeightPct / 100f), true)
+        rows.forEach { KeyRow(h, pal, it, rowH, false) }
+        KeyRow(h, pal, bottom, rowH, false)
     }
 }
 
 @Composable
-private fun KeyRow(s: KanadeKeyboardService, pal: KbPalette, keys: List<KbKey>, height: Dp, numberRow: Boolean) {
+private fun KeyRow(h: KbHost, pal: KbPalette, keys: List<KbKey>, height: Dp, numberRow: Boolean) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -372,14 +589,17 @@ private fun KeyRow(s: KanadeKeyboardService, pal: KbPalette, keys: List<KbKey>, 
             if (k.kind == KeyKind.GAP) {
                 Spacer(Modifier.weight(k.weight))
             } else {
-                KeyView(s, pal, k, numberRow, Modifier.weight(k.weight).fillMaxHeight())
+                KeyView(h, pal, k, numberRow, Modifier.weight(k.weight).fillMaxHeight())
             }
         }
     }
 }
 
 @Composable
-private fun KeyView(s: KanadeKeyboardService, pal: KbPalette, k: KbKey, numberRow: Boolean, modifier: Modifier) {
+private fun KeyView(h: KbHost, pal: KbPalette, k: KbKey, numberRow: Boolean, modifier: Modifier) {
+    val cfg = h.cfg
+    val fx = h.fx
+    val group = kbGroupOf(k.kind, numberRow)
     val isEnter = k.kind == KeyKind.ENTER
     val special = k.kind != KeyKind.CHAR && k.kind != KeyKind.SPACE
     val base = when {
@@ -393,59 +613,90 @@ private fun KeyView(s: KanadeKeyboardService, pal: KbPalette, k: KbKey, numberRo
         special -> pal.specialDown
         else -> pal.keyDown
     }
-    val upper = s.page == PG_LETTERS && s.lang == "en" && s.shift != 0
+    val borderColor = cfg.borderColor.getOrElse(group) { 0 }
+    val style = KeyStyle(
+        base = base,
+        pressed = down,
+        radius = cfg.keyRadius.dp,
+        gapH = cfg.keyGap.dp,
+        gapV = (cfg.keyGap * 1.5f).dp,
+        borderW = (cfg.borderWidth.getOrElse(group) { 0 } / 10f).dp,
+        borderC = if (borderColor != 0) Color(borderColor) else pal.text.copy(alpha = 0.5f),
+        fxStyle = cfg.keyFxStyle,
+        fxColor = pal.keyFx,
+        motion = cfg.keyMotion,
+    )
+    val upper = h.page == PG_LETTERS && h.lang == "en" && h.shift != 0
     val shown = if (k.kind == KeyKind.CHAR && upper) k.label.uppercase() else k.label
-    val hintChar = if (k.kind == KeyKind.CHAR) k.alts.firstOrNull()?.removePrefix("◌") else null
+    val hintChar = if (cfg.showHints && k.kind == KeyKind.CHAR) k.alts.firstOrNull()?.removePrefix("◌") else null
     val iconColor = if (isEnter) pal.onAccent else pal.icon
+    val letterSize = (22f * cfg.textPct / 100f).sp
 
     KeyCap(
         modifier = modifier,
-        baseColor = base,
-        pressedColor = down,
+        st = style,
         repeat = k.kind == KeyKind.BACKSPACE,
         hasLong = (k.kind == KeyKind.CHAR && k.alts.isNotEmpty()) || k.kind == KeyKind.SPACE,
-        onDown = { s.feedback(k.kind) },
+        onDown = { h.feedback(k.kind) },
         onStart = { rect, touch ->
-            if (k.kind == KeyKind.CHAR && shown.isNotBlank()) s.showPress(PressInfo(shown, rect))
-            s.spawnEffect(touch)
+            fx.bubble = null
+            if (k.kind == KeyKind.CHAR && shown.isNotBlank()) fx.showPress(PressInfo(shown, rect))
+            fx.spawn(cfg, rect, touch)
         },
-        onEnd = { s.hidePress() },
+        onEnd = { fx.hidePress() },
         onTap = {
             when (k.kind) {
-                KeyKind.CHAR -> s.typeChar(k.label)
-                KeyKind.SPACE -> s.onSpace()
-                KeyKind.BACKSPACE -> s.onBackspace()
-                KeyKind.ENTER -> s.onEnter()
-                KeyKind.SHIFT -> s.onShift()
-                KeyKind.SYMBOLS -> s.showSymbols()
-                KeyKind.LETTERS -> s.showLetters()
-                KeyKind.SYM_PAGE -> s.togglePage()
-                KeyKind.LANG -> s.toggleLang()
-                KeyKind.EMOJI -> s.showEmoji()
+                KeyKind.CHAR -> h.typeChar(k.label)
+                KeyKind.SPACE -> h.onSpace()
+                KeyKind.BACKSPACE -> h.onBackspace()
+                KeyKind.ENTER -> h.onEnter()
+                KeyKind.SHIFT -> h.onShift()
+                KeyKind.SYMBOLS -> h.showSymbols()
+                KeyKind.LETTERS -> h.showLetters()
+                KeyKind.SYM_PAGE -> h.togglePage()
+                KeyKind.LANG -> h.toggleLang()
+                KeyKind.EMOJI -> h.showEmoji()
                 KeyKind.GAP -> {}
             }
         },
-        onLong = {
-            if (k.kind == KeyKind.SPACE) s.showPicker() else s.alts = k.alts
+        onLong = { rect ->
+            if (k.kind == KeyKind.SPACE) {
+                h.showPicker()
+            } else if (cfg.altsInBubble) {
+                fx.hidePressNow()
+                fx.bubble = AltBubble(k.alts, rect)
+            } else {
+                h.showAlts(k.alts)
+            }
+        },
+        onLongMove = { pos -> fx.hover = fx.altIndexAt(pos) },
+        onLongEnd = {
+            val b = fx.bubble
+            val i = fx.hover
+            if (b != null && i in b.alts.indices) {
+                h.typeAlt(b.alts[i])
+                fx.bubble = null
+            }
+            fx.hover = -1
         },
     ) {
         when (k.kind) {
             KeyKind.BACKSPACE -> PathIcon(BACKSPACE_PATH, iconColor, 24.dp)
             KeyKind.SHIFT -> PathIcon(
-                if (s.shift == 2) CAPS_PATH else SHIFT_PATH,
-                if (s.shift != 0) pal.accent else iconColor,
+                if (h.shift == 2) CAPS_PATH else SHIFT_PATH,
+                if (h.shift != 0) pal.accent else iconColor,
                 24.dp,
             )
             KeyKind.ENTER ->
-                if (s.enterLabel.isEmpty()) {
+                if (h.enterLabel.isEmpty()) {
                     PathIcon(ENTER_PATH, iconColor, 24.dp)
                 } else {
-                    Text(s.enterLabel, color = iconColor, fontSize = 14.sp, maxLines = 1)
+                    Text(h.enterLabel, color = iconColor, fontSize = 14.sp, maxLines = 1)
                 }
             KeyKind.LANG -> GlobeIcon(iconColor, 24.dp)
             KeyKind.EMOJI -> SmileyIcon(iconColor, 24.dp)
             KeyKind.SPACE -> Text(
-                if (s.lang == "ar") "العربية" else "English",
+                if (h.lang == "ar") "العربية" else "English",
                 color = pal.sub,
                 fontSize = 12.sp,
                 maxLines = 1,
@@ -455,7 +706,7 @@ private fun KeyView(s: KanadeKeyboardService, pal: KbPalette, k: KbKey, numberRo
                 Text(
                     shown,
                     color = if (special) pal.icon else pal.text,
-                    fontSize = if (shown.length > 1 && special) 14.sp else 22.sp,
+                    fontSize = if (shown.length > 1 && special) 14.sp else letterSize,
                     maxLines = 1,
                 )
                 if (hintChar != null) {
@@ -476,30 +727,39 @@ private fun KeyView(s: KanadeKeyboardService, pal: KbPalette, k: KbKey, numberRo
 
 /**
  * One key. A tap types on release. [repeat] keys (backspace) type on press and keep going while
- * held. [hasLong] keys show their long-press action after a short hold.
- * [onStart] and [onEnd] tell the keyboard when the finger goes down and up, for the bubble.
+ * held. [hasLong] keys do their long-press action after a short hold, and then follow the finger
+ * so the extra letters can be picked by sliding.
+ * The pressed look (color, glow, ring...) and the motion (tilt, shrink...) fade in and out.
  */
 @Composable
 private fun KeyCap(
     modifier: Modifier,
-    baseColor: Color,
-    pressedColor: Color,
+    st: KeyStyle,
     repeat: Boolean,
     hasLong: Boolean,
     onDown: () -> Unit,
     onStart: (Rect, Offset) -> Unit,
     onEnd: () -> Unit,
     onTap: () -> Unit,
-    onLong: () -> Unit,
+    onLong: (Rect) -> Unit,
+    onLongMove: (Offset) -> Unit,
+    onLongEnd: () -> Unit,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    var pressed by remember { mutableStateOf(false) }
     val holder = remember { RectHolder() }
+    val scope = rememberCoroutineScope()
+    val glow = remember { Animatable(0f) }
+    val motion = remember { Animatable(0f) }
+    val tilt = remember { floatArrayOf(1f) }
+    val style by rememberUpdatedState(st)
     val tap by rememberUpdatedState(onTap)
     val long by rememberUpdatedState(onLong)
+    val longMove by rememberUpdatedState(onLongMove)
+    val longEnd by rememberUpdatedState(onLongEnd)
     val press by rememberUpdatedState(onDown)
     val start by rememberUpdatedState(onStart)
     val end by rememberUpdatedState(onEnd)
+    val shape = RoundedCornerShape(st.radius)
 
     Box(
         modifier = modifier
@@ -507,7 +767,9 @@ private fun KeyCap(
             .pointerInput(repeat, hasLong) {
                 awaitEachGesture {
                     val first = awaitFirstDown(requireUnconsumed = false)
-                    pressed = true
+                    tilt[0] = if (first.position.x < size.width / 2f) -1f else 1f
+                    scope.launch { glow.snapTo(1f) }
+                    scope.launch { motion.animateTo(1f, tween<Float>(70)) }
                     try {
                         press()
                         start(holder.rect, first.position + holder.rect.topLeft)
@@ -534,8 +796,18 @@ private fun KeyCap(
                                 timedOut = false
                             }
                             if (timedOut) {
-                                long()
-                                waitForUpOrCancellation()
+                                long(holder.rect)
+                                while (true) {
+                                    val ev = awaitPointerEvent()
+                                    val ch = ev.changes.firstOrNull() ?: break
+                                    if (ch.isConsumed) break
+                                    longMove(ch.position + holder.rect.topLeft)
+                                    if (!ch.pressed) {
+                                        longEnd()
+                                        break
+                                    }
+                                    ch.consume()
+                                }
                             } else if (up != null) {
                                 tap()
                             }
@@ -543,14 +815,97 @@ private fun KeyCap(
                             if (waitForUpOrCancellation() != null) tap()
                         }
                     } finally {
-                        pressed = false
+                        val s = style
+                        scope.launch {
+                            glow.animateTo(0f, tween<Float>(if (s.fxStyle == KB_KEYFX_DEFAULT) 140 else 320))
+                        }
+                        scope.launch {
+                            if (s.motion == KB_MOTION_BOUNCE) {
+                                motion.animateTo(0f, spring<Float>(dampingRatio = 0.35f, stiffness = 450f))
+                            } else {
+                                motion.animateTo(0f, tween<Float>(130))
+                            }
+                        }
                         end()
                     }
                 }
             }
-            .padding(horizontal = 2.dp, vertical = 3.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(if (pressed) pressedColor else baseColor),
+            .padding(horizontal = st.gapH, vertical = st.gapV)
+            .graphicsLayer {
+                val p = motion.value
+                when (style.motion) {
+                    KB_MOTION_TILT -> {
+                        rotationZ = p * 7f * tilt[0]
+                        val sc = 1f - 0.03f * p
+                        scaleX = sc
+                        scaleY = sc
+                    }
+                    KB_MOTION_SHRINK -> {
+                        val sc = 1f - 0.14f * p
+                        scaleX = sc
+                        scaleY = sc
+                    }
+                    KB_MOTION_GROW -> {
+                        val sc = 1f + 0.14f * p
+                        scaleX = sc
+                        scaleY = sc
+                    }
+                    KB_MOTION_LIFT -> {
+                        translationY = -6.dp.toPx() * p
+                        val sc = 1f + 0.04f * p
+                        scaleX = sc
+                        scaleY = sc
+                    }
+                    KB_MOTION_BOUNCE -> {
+                        val sc = 1f - 0.16f * p
+                        scaleX = sc
+                        scaleY = sc
+                    }
+                }
+            }
+            .clip(shape)
+            .background(st.base)
+            .drawBehind {
+                val g = glow.value
+                if (g > 0.001f) {
+                    val s = style
+                    val corner = CornerRadius(s.radius.toPx())
+                    when (s.fxStyle) {
+                        KB_KEYFX_SOLID -> drawRect(s.fxColor.copy(alpha = s.fxColor.alpha * g))
+                        KB_KEYFX_SOFT -> drawRect(s.fxColor.copy(alpha = s.fxColor.alpha * 0.45f * g))
+                        KB_KEYFX_RING -> {
+                            drawRect(s.pressed.copy(alpha = s.pressed.alpha * 0.4f * g))
+                            val w = 2.5.dp.toPx()
+                            drawRoundRect(
+                                s.fxColor.copy(alpha = s.fxColor.alpha * g),
+                                Offset(w / 2f, w / 2f), Size(size.width - w, size.height - w), corner,
+                                style = Stroke(width = w),
+                            )
+                        }
+                        KB_KEYFX_GRADIENT -> drawRect(
+                            Brush.verticalGradient(
+                                listOf(Color.Transparent, s.fxColor.copy(alpha = s.fxColor.alpha * g)),
+                            ),
+                        )
+                        KB_KEYFX_GLOW -> {
+                            val w1 = 6.dp.toPx()
+                            val w2 = 2.dp.toPx()
+                            drawRoundRect(
+                                s.fxColor.copy(alpha = s.fxColor.alpha * 0.4f * g),
+                                Offset(w1 / 2f, w1 / 2f), Size(size.width - w1, size.height - w1), corner,
+                                style = Stroke(width = w1),
+                            )
+                            drawRoundRect(
+                                s.fxColor.copy(alpha = s.fxColor.alpha * g),
+                                Offset(w2 / 2f, w2 / 2f), Size(size.width - w2, size.height - w2), corner,
+                                style = Stroke(width = w2),
+                            )
+                        }
+                        else -> drawRect(s.pressed.copy(alpha = s.pressed.alpha * g))
+                    }
+                }
+            }
+            .then(if (st.borderW > 0.dp) Modifier.border(st.borderW, st.borderC, shape) else Modifier),
         contentAlignment = Alignment.Center,
         content = content,
     )
@@ -559,12 +914,14 @@ private fun KeyCap(
 // ───────────────────────── Emoji ─────────────────────────
 
 @Composable
-private fun EmojiPanel(s: KanadeKeyboardService, pal: KbPalette, rowH: Dp) {
+private fun EmojiPanel(h: KbHost, pal: KbPalette, rowH: Dp) {
     val ctx = LocalContext.current
+    val cfg = h.cfg
     var cat by remember { mutableIntStateOf(if (KbPrefs.recentEmoji(ctx).isEmpty()) 1 else 0) }
-    val list = remember(cat, s.recentVersion) {
+    val list = remember(cat, h.recentVersion) {
         if (cat == 0) KbPrefs.recentEmoji(ctx) else kbSupportedEmoji(kbEmojiList(KB_EMOJI[cat]))
     }
+    val none: (Rect, Offset) -> Unit = { _, _ -> }
 
     Column {
         LazyVerticalGrid(
@@ -577,7 +934,7 @@ private fun EmojiPanel(s: KanadeKeyboardService, pal: KbPalette, rowH: Dp) {
                 Box(
                     Modifier
                         .height(46.dp)
-                        .clickable { s.typeEmoji(e) },
+                        .clickable { h.typeEmoji(e) },
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(e, fontSize = 26.sp)
@@ -592,13 +949,14 @@ private fun EmojiPanel(s: KanadeKeyboardService, pal: KbPalette, rowH: Dp) {
         ) {
             KeyCap(
                 modifier = Modifier.weight(1.4f).fillMaxHeight(),
-                baseColor = pal.special, pressedColor = pal.specialDown, repeat = false, hasLong = false,
-                onDown = { s.feedback(KeyKind.LETTERS) },
-                onStart = { _, _ -> }, onEnd = {},
-                onTap = { s.closeEmoji() },
-                onLong = {},
+                st = plainStyle(pal.special, pal.specialDown, cfg),
+                repeat = false, hasLong = false,
+                onDown = { h.feedback(KeyKind.LETTERS) },
+                onStart = none, onEnd = {},
+                onTap = { h.closeEmoji() },
+                onLong = {}, onLongMove = {}, onLongEnd = {},
             ) {
-                Text(if (s.lang == "ar") "أب" else "ABC", color = pal.icon, fontSize = 14.sp, maxLines = 1)
+                Text(if (h.lang == "ar") "أب" else "ABC", color = pal.icon, fontSize = 14.sp, maxLines = 1)
             }
             KB_EMOJI.forEachIndexed { i, c ->
                 Box(
@@ -616,11 +974,12 @@ private fun EmojiPanel(s: KanadeKeyboardService, pal: KbPalette, rowH: Dp) {
             }
             KeyCap(
                 modifier = Modifier.weight(1.5f).fillMaxHeight(),
-                baseColor = pal.special, pressedColor = pal.specialDown, repeat = true, hasLong = false,
-                onDown = { s.feedback(KeyKind.BACKSPACE) },
-                onStart = { _, _ -> }, onEnd = {},
-                onTap = { s.onBackspace() },
-                onLong = {},
+                st = plainStyle(pal.special, pal.specialDown, cfg),
+                repeat = true, hasLong = false,
+                onDown = { h.feedback(KeyKind.BACKSPACE) },
+                onStart = none, onEnd = {},
+                onTap = { h.onBackspace() },
+                onLong = {}, onLongMove = {}, onLongEnd = {},
             ) {
                 PathIcon(BACKSPACE_PATH, pal.icon, 24.dp)
             }
