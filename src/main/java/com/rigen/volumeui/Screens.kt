@@ -749,12 +749,6 @@ private fun HomePage(serviceEnabled: Boolean, onOpen: (String) -> Unit) {
                         stringResource(R.string.clock_title),
                         stringResource(R.string.clock_summary),
                     ) { onOpen(PAGE_CLOCK) }
-                    ItemDivider()
-                    SettingsItem(
-                        Glyph.KEYBOARD, ICON_GREEN,
-                        stringResource(R.string.kb_title),
-                        stringResource(R.string.kb_summary),
-                    ) { onOpen(PAGE_KEYBOARD) }
                 }
 
                 SettingsGroup {
@@ -830,11 +824,7 @@ private fun searchIndex(): List<SearchEntry> {
         SearchEntry(stringResource(R.string.g2048_title), stringResource(R.string.games_title), PAGE_2048),
         SearchEntry(stringResource(R.string.memory_title), stringResource(R.string.games_title), PAGE_MEMORY),
         SearchEntry(stringResource(R.string.stack_title), stringResource(R.string.games_title), PAGE_STACK),
-        SearchEntry(stringResource(R.string.kb_title), stringResource(R.string.app_title), PAGE_KEYBOARD),
-        SearchEntry(stringResource(R.string.kb_suggest), stringResource(R.string.kb_title), PAGE_KEYBOARD),
-        SearchEntry(stringResource(R.string.kb_learn), stringResource(R.string.kb_title), PAGE_KEYBOARD),
-        SearchEntry(stringResource(R.string.kb_theme), stringResource(R.string.kb_title), PAGE_KEYBOARD),
-        SearchEntry(stringResource(R.string.kb_clear), stringResource(R.string.kb_title), PAGE_KEYBOARD),
+        SearchEntry(stringResource(R.string.ty_title), stringResource(R.string.games_title), PAGE_TYCOON),
     )
 }
 
@@ -1912,7 +1902,7 @@ class MainActivity : ComponentActivity() {
             val parent = when (page) {
                 PAGE_PANEL, PAGE_BEHAVIOR, PAGE_STATION, PAGE_APPS -> PAGE_VOLUME
                 PAGE_CLOCK_TIME, PAGE_ALARMS, PAGE_TIMER, PAGE_STOPWATCH, PAGE_SLEEP -> PAGE_CLOCK
-                PAGE_BLOCKS, PAGE_2048, PAGE_MEMORY, PAGE_STACK -> PAGE_GAMES
+                PAGE_BLOCKS, PAGE_2048, PAGE_MEMORY, PAGE_STACK, PAGE_TYCOON -> PAGE_GAMES
                 else -> PAGE_HOME
             }
             BackHandler(enabled = page != PAGE_HOME) { page = parent }
@@ -1931,13 +1921,13 @@ class MainActivity : ComponentActivity() {
                 PAGE_TIMER -> TimerPage(goBack)
                 PAGE_STOPWATCH -> StopwatchPage(goBack)
                 PAGE_ACCOUNT -> AccountPage(goBack)
-                PAGE_KEYBOARD -> KeyboardPage(goBack)
                 PAGE_SLEEP -> SleepPage(goBack)
                 PAGE_GAMES -> GameHubPage({ page = it }, goBack)
                 PAGE_BLOCKS -> BlocksGamePage(goBack)
                 PAGE_2048 -> Game2048Page(goBack)
                 PAGE_MEMORY -> MemoryGamePage(goBack)
                 PAGE_STACK -> StackGamePage(goBack)
+                PAGE_TYCOON -> TycoonPage(goBack)
                 else -> HomePage(serviceEnabled) { page = it }
             }
         }
