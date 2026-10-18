@@ -8,6 +8,7 @@ import androidx.compose.ui.graphics.Color
  * Everything here is stored on the phone only. The keyboard never uses the network.
  */
 
+
 internal const val KB_THEME_AUTO = 0
 internal const val KB_THEME_LIGHT = 1
 internal const val KB_THEME_DARK = 2
@@ -20,6 +21,9 @@ internal const val KB_SHAPE_DIAMOND = 3
 internal const val KB_SHAPE_HEXAGON = 4
 internal const val KB_SHAPE_STAR = 5
 internal const val KB_SHAPE_HEART = 6
+
+/** How many pages of keys can be edited. */
+internal const val KB_PAGES = 4
 
 // Key groups, each with its own border.
 internal const val KB_GROUPS = 9
@@ -118,6 +122,9 @@ internal data class KbConfig(
     val colPicture: Int = 0,
     val pictureInside: Boolean = true,
     val pictureMotion: Int = KB_PIC_FADE,
+    // Each page's keys after the person edited them (size, position, added keys). "" = the default.
+    // Pages: 0 Arabic letters, 1 English letters, 2 symbols 1, 3 symbols 2.
+    val layouts: List<String> = List(KB_PAGES) { "" },
 )
 
 internal object KbPrefs {
@@ -176,6 +183,7 @@ internal object KbPrefs {
             colPicture = p.getInt("c_picture", 0),
             pictureInside = p.getBoolean("pic_inside", d.pictureInside),
             pictureMotion = p.getInt("pic_motion", d.pictureMotion).coerceIn(0, 3),
+            layouts = List(KB_PAGES) { p.getString("layout2_$it", "") ?: "" },
         )
     }
 
@@ -227,6 +235,9 @@ internal object KbPrefs {
             .putInt("c_picture", k.colPicture)
             .putBoolean("pic_inside", k.pictureInside)
             .putInt("pic_motion", k.pictureMotion)
+            .apply {
+                for (i in 0 until KB_PAGES) putString("layout2_$i", k.layouts.getOrElse(i) { "" })
+            }
             .apply()
     }
 

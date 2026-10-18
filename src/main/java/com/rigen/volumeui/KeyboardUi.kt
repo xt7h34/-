@@ -555,41 +555,44 @@ private fun SuggestionBar(h: KbHost, pal: KbPalette) {
 @Composable
 private fun KeysPanel(h: KbHost, pal: KbPalette, rowH: Dp) {
     val cfg = h.cfg
-    val symbols = h.page != PG_LETTERS
-    val raw = if (h.lang == "ar") cfg.layoutAr else cfg.layoutEn
-    val rows = remember(h.lang, h.page, raw, h.customSymbols) {
-        if (symbols) {
-            val n = when (h.page) {
-                PG_SYM2 -> 2
-                PG_SYM3 -> 3
-                else -> 1
-            }
-            kbSymbolRows(n, h.customSymbols)
-        } else {
-            kbLetterRows(h.lang, raw)
-        }
+    val idx = when (h.page) {
+        PG_LETTERS -> if (h.lang == "ar") 0 else 1
+        PG_SYM1 -> 2
+        PG_SYM2 -> 3
+        else -> 4
     }
-    val bottom = remember(h.lang, symbols, cfg.emojiInBar) { kbBottomRow(h.lang, symbols, cfg.emojiInBar) }
-    val numbers = remember { kbNumberRow() }
+    // The person's own arrangement when they edited this page, otherwise the default keys.
+    val rows = remember(idx, cfg.layouts, cfg.layoutAr, cfg.layoutEn, h.customSymbols, cfg.emojiInBar, cfg.numberRow) {
+        kbPageRows(cfg, idx, h.customSymbols)
+            .filter { cfg.numberRow || !it.number }
+            .map { r ->
+                r.number to r.keys
+                    .filter { !(cfg.emojiInBar && it.kind == KeyKind.EMOJI) }
+                    .map { KbKey(it.label, it.kind, it.weight, it.alts, it.hScale) }
+            }
+    }
     Column {
-        if (cfg.numberRow) KeyRow(h, pal, numbers, rowH * (cfg.numHeightPct / 100f), true)
-        rows.forEach { KeyRow(h, pal, it, rowH, false) }
-        KeyRow(h, pal, bottom, rowH, false)
+        rows.forEach { (isNumber, keys) ->
+            KeyRow(h, pal, keys, if (isNumber) rowH * (cfg.numHeightPct / 100f) else rowH, isNumber)
+        }
     }
 }
 
 @Composable
 private fun KeyRow(h: KbHost, pal: KbPalette, keys: List<KbKey>, height: Dp, numberRow: Boolean) {
+    // The row is as tall as its tallest key. Shorter keys sit in the middle.
+    val maxH = keys.filter { it.kind != KeyKind.GAP }.maxOfOrNull { it.hScale } ?: 1f
     Row(
         Modifier
             .fillMaxWidth()
-            .height(height),
+            .height(height * maxH),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         keys.forEach { k ->
             if (k.kind == KeyKind.GAP) {
                 Spacer(Modifier.weight(k.weight))
             } else {
-                KeyView(h, pal, k, numberRow, Modifier.weight(k.weight).fillMaxHeight())
+                KeyView(h, pal, k, numberRow, Modifier.weight(k.weight).fillMaxHeight(k.hScale / maxH))
             }
         }
     }
@@ -627,7 +630,18 @@ private fun KeyView(h: KbHost, pal: KbPalette, k: KbKey, numberRow: Boolean, mod
         motion = cfg.keyMotion,
     )
     val upper = h.page == PG_LETTERS && h.lang == "en" && h.shift != 0
-    val shown = if (k.kind == KeyKind.CHAR && upper) k.label.uppercase() else k.label
+    // These keys' names depend on where the keyboard is, so they are worked out here.
+    val label = when (k.kind) {
+        KeyKind.LETTERS -> if (h.lang == "ar") "أب" else "ABC"
+        KeyKind.SYMBOLS -> "?123"
+        KeyKind.SYM_PAGE -> when (h.page) {
+            PG_SYM1 -> "=\\<"
+            PG_SYM2 -> if (h.customSymbols.isNotEmpty()) "★" else "?123"
+            else -> "?123"
+        }
+        else -> k.label
+    }
+    val shown = if (k.kind == KeyKind.CHAR && upper) label.uppercase() else label
     val hintChar = if (cfg.showHints && k.kind == KeyKind.CHAR) k.alts.firstOrNull()?.removePrefix("◌") else null
     val iconColor = if (isEnter) pal.onAccent else pal.icon
     val letterSize = (22f * cfg.textPct / 100f).sp

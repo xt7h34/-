@@ -97,7 +97,7 @@ internal fun KbEffectsTab(cfg: KbConfig, update: (KbConfig) -> Unit) {
 
 @Composable
 internal fun KbLayoutTab(cfg: KbConfig, update: (KbConfig) -> Unit) {
-    LayoutEditor(cfg, update)
+    KbKeyEditor(cfg, update)
     SymbolsSection(cfg, update)
     HintsSection(cfg, update)
 }
@@ -575,106 +575,6 @@ private fun PressSection(cfg: KbConfig, update: (KbConfig) -> Unit) {
                 ),
                 cfg.pictureMotion,
             ) { update(cfg.copy(pictureMotion = it)) }
-        }
-    }
-}
-
-// ───────────────────────── Letter positions ─────────────────────────
-
-@Composable
-private fun LayoutEditor(cfg: KbConfig, update: (KbConfig) -> Unit) {
-    var lang by remember { mutableStateOf("ar") }
-    var sel by remember { mutableStateOf<Pair<Int, Int>?>(null) }
-    val rows = kbParseLayout(if (lang == "ar") cfg.layoutAr else cfg.layoutEn, lang)
-
-    fun save(raw: String) {
-        update(if (lang == "ar") cfg.copy(layoutAr = raw) else cfg.copy(layoutEn = raw))
-    }
-
-    Section(stringResource(R.string.kb_layout_title)) {
-        Text(
-            stringResource(R.string.kb_layout_note),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        ChoiceRow(
-            listOf(stringResource(R.string.kb_layout_ar), stringResource(R.string.kb_layout_en)),
-            if (lang == "ar") 0 else 1,
-        ) {
-            lang = if (it == 0) "ar" else "en"
-            sel = null
-        }
-        // The keys are drawn left to right, the same as on the keyboard.
-        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                rows.forEachIndexed { r, row ->
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        row.forEachIndexed { c, tok ->
-                            val on = sel == Pair(r, c)
-                            Box(
-                                Modifier
-                                    .weight(1f)
-                                    .height(40.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(
-                                        if (on) MaterialTheme.colorScheme.primary
-                                        else MaterialTheme.colorScheme.surfaceContainerHighest,
-                                    )
-                                    .clickable {
-                                        val first = sel
-                                        if (first == null) {
-                                            sel = Pair(r, c)
-                                        } else if (first == Pair(r, c)) {
-                                            sel = null
-                                        } else {
-                                            val m = rows.map { it.toMutableList() }
-                                            val t = m[first.first][first.second]
-                                            m[first.first][first.second] = m[r][c]
-                                            m[r][c] = t
-                                            save(kbEncodeLayout(m))
-                                            sel = null
-                                        }
-                                    },
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    tok,
-                                    color = if (on) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                                    fontSize = 16.sp,
-                                    maxLines = 1,
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        val chosen = sel
-        if (chosen != null) {
-            OutlinedTextField(
-                value = "",
-                onValueChange = { v ->
-                    val g = kbGraphemes(v).lastOrNull()
-                    if (g != null && g != "|") {
-                        val m = rows.map { it.toMutableList() }
-                        m[chosen.first][chosen.second] = if (lang == "en") g.lowercase() else g
-                        save(kbEncodeLayout(m))
-                        sel = null
-                    }
-                },
-                label = { Text(stringResource(R.string.kb_layout_replace)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-        OutlinedButton(
-            onClick = {
-                save("")
-                sel = null
-            },
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(stringResource(R.string.kb_layout_reset))
         }
     }
 }

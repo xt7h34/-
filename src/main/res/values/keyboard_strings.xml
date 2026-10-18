@@ -171,4 +171,37 @@
     <string name="kb_alts_note">Hold a key, then slide to a letter and let go, or tap it. Off means they show in the top bar instead.</string>
     <string name="kb_emoji_bar">Put the emoji button in the top bar</string>
     <string name="kb_emoji_bar_note">It leaves the bottom row, and sits next to the settings button in the top bar.</string>
+
+    <string name="kb_ke_title">Edit the keys</string>
+    <string name="kb_ke_note">Tap a key to select it. Then change how wide and how tall it is, move it, delete it, or add new keys. Everything can be undone.</string>
+    <string name="kb_ke_p_ar">Arabic</string>
+    <string name="kb_ke_p_en">English</string>
+    <string name="kb_ke_p_s1">Symbols 1</string>
+    <string name="kb_ke_p_s2">Symbols 2</string>
+    <string name="kb_ke_numrow_note">The top row is the number row. It shows on the keyboard only when the number row is on.</string>
+    <string name="kb_ke_select_hint">Tap a key above to edit it.</string>
+    <string name="kb_ke_tab_w">Width</string>
+    <string name="kb_ke_tab_h">Height</string>
+    <string name="kb_ke_width">Width: %1$s times</string>
+    <string name="kb_ke_height">Height: %1$s times</string>
+    <string name="kb_ke_undo">Undo</string>
+    <string name="kb_ke_redo">Redo</string>
+    <string name="kb_ke_add">Add a key</string>
+    <string name="kb_ke_delete">Delete this key</string>
+    <string name="kb_ke_reset">Put this page back as it was</string>
+    <string name="kb_ke_text">What the key types</string>
+    <string name="kb_ke_alts">Extra letters (when you hold the key)</string>
+    <string name="kb_ke_add_title">Add a key</string>
+    <string name="kb_ke_kind">Kind of key</string>
+    <string name="kb_ke_row">Put it in row</string>
+    <string name="kb_ke_add_ok">Add</string>
+    <string name="kb_ke_cancel">Cancel</string>
+    <string name="kb_kind_text">Text</string>
+    <string name="kb_kind_space">Space</string>
+    <string name="kb_kind_delete">Delete</string>
+    <string name="kb_kind_enter">Enter</string>
+    <string name="kb_kind_shift">Shift</string>
+    <string name="kb_kind_lang">Language</string>
+    <string name="kb_kind_emoji">Emoji</string>
+    <string name="kb_kind_symbols">Symbols</string>
 </resources>

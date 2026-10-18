@@ -171,4 +171,37 @@
     <string name="kb_alts_note">اضغط مطولاً على الزر ثم اسحب إلى الحرف وارفع إصبعك، أو اضغط عليه. وعند إيقافها تظهر في الشريط العلوي.</string>
     <string name="kb_emoji_bar">وضع زر الإيموجي في الشريط العلوي</string>
     <string name="kb_emoji_bar_note">يغادر الصف السفلي ويستقر بجانب زر الإعدادات في الشريط العلوي.</string>
+
+    <string name="kb_ke_title">تعديل الأزرار</string>
+    <string name="kb_ke_note">اضغط على زر لتحديده. ثم غيّر عرضه وطوله، أو انقله، أو احذفه، أو أضف أزراراً جديدة. ويمكنك التراجع عن أي خطوة.</string>
+    <string name="kb_ke_p_ar">العربية</string>
+    <string name="kb_ke_p_en">English</string>
+    <string name="kb_ke_p_s1">الرموز 1</string>
+    <string name="kb_ke_p_s2">الرموز 2</string>
+    <string name="kb_ke_numrow_note">الصف العلوي هو صف الأرقام. يظهر في لوحة المفاتيح فقط عند تشغيل صف الأرقام.</string>
+    <string name="kb_ke_select_hint">اضغط على زر في الأعلى لتعديله.</string>
+    <string name="kb_ke_tab_w">العرض</string>
+    <string name="kb_ke_tab_h">الطول</string>
+    <string name="kb_ke_width">العرض: %1$s مرة</string>
+    <string name="kb_ke_height">الطول: %1$s مرة</string>
+    <string name="kb_ke_undo">تراجع</string>
+    <string name="kb_ke_redo">إعادة</string>
+    <string name="kb_ke_add">إضافة زر</string>
+    <string name="kb_ke_delete">حذف هذا الزر</string>
+    <string name="kb_ke_reset">إعادة هذه الصفحة كما كانت</string>
+    <string name="kb_ke_text">ما يكتبه الزر</string>
+    <string name="kb_ke_alts">حروف إضافية (عند الضغط المطوّل)</string>
+    <string name="kb_ke_add_title">إضافة زر</string>
+    <string name="kb_ke_kind">نوع الزر</string>
+    <string name="kb_ke_row">ضعه في الصف</string>
+    <string name="kb_ke_add_ok">إضافة</string>
+    <string name="kb_ke_cancel">إلغاء</string>
+    <string name="kb_kind_text">نص</string>
+    <string name="kb_kind_space">مسافة</string>
+    <string name="kb_kind_delete">حذف</string>
+    <string name="kb_kind_enter">إدخال</string>
+    <string name="kb_kind_shift">Shift</string>
+    <string name="kb_kind_lang">اللغة</string>
+    <string name="kb_kind_emoji">إيموجي</string>
+    <string name="kb_kind_symbols">الرموز</string>
 </resources>
