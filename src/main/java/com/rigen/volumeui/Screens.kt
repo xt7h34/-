@@ -761,6 +761,14 @@ private fun HomePage(serviceEnabled: Boolean, onOpen: (String) -> Unit) {
 
                 SettingsGroup {
                     SettingsItem(
+                        Glyph.KEYBOARD, ICON_BLUE,
+                        stringResource(R.string.kb_title),
+                        stringResource(R.string.kb_summary),
+                    ) { onOpen(PAGE_KEYBOARD) }
+                }
+
+                SettingsGroup {
+                    SettingsItem(
                         Glyph.PALETTE, ICON_PINK,
                         stringResource(R.string.item_app_title),
                         stringResource(R.string.item_app_summary),
@@ -820,6 +828,7 @@ private fun searchIndex(): List<SearchEntry> {
         SearchEntry(stringResource(R.string.section_diag), appPage, PAGE_APP),
         SearchEntry(stringResource(R.string.keepalive_title), keepPage, PAGE_KEEPALIVE),
         SearchEntry(stringResource(R.string.games_title), stringResource(R.string.app_title), PAGE_GAMES),
+        SearchEntry(stringResource(R.string.kb_title), stringResource(R.string.app_title), PAGE_KEYBOARD),
         SearchEntry(stringResource(R.string.blocks_title), stringResource(R.string.games_title), PAGE_BLOCKS),
         SearchEntry(stringResource(R.string.g2048_title), stringResource(R.string.games_title), PAGE_2048),
         SearchEntry(stringResource(R.string.memory_title), stringResource(R.string.games_title), PAGE_MEMORY),
@@ -1923,6 +1932,7 @@ class MainActivity : ComponentActivity() {
                 PAGE_ACCOUNT -> AccountPage(goBack)
                 PAGE_SLEEP -> SleepPage(goBack)
                 PAGE_GAMES -> GameHubPage({ page = it }, goBack)
+                PAGE_KEYBOARD -> KeyboardPage(goBack)
                 PAGE_BLOCKS -> BlocksGamePage(goBack)
                 PAGE_2048 -> Game2048Page(goBack)
                 PAGE_MEMORY -> MemoryGamePage(goBack)
