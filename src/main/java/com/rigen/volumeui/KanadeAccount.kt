@@ -43,6 +43,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.security.KeyStore
 import java.text.DateFormat
+import java.text.NumberFormat
 import java.util.Date
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -154,18 +155,21 @@ object AccountStore {
 
 private enum class Step { Start, Login, Register, Code, Done }
 
-private class DeviceItem(val id: String, val device: String, val created: Long, val current: Boolean)
+private class DeviceItem(val id: String, val device: String, val created: Long, val last: Long, val current: Boolean)
 
 private fun parseDevices(b: JSONObject?): List<DeviceItem> {
     val a = b?.optJSONArray("sessions") ?: return emptyList()
     return (0 until a.length()).map {
         val o = a.getJSONObject(it)
-        DeviceItem(o.optString("id"), o.optString("device"), o.optLong("created"), o.optBoolean("current"))
+        DeviceItem(
+            o.optString("id"), o.optString("device"), o.optLong("created"),
+            o.optLong("last", o.optLong("created")), o.optBoolean("current"),
+        )
     }
 }
 
 @Composable
-fun AccountPage(onBack: () -> Unit) {
+fun AccountPage(onOpen: (String) -> Unit, onBack: () -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var session by remember { mutableStateOf(AccountStore.load(ctx)) }
@@ -500,6 +504,26 @@ fun AccountPage(onBack: () -> Unit) {
                                 color = MaterialTheme.colorScheme.primary,
                             )
                         }
+                        val rank = p.optString("rank")
+                        Text(
+                            stringResource(R.string.acc_level, p.optInt("level", 1)) +
+                                if (rank.isNotBlank()) " \u2022 $rank" else "",
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        LinearProgressIndicator(
+                            progress = { p.optInt("levelPercent") / 100f },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        val nf = NumberFormat.getIntegerInstance()
+                        Text(
+                            stringResource(
+                                R.string.acc_wallet,
+                                nf.format(p.optLong("money")),
+                                nf.format(p.optLong("diamond")),
+                                nf.format(p.optLong("limit")),
+                            ),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
                         val referral = p.optString("referralCode")
                         if (referral.isNotBlank()) {
                             Text(stringResource(R.string.acc_referral, referral), style = MaterialTheme.typography.bodyMedium)
@@ -519,6 +543,18 @@ fun AccountPage(onBack: () -> Unit) {
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     }
+                    OutlinedButton(
+                        onClick = { onOpen(PAGE_HABITS) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text(stringResource(R.string.habits_open)) }
+                    OutlinedButton(
+                        onClick = { onOpen(PAGE_PASS) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text(stringResource(R.string.pass_title)) }
+                    OutlinedButton(
+                        onClick = { onOpen(PAGE_LINKED) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text(stringResource(R.string.linked_open)) }
                     Section(stringResource(R.string.rem_section)) {
                         val labels = mapOf(
                             "daily" to R.string.rem_daily,
@@ -708,7 +744,10 @@ fun AccountPage(onBack: () -> Unit) {
                                         style = MaterialTheme.typography.bodyLarge,
                                     )
                                     Text(
-                                        DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(d.created)),
+                                        stringResource(
+                                            R.string.acc_device_last,
+                                            DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(d.last)),
+                                        ),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
@@ -775,7 +814,7 @@ fun AccountPage(onBack: () -> Unit) {
 }
 
 @Composable
-private fun Field(
+internal fun Field(
     label: String,
     value: String,
     onChange: (String) -> Unit,
@@ -795,7 +834,7 @@ private fun Field(
 }
 
 @Composable
-private fun ErrorText(error: String) {
+internal fun ErrorText(error: String) {
     if (error.isNotBlank()) {
         Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
     }
