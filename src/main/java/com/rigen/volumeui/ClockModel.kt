@@ -17,13 +17,6 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Calendar
 
-const val PAGE_CLOCK = "clock"
-const val PAGE_CLOCK_TIME = "clock_time"
-const val PAGE_ALARMS = "alarms"
-const val PAGE_TIMER = "timer"
-const val PAGE_SLEEP = "sleep"
-const val PAGE_STOPWATCH = "stopwatch"
-
 /** [days] is a bit mask, bit 0 = Sunday ... bit 6 = Saturday. Zero means "once". */
 data class AlarmItem(
     val id: Int,

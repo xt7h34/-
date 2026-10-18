@@ -138,7 +138,7 @@ class FloatingTimer(private val service: VolumeAccessibilityService) {
             service.startActivity(
                 Intent(service, MainActivity::class.java)
                     .putExtra(EXTRA_PAGE, PAGE_TIMER)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+                    .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
             )
         } catch (e: Exception) {
             Diag.error(service, "Could not open the timer", e)
