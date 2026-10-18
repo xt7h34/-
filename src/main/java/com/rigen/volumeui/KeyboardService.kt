@@ -373,8 +373,8 @@ class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRe
 
     internal fun openSettings() {
         val i = Intent(this, MainActivity::class.java)
-            .putExtra(EXTRA_PAGE, PAGE_KEYBOARD)
-            .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        i.putExtra(EXTRA_PAGE, PAGE_KEYBOARD)
+        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
         try {
             startActivity(i)
             requestHideSelf(0)

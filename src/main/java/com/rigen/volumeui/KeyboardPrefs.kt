@@ -8,8 +8,6 @@ import androidx.compose.ui.graphics.Color
  * Everything here is stored on the phone only. The keyboard never uses the network.
  */
 
-const val PAGE_KEYBOARD = "keyboard"
-
 internal const val KB_THEME_AUTO = 0
 internal const val KB_THEME_LIGHT = 1
 internal const val KB_THEME_DARK = 2
