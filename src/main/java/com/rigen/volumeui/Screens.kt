@@ -233,6 +233,7 @@ private fun HeaderSpacer() {
 /**
  * The page title. It starts big and centered. Scrolling moves it to the top corner and makes it
  * smaller, and scrolling further makes it fade away, like in the system Settings app.
+ * When [pinned] is true it stays collapsed (for pages that do not scroll).
  */
 @Composable
 private fun CollapsingTitle(title: String, startPad: Dp, pinned: Boolean = false, scrollPx: () -> Int) {
@@ -827,6 +828,7 @@ private fun searchIndex(): List<SearchEntry> {
         SearchEntry(stringResource(R.string.section_language), appPage, PAGE_APP),
         SearchEntry(stringResource(R.string.section_diag), appPage, PAGE_APP),
         SearchEntry(stringResource(R.string.keepalive_title), keepPage, PAGE_KEEPALIVE),
+        // ── From the second file: games + keyboard ──
         SearchEntry(stringResource(R.string.games_title), stringResource(R.string.app_title), PAGE_GAMES),
         SearchEntry(stringResource(R.string.kb_title), stringResource(R.string.app_title), PAGE_KEYBOARD),
         SearchEntry(stringResource(R.string.blocks_title), stringResource(R.string.games_title), PAGE_BLOCKS),
@@ -834,6 +836,10 @@ private fun searchIndex(): List<SearchEntry> {
         SearchEntry(stringResource(R.string.memory_title), stringResource(R.string.games_title), PAGE_MEMORY),
         SearchEntry(stringResource(R.string.stack_title), stringResource(R.string.games_title), PAGE_STACK),
         SearchEntry(stringResource(R.string.ty_title), stringResource(R.string.games_title), PAGE_TYCOON),
+        // ── From the first file: account pages ──
+        SearchEntry(stringResource(R.string.habits_title), stringResource(R.string.account_title), PAGE_HABITS),
+        SearchEntry(stringResource(R.string.pass_title), stringResource(R.string.account_title), PAGE_PASS),
+        SearchEntry(stringResource(R.string.linked_title), stringResource(R.string.account_title), PAGE_LINKED),
     )
 }
 
@@ -1912,32 +1918,43 @@ class MainActivity : ComponentActivity() {
                 PAGE_PANEL, PAGE_BEHAVIOR, PAGE_STATION, PAGE_APPS -> PAGE_VOLUME
                 PAGE_CLOCK_TIME, PAGE_ALARMS, PAGE_TIMER, PAGE_STOPWATCH, PAGE_SLEEP -> PAGE_CLOCK
                 PAGE_BLOCKS, PAGE_2048, PAGE_MEMORY, PAGE_STACK, PAGE_TYCOON -> PAGE_GAMES
+                PAGE_HABITS, PAGE_PASS, PAGE_LINKED -> PAGE_ACCOUNT
                 else -> PAGE_HOME
             }
             BackHandler(enabled = page != PAGE_HOME) { page = parent }
             val goBack = { page = parent }
             when (page) {
+                // ── Volume ──
                 PAGE_VOLUME -> VolumeHubPage(settings, { page = it }, goBack)
                 PAGE_PANEL -> PanelPage(settings, onChange, goBack)
                 PAGE_BEHAVIOR -> BehaviorPage(settings, onChange, goBack)
                 PAGE_STATION -> StationPage(settings, dndAccess, mediaAccess, onChange, goBack)
                 PAGE_APPS -> AppsPage(settings, onChange, goBack)
+                // ── App ──
                 PAGE_APP -> AppPage(settings, onChange, goBack)
                 PAGE_KEEPALIVE -> KeepAlivePage(goBack)
+                // ── Clock ──
                 PAGE_CLOCK -> ClockHubPage({ page = it }, goBack)
                 PAGE_CLOCK_TIME -> WorldClockPage(goBack)
                 PAGE_ALARMS -> AlarmsPage(goBack)
                 PAGE_TIMER -> TimerPage(goBack)
                 PAGE_STOPWATCH -> StopwatchPage(goBack)
-                PAGE_ACCOUNT -> AccountPage(goBack)
                 PAGE_SLEEP -> SleepPage(goBack)
+                // ── Account ──
+                PAGE_ACCOUNT -> AccountPage({ page = it }, goBack)
+                PAGE_HABITS -> HabitsPage(goBack)
+                PAGE_PASS -> PassPage(goBack)
+                PAGE_LINKED -> LinkedAccountsPage(goBack)
+                // ── Games ──
                 PAGE_GAMES -> GameHubPage({ page = it }, goBack)
-                PAGE_KEYBOARD -> KeyboardPage(goBack)
                 PAGE_BLOCKS -> BlocksGamePage(goBack)
                 PAGE_2048 -> Game2048Page(goBack)
                 PAGE_MEMORY -> MemoryGamePage(goBack)
                 PAGE_STACK -> StackGamePage(goBack)
                 PAGE_TYCOON -> TycoonPage(goBack)
+                // ── Keyboard ──
+                PAGE_KEYBOARD -> KeyboardPage(goBack)
+                // ── Home ──
                 else -> HomePage(serviceEnabled) { page = it }
             }
         }
