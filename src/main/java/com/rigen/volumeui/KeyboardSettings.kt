@@ -192,6 +192,8 @@ internal fun KeyboardPage(onBack: () -> Unit) {
                 SwitchRow(stringResource(R.string.kb_sound), cfg.sound) { update(cfg.copy(sound = it)) }
             }
 
+            KbStyleSections(cfg) { update(it) }
+
             Section(stringResource(R.string.kb_privacy_title)) {
                 Text(
                     stringResource(R.string.kb_privacy),
@@ -204,7 +206,7 @@ internal fun KeyboardPage(onBack: () -> Unit) {
 }
 
 @Composable
-private fun ChoiceRow(options: List<String>, selected: Int, onPick: (Int) -> Unit) {
+internal fun ChoiceRow(options: List<String>, selected: Int, onPick: (Int) -> Unit) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         options.forEachIndexed { i, label ->
             val on = i == selected

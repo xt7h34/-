@@ -51,4 +51,54 @@
     <string name="kb_enter_send">إرسال</string>
     <string name="kb_enter_next">التالي</string>
     <string name="kb_enter_done">تم</string>
+
+    <string name="kb_preview_title">معاينة</string>
+
+    <string name="kb_colors_title">الألوان</string>
+    <string name="kb_colors_note">اضغط على أي لون لتغييره. كل جزء في لوحة المفاتيح يمكنك تلوينه، حتى بألوان شفافة.</string>
+    <string name="kb_color_default">الافتراضي</string>
+    <string name="kb_colors_reset">إعادة كل الألوان للوضع الافتراضي</string>
+    <string name="kb_c_bg">خلفية لوحة المفاتيح</string>
+    <string name="kb_c_bg2">لون الخلفية الثاني (يعمل تدرجاً)</string>
+    <string name="kb_c_key">أزرار الحروف</string>
+    <string name="kb_c_num">أزرار صف الأرقام</string>
+    <string name="kb_c_special">الأزرار الخاصة (الحذف، Shift، الرموز)</string>
+    <string name="kb_c_text">الحروف</string>
+    <string name="kb_c_icon">أيقونات ونصوص الأزرار الخاصة</string>
+    <string name="kb_c_press">لون الزر عند الضغط</string>
+    <string name="kb_c_accent">زر الإدخال</string>
+    <string name="kb_c_preview">الفقاعة فوق الزر المضغوط</string>
+    <string name="kb_c_hint">التلميحات والعناوين الصغيرة</string>
+    <string name="kb_pick_hue">اللون</string>
+    <string name="kb_pick_sat">قوة اللون</string>
+    <string name="kb_pick_val">السطوع</string>
+    <string name="kb_pick_alpha">الشفافية</string>
+    <string name="kb_pick_hex">كود اللون</string>
+    <string name="kb_pick_ok">استخدام هذا اللون</string>
+    <string name="kb_pick_default">العودة للافتراضي</string>
+
+    <string name="kb_press_title">عند الضغط على زر</string>
+    <string name="kb_shape">شكل الفقاعة فوق الزر</string>
+    <string name="kb_shape_none">بدون</string>
+    <string name="kb_shape_rounded">مربع</string>
+    <string name="kb_shape_circle">دائرة</string>
+    <string name="kb_shape_diamond">معيّن</string>
+    <string name="kb_shape_hex">سداسي</string>
+    <string name="kb_shape_star">نجمة</string>
+    <string name="kb_shape_heart">قلب</string>
+    <string name="kb_effect_on">إظهار صورة على الزر عند الضغط عليه</string>
+    <string name="kb_effect_chars">الصور (إيموجي أو رموز، تُختار واحدة منها عشوائياً)</string>
+    <string name="kb_effect_size">حجم الصورة: %1$d</string>
+
+    <string name="kb_layout_title">ترتيب الحروف</string>
+    <string name="kb_layout_note">اضغط على زر ثم على زر آخر لتبديل مكانيهما. أو بعد الضغط على زر، اكتب حرفاً جديداً ليحل محله.</string>
+    <string name="kb_layout_ar">العربية</string>
+    <string name="kb_layout_en">English</string>
+    <string name="kb_layout_replace">استبدال الزر المحدد بـ</string>
+    <string name="kb_layout_reset">إعادة هذا الترتيب للأصل</string>
+
+    <string name="kb_symbols_title">رموزك الخاصة</string>
+    <string name="kb_symbols_hint">اكتب الرموز التي تريدها، حتى 27 رمزاً. تظهر في صفحة خاصة بها، وتصل إليها بزر النجمة في صفحة الرموز.</string>
+    <string name="kb_symbols_field">الرموز</string>
+    <string name="kb_symbols_count">الرموز المضافة: %1$d من 27</string>
 </resources>

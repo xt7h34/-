@@ -51,4 +51,54 @@
     <string name="kb_enter_send">Send</string>
     <string name="kb_enter_next">Next</string>
     <string name="kb_enter_done">Done</string>
+
+    <string name="kb_preview_title">Preview</string>
+
+    <string name="kb_colors_title">Colors</string>
+    <string name="kb_colors_note">Tap any color to change it. Every part of the keyboard is yours to color, including see-through colors.</string>
+    <string name="kb_color_default">Default</string>
+    <string name="kb_colors_reset">Reset all colors</string>
+    <string name="kb_c_bg">Keyboard background</string>
+    <string name="kb_c_bg2">Second background color (makes a gradient)</string>
+    <string name="kb_c_key">Letter keys</string>
+    <string name="kb_c_num">Number row keys</string>
+    <string name="kb_c_special">Special keys (delete, shift, symbols)</string>
+    <string name="kb_c_text">Letters</string>
+    <string name="kb_c_icon">Icons and text on special keys</string>
+    <string name="kb_c_press">Color of a pressed key</string>
+    <string name="kb_c_accent">Enter key</string>
+    <string name="kb_c_preview">Bubble above the pressed key</string>
+    <string name="kb_c_hint">Small hints and labels</string>
+    <string name="kb_pick_hue">Color</string>
+    <string name="kb_pick_sat">Strength</string>
+    <string name="kb_pick_val">Brightness</string>
+    <string name="kb_pick_alpha">Opacity</string>
+    <string name="kb_pick_hex">Hex code</string>
+    <string name="kb_pick_ok">Use this color</string>
+    <string name="kb_pick_default">Back to default</string>
+
+    <string name="kb_press_title">When a key is pressed</string>
+    <string name="kb_shape">Shape of the bubble above the key</string>
+    <string name="kb_shape_none">None</string>
+    <string name="kb_shape_rounded">Square</string>
+    <string name="kb_shape_circle">Circle</string>
+    <string name="kb_shape_diamond">Diamond</string>
+    <string name="kb_shape_hex">Hexagon</string>
+    <string name="kb_shape_star">Star</string>
+    <string name="kb_shape_heart">Heart</string>
+    <string name="kb_effect_on">Show a picture on the key when it is pressed</string>
+    <string name="kb_effect_chars">Pictures (emoji or symbols, one is picked at random)</string>
+    <string name="kb_effect_size">Picture size: %1$d</string>
+
+    <string name="kb_layout_title">Arrange the letters</string>
+    <string name="kb_layout_note">Tap a key, then tap another key to swap them. Or after tapping a key, type a new character to replace it.</string>
+    <string name="kb_layout_ar">Arabic</string>
+    <string name="kb_layout_en">English</string>
+    <string name="kb_layout_replace">Replace the selected key with</string>
+    <string name="kb_layout_reset">Reset this layout</string>
+
+    <string name="kb_symbols_title">Your own symbols</string>
+    <string name="kb_symbols_hint">Type the symbols you want, up to 27. They get their own page, reached with the star key on the symbols page.</string>
+    <string name="kb_symbols_field">Symbols</string>
+    <string name="kb_symbols_count">Symbols added: %1$d of 27</string>
 </resources>

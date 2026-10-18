@@ -15,8 +15,11 @@ import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputMethodManager
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.ComposeView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
@@ -26,6 +29,7 @@ import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import kotlin.random.Random
 
 /*
  * Kanade Keyboard. A real system keyboard that lives inside the Kanade app.
@@ -39,6 +43,13 @@ internal const val PG_LETTERS = 0
 internal const val PG_SYM1 = 1
 internal const val PG_SYM2 = 2
 internal const val PG_EMOJI = 3
+internal const val PG_SYM3 = 4 // the person's own symbols
+
+/** The key being pressed, so the keyboard can draw the bubble above it. */
+internal class PressInfo(val label: String, val rect: Rect)
+
+/** One picture (a paw, a heart...) that appears where a key was pressed and fades away. */
+internal class TapEffect(val id: Long, val symbol: String, val x: Float, val y: Float, val rot: Float)
 
 class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner {
 
@@ -63,6 +74,9 @@ class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRe
     internal var hint by mutableStateOf<String?>(null)
     internal var enterLabel by mutableStateOf("")
     internal var recentVersion by mutableIntStateOf(0)
+    internal var press by mutableStateOf<PressInfo?>(null)
+    internal val effects = mutableStateListOf<TapEffect>()
+    internal var customSymbols by mutableStateOf<List<String>>(emptyList())
 
     // What the current text field asked for.
     private var secure = false
@@ -72,9 +86,12 @@ class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRe
     private var noEnterAction = false
     private var lastShiftTap = 0L
     private var pageBeforeEmoji = PG_LETTERS
+    private var effectSymbols: List<String> = emptyList()
+    private var effectId = 0L
 
     private val refreshRunnable = Runnable { refreshNow() }
     private val saveRunnable = Runnable { learner.save() }
+    private val clearPressRunnable = Runnable { press = null }
 
     // ───────────────────────── Lifecycle ─────────────────────────
 
@@ -88,6 +105,7 @@ class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRe
         learner = KbLearner(this).also { it.load() }
         seenWipe = KbPrefs.wipeGen(this)
         cfg = KbPrefs.load(this)
+        applyConfig()
         lang = cfg.lang
         uiContext = Prefs.localized(this)
     }
@@ -110,6 +128,9 @@ class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRe
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         cfg = KbPrefs.load(this)
+        applyConfig()
+        press = null
+        effects.clear()
         uiContext = Prefs.localized(this)
         if (KbPrefs.wipeGen(this) != seenWipe) {
             learner.clearAll()
@@ -167,6 +188,8 @@ class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRe
 
     override fun onFinishInput() {
         super.onFinishInput()
+        press = null
+        effects.clear()
         handler.removeCallbacks(saveRunnable)
         learner.save()
         alts = emptyList()
@@ -286,7 +309,37 @@ class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRe
     }
 
     internal fun togglePage() {
-        page = if (page == PG_SYM1) PG_SYM2 else PG_SYM1
+        page = when (page) {
+            PG_SYM1 -> PG_SYM2
+            PG_SYM2 -> if (customSymbols.isNotEmpty()) PG_SYM3 else PG_SYM1
+            else -> PG_SYM1
+        }
+    }
+
+    /** Things the keyboard works out from the settings once, instead of on every key press. */
+    private fun applyConfig() {
+        effectSymbols = kbGraphemes(cfg.effectChars).take(12)
+        customSymbols = kbGraphemes(cfg.symbols).take(27)
+    }
+
+    // ───────────────────────── Press bubble and picture ─────────────────────────
+
+    internal fun showPress(info: PressInfo) {
+        handler.removeCallbacks(clearPressRunnable)
+        press = info
+    }
+
+    /** The bubble stays a moment after the finger lifts, so a fast tap can still be seen. */
+    internal fun hidePress() {
+        handler.removeCallbacks(clearPressRunnable)
+        handler.postDelayed(clearPressRunnable, 90L)
+    }
+
+    internal fun spawnEffect(at: Offset) {
+        if (!cfg.effectOn || effectSymbols.isEmpty()) return
+        while (effects.size >= 12) effects.removeAt(0)
+        effectId++
+        effects.add(TapEffect(effectId, effectSymbols.random(), at.x, at.y, Random.nextFloat() * 40f - 20f))
     }
 
     internal fun toggleLang() {

@@ -34,7 +34,10 @@ private val EN_ALTS = mapOf(
     'y' to arrayOf("ý", "ÿ"),
 )
 
-private fun en(c: Char) = ch(c.toString(), *(EN_ALTS[c] ?: emptyArray<String>()))
+private fun enKey(tok: String): KbKey {
+    val alts = tok.singleOrNull()?.let { EN_ALTS[it] } ?: emptyArray<String>()
+    return ch(tok, *alts)
+}
 
 private val AR_ALTS = mapOf(
     "ا" to arrayOf("أ", "إ", "آ", "ٱ"),
@@ -50,42 +53,101 @@ private val AR_ALTS = mapOf(
     "ز" to arrayOf("ژ"),
 )
 
-private fun ar(s: String) = ch(s, *(AR_ALTS[s] ?: emptyArray<String>()))
+private fun arKey(tok: String): KbKey = ch(tok, *(AR_ALTS[tok] ?: emptyArray<String>()))
 
-/** The three letter rows of a language. */
-internal fun kbLetterRows(lang: String): List<List<KbKey>> =
-    if (lang == "ar") {
+// ── Splitting text into single characters (emoji count as one) ──
+
+/** Splits text into what a person sees as single characters. Spaces are dropped. */
+internal fun kbGraphemes(s: String): List<String> {
+    val out = ArrayList<String>()
+    val it = java.text.BreakIterator.getCharacterInstance()
+    it.setText(s)
+    var start = it.first()
+    var end = it.next()
+    while (end != java.text.BreakIterator.DONE) {
+        val g = s.substring(start, end)
+        if (g.isNotBlank()) out.add(g)
+        start = end
+        end = it.next()
+    }
+    return out
+}
+
+// ── The letter rows, which the person can rearrange ──
+
+private val DEFAULT_AR = listOf("ضصثقفغعهخحج", "شسيبلاتنمكط", "ظزرذدئوةى")
+private val DEFAULT_EN = listOf("qwertyuiop", "asdfghjkl", "zxcvbnm")
+
+internal fun kbDefaultTokens(lang: String): List<List<String>> =
+    (if (lang == "ar") DEFAULT_AR else DEFAULT_EN).map { kbGraphemes(it) }
+
+/** The saved arrangement, or the default one when nothing is saved or the saved one is damaged. */
+internal fun kbParseLayout(raw: String, lang: String): List<List<String>> {
+    val def = kbDefaultTokens(lang)
+    if (raw.isBlank()) return def
+    val rows = raw.split("|").map { r -> r.split(" ").filter { it.isNotEmpty() } }
+    if (rows.size != def.size) return def
+    for (i in rows.indices) if (rows[i].size != def[i].size) return def
+    return rows
+}
+
+internal fun kbEncodeLayout(rows: List<List<String>>): String =
+    rows.joinToString("|") { it.joinToString(" ") }
+
+/** The three letter rows of a language. [raw] is the person's own arrangement, or empty. */
+internal fun kbLetterRows(lang: String, raw: String = ""): List<List<KbKey>> {
+    val t = kbParseLayout(raw, lang)
+    return if (lang == "ar") {
         listOf(
-            "ضصثقفغعهخحج".map { ar(it.toString()) },
-            "شسيبلاتنمكط".map { ar(it.toString()) },
-            "ظزرذدئوةى".map { ar(it.toString()) } + KbKey("", KeyKind.BACKSPACE, 2f),
+            t[0].map { arKey(it) },
+            t[1].map { arKey(it) },
+            t[2].map { arKey(it) } + KbKey("", KeyKind.BACKSPACE, 2f),
         )
     } else {
         listOf(
-            "qwertyuiop".map { en(it) },
-            listOf(gap(0.5f)) + "asdfghjkl".map { en(it) } + gap(0.5f),
-            listOf(KbKey("", KeyKind.SHIFT, 1.5f)) + "zxcvbnm".map { en(it) } + KbKey("", KeyKind.BACKSPACE, 1.5f),
+            t[0].map { enKey(it) },
+            listOf(gap(0.5f)) + t[1].map { enKey(it) } + gap(0.5f),
+            listOf(KbKey("", KeyKind.SHIFT, 1.5f)) + t[2].map { enKey(it) } + KbKey("", KeyKind.BACKSPACE, 1.5f),
         )
     }
+}
 
-/** The three symbol rows. [page] is 1 or 2. */
-internal fun kbSymbolRows(page: Int): List<List<KbKey>> =
-    if (page == 1) {
-        listOf(
+/** Centers a short row of keys so they keep the normal key width. */
+private fun padRow(keys: List<KbKey>, total: Float = 10f): List<KbKey> {
+    val used = keys.sumOf { it.weight.toDouble() }.toFloat()
+    if (used >= total || keys.isEmpty()) return if (keys.isEmpty()) listOf(gap(total)) else keys
+    val side = (total - used) / 2f
+    return listOf(gap(side)) + keys + gap(side)
+}
+
+/** The symbol rows. [page] is 1, 2, or 3 (the person's own symbols). */
+internal fun kbSymbolRows(page: Int, custom: List<String>): List<List<KbKey>> =
+    when (page) {
+        1 -> listOf(
             "@#\$_&-+()/".map { ch(it.toString()) },
             listOf(ch("*"), ch("\""), ch("'"), ch(":"), ch(";"), ch("!"), ch("?"), ch("%"), ch("="), ch("\\")),
             listOf(KbKey("=\\<", KeyKind.SYM_PAGE, 1.5f)) +
                 listOf("،", "؛", "؟", "…", "~").map { KbKey(it, KeyKind.CHAR, 1.4f) } +
                 KbKey("", KeyKind.BACKSPACE, 1.5f),
         )
-    } else {
-        listOf(
+        2 -> listOf(
             "[]{}<>^~|`".map { ch(it.toString()) },
             listOf("€", "£", "¥", "₹", "¢", "©", "®", "™", "°", "·").map { ch(it) },
-            listOf(KbKey("?123", KeyKind.SYM_PAGE, 1.5f)) +
+            listOf(KbKey(if (custom.isNotEmpty()) "★" else "?123", KeyKind.SYM_PAGE, 1.5f)) +
                 listOf("«", "»", "•", "×", "÷").map { KbKey(it, KeyKind.CHAR, 1.4f) } +
                 KbKey("", KeyKind.BACKSPACE, 1.5f),
         )
+        else -> {
+            val last = custom.drop(20).take(7)
+            val w = if (last.isEmpty()) 1f else minOf(1.4f, 7f / last.size)
+            listOf(
+                padRow(custom.take(10).map { ch(it) }),
+                padRow(custom.drop(10).take(10).map { ch(it) }),
+                listOf(KbKey("?123", KeyKind.SYM_PAGE, 1.5f)) +
+                    last.map { KbKey(it, KeyKind.CHAR, w) } +
+                    KbKey("", KeyKind.BACKSPACE, 1.5f),
+            )
+        }
     }
 
 /** The bottom row: symbols or letters switch, language, comma, space, period, emoji, enter. */
