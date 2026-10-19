@@ -1858,6 +1858,8 @@ private fun AppPage(settings: PanelSettings, onChange: (PanelSettings) -> Unit, 
                 }
             }
 
+            UpdateSection()
+
             Text(stringResource(R.string.about_text, version), style = MaterialTheme.typography.bodySmall)
         }
     }
@@ -1923,6 +1925,8 @@ class MainActivity : ComponentActivity() {
             }
             BackHandler(enabled = page != PAGE_HOME) { page = parent }
             val goBack = { page = parent }
+            // Asks when a newer version of the app is out.
+            UpdatePrompt()
             when (page) {
                 // ── Volume ──
                 PAGE_VOLUME -> VolumeHubPage(settings, { page = it }, goBack)
