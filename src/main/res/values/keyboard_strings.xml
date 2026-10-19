@@ -230,4 +230,25 @@
     <string name="kb_clip_more">Show more</string>
     <string name="kb_clip_less">Show less</string>
     <string name="kb_clip_delete_all">Delete all</string>
+
+    <string name="kb_tr_title">Translate</string>
+    <string name="kb_tr_on">Show the translate button</string>
+    <string name="kb_tr_note">Translation works on this phone, without the internet. Download each language once, about 30 MB each. Translating between two languages that are not English also needs English. The keyboard itself never downloads anything.</string>
+    <string name="kb_tr_wifi">Download only on Wi-Fi</string>
+    <string name="kb_tr_download">Download</string>
+    <string name="kb_tr_delete">Delete</string>
+    <string name="kb_tr_ready">Ready</string>
+    <string name="kb_tr_busy">Downloading…</string>
+    <string name="kb_tr_download_failed">Could not download. Check your internet and that Google Play services is on this phone.</string>
+    <string name="kb_tr_refresh">Refresh</string>
+    <string name="kb_tr_original">Original</string>
+    <string name="kb_tr_translation">Translation</string>
+    <string name="kb_tr_replace">Replace</string>
+    <string name="kb_tr_insert">Insert</string>
+    <string name="kb_tr_copy">Copy</string>
+    <string name="kb_tr_working">Translating…</string>
+    <string name="kb_tr_failed">Could not translate this text.</string>
+    <string name="kb_tr_empty">Type or select some text in the field first, then open Translate.</string>
+    <string name="kb_tr_missing">Download these languages first, in the keyboard settings: %1$s</string>
+    <string name="kb_tr_open_settings">Open settings</string>
 </resources>

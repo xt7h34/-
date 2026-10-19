@@ -230,4 +230,25 @@
     <string name="kb_clip_more">عرض المزيد</string>
     <string name="kb_clip_less">عرض أقل</string>
     <string name="kb_clip_delete_all">حذف الكل</string>
+
+    <string name="kb_tr_title">الترجمة</string>
+    <string name="kb_tr_on">إظهار زر الترجمة</string>
+    <string name="kb_tr_note">الترجمة تعمل على هذا الهاتف من غير إنترنت. نزّل كل لغة مرة واحدة، حوالي 30 ميغابايت لكل لغة. والترجمة بين لغتين ليس بينهما الإنجليزية تحتاج الإنجليزية أيضاً. ولوحة المفاتيح نفسها لا تنزّل أي شيء.</string>
+    <string name="kb_tr_wifi">التنزيل عبر الواي فاي فقط</string>
+    <string name="kb_tr_download">تنزيل</string>
+    <string name="kb_tr_delete">حذف</string>
+    <string name="kb_tr_ready">جاهزة</string>
+    <string name="kb_tr_busy">جارٍ التنزيل…</string>
+    <string name="kb_tr_download_failed">تعذّر التنزيل. تأكد من الإنترنت ومن وجود خدمات Google Play على هذا الهاتف.</string>
+    <string name="kb_tr_refresh">تحديث</string>
+    <string name="kb_tr_original">النص الأصلي</string>
+    <string name="kb_tr_translation">الترجمة</string>
+    <string name="kb_tr_replace">استبدال</string>
+    <string name="kb_tr_insert">إدراج</string>
+    <string name="kb_tr_copy">نسخ</string>
+    <string name="kb_tr_working">جارٍ الترجمة…</string>
+    <string name="kb_tr_failed">تعذّرت ترجمة هذا النص.</string>
+    <string name="kb_tr_empty">اكتب نصاً في الحقل أو حدّده أولاً، ثم افتح الترجمة.</string>
+    <string name="kb_tr_missing">نزّل هذه اللغات أولاً من إعدادات لوحة المفاتيح: %1$s</string>
+    <string name="kb_tr_open_settings">فتح الإعدادات</string>
 </resources>

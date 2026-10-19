@@ -32,6 +32,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -212,6 +214,8 @@ internal fun KeyboardRoot(h: KbHost, withInsets: Boolean = true) {
                 ) {
                     if (h.page == PG_CLIP) {
                         ClipboardScreen(h, pal, rowH)
+                    } else if (h.page == PG_TRANS) {
+                        TranslateScreen(h, pal, rowH)
                     } else {
                         SuggestionBar(h, pal)
                         if (h.page == PG_EMOJI) EmojiPanel(h, pal, rowH) else KeysPanel(h, pal, rowH)
@@ -832,6 +836,210 @@ private fun ClipCard(c: ClipItem, pal: KbPalette, mode: Int, line: Color, onClic
     }
 }
 
+// ───────────────────────── Translate ─────────────────────────
+
+/** The translate screen: languages on top, the original, the translation and what to do with it. */
+@Composable
+private fun TranslateScreen(h: KbHost, pal: KbPalette, rowH: Dp) {
+    val cfg = h.cfg
+    val tr = h.tr
+    var picking by remember { mutableIntStateOf(0) } // 0 nothing, 1 choosing the source, 2 the target
+    val line = pal.accent.copy(alpha = 0.55f)
+    val total = 48.dp + rowH * (if (cfg.numberRow) 4.85f else 4f)
+    val cardShape = RoundedCornerShape(18.dp)
+
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .height(total),
+    ) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .height(48.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                Modifier.size(44.dp).clickable { h.closeTranslate() },
+                contentAlignment = Alignment.Center,
+            ) { KeyboardIcon(pal.accent, 24.dp) }
+            Box(
+                Modifier
+                    .width(1.dp)
+                    .height(20.dp)
+                    .background(line),
+            )
+            Text(
+                h.text(R.string.kb_tr_title),
+                color = pal.accent,
+                fontSize = 20.sp,
+                maxLines = 1,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 12.dp),
+            )
+            Text(
+                h.text(R.string.kb_tr_refresh),
+                color = pal.accent.copy(alpha = 0.85f),
+                fontSize = 15.sp,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable {
+                        picking = 0
+                        tr.refresh()
+                    }
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            )
+        }
+        // From, swap, to.
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .height(44.dp)
+                .padding(horizontal = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            LangChip(kbLangName(tr.from), picking == 1, pal, Modifier.weight(1f)) {
+                picking = if (picking == 1) 0 else 1
+            }
+            Box(
+                Modifier.size(44.dp).clickable {
+                    picking = 0
+                    tr.swap()
+                },
+                contentAlignment = Alignment.Center,
+            ) { SwapIcon(pal.accent, 22.dp) }
+            LangChip(kbLangName(tr.to), picking == 2, pal, Modifier.weight(1f)) {
+                picking = if (picking == 2) 0 else 2
+            }
+        }
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .weight(1f),
+        ) {
+            if (picking != 0) {
+                val current = if (picking == 1) tr.from else tr.to
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(3),
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    contentPadding = PaddingValues(6.dp),
+                ) {
+                    items(KB_TR_LANGS, key = { it }) { code ->
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .height(44.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (code == current) pal.accent.copy(alpha = 0.25f) else pal.key)
+                                .clickable {
+                                    if (picking == 1) tr.pickFrom(code) else tr.pickTo(code)
+                                    picking = 0
+                                },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(kbLangName(code), color = pal.text, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                }
+            } else {
+                Column(
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 6.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    val text = TextStyle(textDirection = TextDirection.Content, textAlign = TextAlign.Start)
+                    if (tr.source.isNotEmpty()) {
+                        Text(h.text(R.string.kb_tr_original), color = pal.sub, fontSize = 13.sp)
+                        Text(
+                            tr.source,
+                            color = pal.text,
+                            fontSize = 16.sp,
+                            maxLines = 4,
+                            overflow = TextOverflow.Ellipsis,
+                            style = text,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(cardShape)
+                                .border(1.dp, line, cardShape)
+                                .padding(12.dp),
+                        )
+                    }
+                    Text(h.text(R.string.kb_tr_translation), color = pal.sub, fontSize = 13.sp)
+                    when (tr.status) {
+                        KB_TR_DONE -> {
+                            Text(
+                                tr.result,
+                                color = pal.text,
+                                fontSize = 17.sp,
+                                style = text,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(cardShape)
+                                    .background(pal.accent.copy(alpha = 0.12f))
+                                    .border(1.dp, line, cardShape)
+                                    .padding(12.dp),
+                            )
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                PillButton(h.text(R.string.kb_tr_replace), pal, Modifier.weight(1f)) { tr.replace() }
+                                PillButton(h.text(R.string.kb_tr_insert), pal, Modifier.weight(1f)) { tr.insert() }
+                                PillButton(h.text(R.string.kb_tr_copy), pal, Modifier.weight(1f)) { tr.copy() }
+                            }
+                        }
+                        KB_TR_WORKING -> Text(h.text(R.string.kb_tr_working), color = pal.sub, fontSize = 15.sp)
+                        KB_TR_FAILED -> Text(h.text(R.string.kb_tr_failed), color = pal.sub, fontSize = 15.sp)
+                        KB_TR_EMPTY -> Text(h.text(R.string.kb_tr_empty), color = pal.sub, fontSize = 15.sp)
+                        KB_TR_MISSING -> {
+                            Text(
+                                h.text(R.string.kb_tr_missing).replace("%1\$s", tr.missing.joinToString(", ") { kbLangName(it) }),
+                                color = pal.sub,
+                                fontSize = 15.sp,
+                            )
+                            PillButton(h.text(R.string.kb_tr_open_settings), pal, Modifier.fillMaxWidth()) { h.openSettings() }
+                        }
+                        else -> {}
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LangChip(name: String, active: Boolean, pal: KbPalette, modifier: Modifier, onClick: () -> Unit) {
+    Box(
+        modifier
+            .height(38.dp)
+            .clip(RoundedCornerShape(19.dp))
+            .background(if (active) pal.accent.copy(alpha = 0.25f) else pal.key)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(name, color = pal.text, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+private fun PillButton(text: String, pal: KbPalette, modifier: Modifier, onClick: () -> Unit) {
+    Box(
+        modifier
+            .height(40.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(pal.accent.copy(alpha = 0.22f))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text, color = pal.accent, fontSize = 15.sp, maxLines = 1)
+    }
+}
+
 // ───────────────────────── Suggestions bar ─────────────────────────
 
 @Composable
@@ -867,6 +1075,9 @@ private fun SuggestionBar(h: KbHost, pal: KbPalette) {
                 }
                 if (h.cfg.clipOn) {
                     ToolButton(onClick = { h.showClipboard() }) { ClipboardIcon(pal.sub, 24.dp) }
+                }
+                if (h.cfg.trOn) {
+                    ToolButton(onClick = { h.showTranslate() }) { Text("\u6587A", color = pal.sub, fontSize = 18.sp) }
                 }
                 ToolButton(onClick = { h.setOneHanded(if (h.cfg.oneHanded == 0) 1 else 0) }) {
                     if (h.cfg.oneHanded == 0) SwapIcon(pal.sub, 24.dp) else ExpandIcon(pal.sub, 24.dp)

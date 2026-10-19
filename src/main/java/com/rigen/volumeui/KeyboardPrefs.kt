@@ -132,6 +132,11 @@ internal data class KbConfig(
     val clipOn: Boolean = true,
     val clipMax: Int = 20,
     val clipHours: Int = 0, // delete unpinned items after this many hours, 0 = never
+    // Translation (on the phone, with downloaded language packs).
+    val trOn: Boolean = true,
+    val trFrom: String = "ar",
+    val trTo: String = "en",
+    val trWifi: Boolean = false,
 )
 
 internal object KbPrefs {
@@ -196,6 +201,10 @@ internal object KbPrefs {
             clipOn = p.getBoolean("clip_on", d.clipOn),
             clipMax = p.getInt("clip_max", d.clipMax).coerceIn(5, 50),
             clipHours = p.getInt("clip_hours", d.clipHours).coerceIn(0, 24 * 30),
+            trOn = p.getBoolean("tr_on", d.trOn),
+            trFrom = p.getString("tr_from", d.trFrom) ?: d.trFrom,
+            trTo = p.getString("tr_to", d.trTo) ?: d.trTo,
+            trWifi = p.getBoolean("tr_wifi", d.trWifi),
         )
     }
 
@@ -252,6 +261,10 @@ internal object KbPrefs {
             .putBoolean("clip_on", k.clipOn)
             .putInt("clip_max", k.clipMax)
             .putInt("clip_hours", k.clipHours)
+            .putBoolean("tr_on", k.trOn)
+            .putString("tr_from", k.trFrom)
+            .putString("tr_to", k.trTo)
+            .putBoolean("tr_wifi", k.trWifi)
             .apply {
                 for (i in 0 until KB_PAGES) putString("layout2_$i", k.layouts.getOrElse(i) { "" })
             }
@@ -300,6 +313,10 @@ internal object KbPrefs {
 
     fun bumpWipe(c: Context) {
         sp(c).edit().putInt("wipe_gen", wipeGen(c) + 1).apply()
+    }
+
+    fun saveTrLangs(c: Context, from: String, to: String) {
+        sp(c).edit().putString("tr_from", from).putString("tr_to", to).apply()
     }
 
     /** Goes up each time the clipboard history is cleared from the settings. */

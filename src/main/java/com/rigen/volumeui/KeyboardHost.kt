@@ -147,6 +147,7 @@ internal abstract class KbHost {
     abstract val toolbarOpen: Boolean
     abstract val clips: List<ClipItem>
     abstract val clipSuggestion: ClipItem?
+    abstract val tr: KbTr
 
     abstract fun feedback(kind: KeyKind)
     abstract fun typeChar(raw: String)
@@ -175,6 +176,8 @@ internal abstract class KbHost {
     abstract fun clearClips()
     abstract fun setOneHanded(mode: Int)
     abstract fun useClipSuggestion()
+    abstract fun showTranslate()
+    abstract fun closeTranslate()
 
     /** A text of the keyboard, in the language chosen inside the app. */
     abstract fun text(id: Int): String
@@ -195,6 +198,14 @@ internal class PreviewHost(override val cfg: KbConfig, private val context: andr
 
     override var toolbarOpen by mutableStateOf(false)
     override val clipSuggestion: ClipItem? = ClipItem("0", "ازيك", false, 3L)
+    override val tr = KbTr(
+        context,
+        object : KbTr.Io {
+            override fun fieldText(): String = ""
+            override fun replaceWith(text: String) {}
+            override fun insert(text: String) {}
+        },
+    )
     override val clips: List<ClipItem> = listOf(
         ClipItem("1", "https://kanade.app", true, 2L),
         ClipItem("2", "+20 100 000 0000", false, 1L),
@@ -233,5 +244,7 @@ internal class PreviewHost(override val cfg: KbConfig, private val context: andr
     override fun clearClips() {}
     override fun setOneHanded(mode: Int) {}
     override fun useClipSuggestion() {}
+    override fun showTranslate() {}
+    override fun closeTranslate() {}
     override fun text(id: Int): String = context.getString(id)
 }

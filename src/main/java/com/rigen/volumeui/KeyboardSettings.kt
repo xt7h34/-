@@ -262,6 +262,8 @@ private fun KbGeneralTab(
                 }
             }
 
+            KbTranslateSection(cfg, update)
+
             Section(stringResource(R.string.kb_feedback_title)) {
                 SwitchRow(stringResource(R.string.kb_haptics), cfg.haptics) { update(cfg.copy(haptics = it)) }
                 SwitchRow(stringResource(R.string.kb_sound), cfg.sound) { update(cfg.copy(sound = it)) }

@@ -42,6 +42,7 @@ internal const val PG_SYM2 = 2
 internal const val PG_EMOJI = 3
 internal const val PG_SYM3 = 4 // the person's own symbols
 internal const val PG_CLIP = 5 // the clipboard history
+internal const val PG_TRANS = 6 // translation
 
 class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner {
 
@@ -56,6 +57,41 @@ class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRe
     private lateinit var clipStore: KbClipStore
     private var seenClipGen = 0
     private var pageBeforeClip = PG_LETTERS
+    private var pageBeforeTr = PG_LETTERS
+
+    // What the translate screen can do in the text field.
+    private val trIo = object : KbTr.Io {
+        override fun fieldText(): String {
+            val c = ic ?: return ""
+            val selected = c.getSelectedText(0)
+            if (!selected.isNullOrEmpty()) return selected.toString()
+            val before = c.getTextBeforeCursor(2000, 0)?.toString() ?: ""
+            val after = c.getTextAfterCursor(2000, 0)?.toString() ?: ""
+            return before + after
+        }
+
+        override fun replaceWith(text: String) {
+            val c = ic ?: return
+            c.beginBatchEdit()
+            val selected = c.getSelectedText(0)
+            if (!selected.isNullOrEmpty()) {
+                c.commitText(text, 1)
+            } else {
+                val before = c.getTextBeforeCursor(2000, 0)?.length ?: 0
+                val after = c.getTextAfterCursor(2000, 0)?.length ?: 0
+                c.deleteSurroundingText(before, after)
+                c.commitText(text, 1)
+            }
+            c.endBatchEdit()
+            closeTranslate()
+        }
+
+        override fun insert(text: String) {
+            ic?.commitText(text, 1)
+            closeTranslate()
+        }
+    }
+    internal val tr = KbTr(this, trIo)
     private val dropClipSuggestion = Runnable { clipSuggestion = null }
     private val clipListener = ClipboardManager.OnPrimaryClipChangedListener { readClipboard() }
     private var uiContext: Context? = null
@@ -110,6 +146,7 @@ class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRe
         override val toolbarOpen: Boolean get() = svc.toolbarOpen
         override val clips: List<ClipItem> get() = svc.clips
         override val clipSuggestion: ClipItem? get() = svc.clipSuggestion
+        override val tr: KbTr get() = svc.tr
 
         override fun feedback(kind: KeyKind) = svc.feedback(kind)
         override fun typeChar(raw: String) = svc.typeChar(raw)
@@ -138,6 +175,8 @@ class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRe
         override fun clearClips() = svc.clearClips()
         override fun setOneHanded(mode: Int) = svc.setOneHanded(mode)
         override fun useClipSuggestion() = svc.useClipSuggestion()
+        override fun showTranslate() = svc.showTranslate()
+        override fun closeTranslate() = svc.closeTranslate()
         override fun text(id: Int): String = svc.str(id)
     }
 
@@ -410,6 +449,21 @@ class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRe
         page = PG_CLIP
         alts = emptyList()
         clips = clipStore.list(cfg)
+    }
+
+    internal fun showTranslate() {
+        toolbarOpen = false
+        clipSuggestion = null
+        pageBeforeTr = if (page == PG_EMOJI || page == PG_CLIP || page == PG_TRANS) PG_LETTERS else page
+        page = PG_TRANS
+        alts = emptyList()
+        tr.start(cfg)
+    }
+
+    internal fun closeTranslate() {
+        page = pageBeforeTr
+        updateAutoCap()
+        scheduleRefresh()
     }
 
     internal fun closeClipboard() {

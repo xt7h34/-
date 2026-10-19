@@ -28,8 +28,8 @@ android {
         applicationId = "com.kanade"
         minSdk = 26
         targetSdk = 35
-        versionCode = 9
-        versionName = "1.8"
+        versionCode = 10
+        versionName = "1.9"
     }
 
     // Fixed debug key: every build is signed the same way, so a new APK installs over the old one.
@@ -60,4 +60,6 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.activity:activity-compose:1.9.3")
     implementation("androidx.core:core-ktx:1.15.0")
+    // On-device translation. The language packs are downloaded once, from the settings.
+    implementation("com.google.mlkit:translate:17.0.3")
 }
