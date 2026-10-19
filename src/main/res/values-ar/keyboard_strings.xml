@@ -224,4 +224,10 @@
     <string name="kb_oh_left">يسار</string>
     <string name="kb_oh_right">يمين</string>
     <string name="kb_oh_width">عرض لوحة المفاتيح: %1$d%%</string>
+
+    <string name="kb_clip_recent">الأحدث</string>
+    <string name="kb_clip_pinned">المثبّتة</string>
+    <string name="kb_clip_more">عرض المزيد</string>
+    <string name="kb_clip_less">عرض أقل</string>
+    <string name="kb_clip_delete_all">حذف الكل</string>
 </resources>

@@ -224,4 +224,10 @@
     <string name="kb_oh_left">Left</string>
     <string name="kb_oh_right">Right</string>
     <string name="kb_oh_width">Keyboard width: %1$d%%</string>
+
+    <string name="kb_clip_recent">Recent</string>
+    <string name="kb_clip_pinned">Pinned</string>
+    <string name="kb_clip_more">Show more</string>
+    <string name="kb_clip_less">Show less</string>
+    <string name="kb_clip_delete_all">Delete all</string>
 </resources>

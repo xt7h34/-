@@ -17,9 +17,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -29,8 +31,10 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
@@ -76,7 +80,10 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -189,24 +196,39 @@ internal fun KeyboardRoot(h: KbHost, withInsets: Boolean = true) {
                 key(b.id) { BurstItem(b, pal.fx, cfg.fxSize) { fx.bursts.remove(b) } }
             }
             val oh = cfg.oneHanded.coerceIn(0, 2)
-            val frac = cfg.oneHandedWidth / 100f
-            Row(
+            val frac = if (oh == 0) 1f else cfg.oneHandedWidth / 100f
+            Box(
                 Modifier
                     .fillMaxWidth()
                     .then(if (withInsets) Modifier.navigationBarsPadding() else Modifier)
                     .padding(horizontal = 3.dp, vertical = 2.dp),
             ) {
-                // One-handed: the keyboard sits on one side, and a thin panel fills the other.
-                if (oh == 2) OneHandedSide(h, pal, Modifier.weight(1f - frac))
-                Column(Modifier.weight(if (oh == 0) 1f else frac)) {
-                    SuggestionBar(h, pal)
-                    when (h.page) {
-                        PG_EMOJI -> EmojiPanel(h, pal, rowH)
-                        PG_CLIP -> ClipboardPanel(h, pal, rowH)
-                        else -> KeysPanel(h, pal, rowH)
+                // The keyboard decides how tall everything is. In one-handed mode it takes a part of
+                // the width and sits on one side.
+                Column(
+                    Modifier
+                        .fillMaxWidth(frac)
+                        .align(if (oh == 2) Alignment.TopEnd else Alignment.TopStart),
+                ) {
+                    if (h.page == PG_CLIP) {
+                        ClipboardScreen(h, pal, rowH)
+                    } else {
+                        SuggestionBar(h, pal)
+                        if (h.page == PG_EMOJI) EmojiPanel(h, pal, rowH) else KeysPanel(h, pal, rowH)
                     }
                 }
-                if (oh == 1) OneHandedSide(h, pal, Modifier.weight(1f - frac))
+                // The thin panel on the other side takes exactly the keyboard's height.
+                if (oh != 0) {
+                    Box(Modifier.matchParentSize()) {
+                        OneHandedSide(
+                            h, pal,
+                            Modifier
+                                .fillMaxHeight()
+                                .fillMaxWidth(1f - frac)
+                                .align(if (oh == 1) Alignment.CenterEnd else Alignment.CenterStart),
+                        )
+                    }
+                }
             }
             // Drawn above the keys; only the extra letters take touches.
             val p = fx.press
@@ -470,11 +492,21 @@ private fun SmileyIcon(color: Color, iconSize: Dp) {
     }
 }
 
+/** A rounded square with an arrow: opens and closes the tools in the top bar. */
 @Composable
-private fun DotsIcon(color: Color, iconSize: Dp) {
-    Canvas(Modifier.size(iconSize)) {
+private fun ToolsToggleIcon(color: Color, open: Boolean) {
+    Canvas(Modifier.size(26.dp)) {
         val w = this.size.minDimension
-        for (i in 0 until 3) drawCircle(color, w * 0.09f, Offset(w * (0.2f + 0.3f * i), w / 2f))
+        val stroke = w * 0.08f
+        val cap = StrokeCap.Round
+        drawRoundRect(
+            color, Offset(w * 0.08f, w * 0.14f), Size(w * 0.84f, w * 0.72f),
+            CornerRadius(w * 0.14f), style = Stroke(width = stroke),
+        )
+        val a = if (open) 0.45f else 0.56f
+        val b = if (open) 0.58f else 0.43f
+        drawLine(color, Offset(w * a, w * 0.34f), Offset(w * b, w * 0.5f), strokeWidth = stroke, cap = cap)
+        drawLine(color, Offset(w * b, w * 0.5f), Offset(w * a, w * 0.66f), strokeWidth = stroke, cap = cap)
     }
 }
 
@@ -535,7 +567,7 @@ private fun ExpandIcon(color: Color, iconSize: Dp) {
 private fun OneHandedSide(h: KbHost, pal: KbPalette, modifier: Modifier) {
     val cfg = h.cfg
     Column(
-        modifier.fillMaxHeight(),
+        modifier,
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -557,98 +589,245 @@ private fun OneHandedSide(h: KbHost, pal: KbPalette, modifier: Modifier) {
 // ───────────────────────── Clipboard ─────────────────────────
 
 @Composable
-private fun ClipboardPanel(h: KbHost, pal: KbPalette, rowH: Dp) {
-    val cfg = h.cfg
-    val clips = h.clips
-    val none: (Rect, Offset) -> Unit = { _, _ -> }
-    val shape = RoundedCornerShape(cfg.keyRadius.coerceAtLeast(6).dp)
+private fun KeyboardIcon(color: Color, iconSize: Dp) {
+    Canvas(Modifier.size(iconSize)) {
+        val w = this.size.minDimension
+        val stroke = w * 0.08f
+        drawRoundRect(
+            color, Offset(w * 0.08f, w * 0.22f), Size(w * 0.84f, w * 0.56f),
+            CornerRadius(w * 0.1f), style = Stroke(width = stroke),
+        )
+        for (r in 0 until 2) {
+            for (c in 0 until 4) {
+                drawCircle(color, w * 0.04f, Offset(w * (0.27f + 0.15f * c), w * (0.4f + 0.14f * r)))
+            }
+        }
+        drawLine(color, Offset(w * 0.34f, w * 0.68f), Offset(w * 0.66f, w * 0.68f), strokeWidth = stroke * 0.8f, cap = StrokeCap.Round)
+    }
+}
 
-    Column {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(rowH * 4),
-        ) {
-            if (clips.isEmpty()) {
-                Text(
-                    h.text(R.string.kb_clip_empty),
-                    color = pal.sub,
-                    fontSize = 14.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .padding(24.dp),
+@Composable
+private fun PinIcon(color: Color, iconSize: Dp) {
+    Canvas(Modifier.size(iconSize)) {
+        val w = this.size.minDimension
+        val stroke = w * 0.09f
+        val cap = StrokeCap.Round
+        drawLine(color, Offset(w * 0.22f, w * 0.78f), Offset(w * 0.5f, w * 0.5f), strokeWidth = stroke, cap = cap)
+        drawLine(color, Offset(w * 0.4f, w * 0.28f), Offset(w * 0.72f, w * 0.6f), strokeWidth = stroke * 1.6f, cap = cap)
+        drawLine(color, Offset(w * 0.5f, w * 0.2f), Offset(w * 0.8f, w * 0.5f), strokeWidth = stroke, cap = cap)
+        drawLine(color, Offset(w * 0.62f, w * 0.18f), Offset(w * 0.82f, w * 0.38f), strokeWidth = stroke * 1.4f, cap = cap)
+    }
+}
+
+@Composable
+private fun TrashIcon(color: Color, iconSize: Dp) {
+    Canvas(Modifier.size(iconSize)) {
+        val w = this.size.minDimension
+        val stroke = w * 0.085f
+        val cap = StrokeCap.Round
+        drawLine(color, Offset(w * 0.2f, w * 0.28f), Offset(w * 0.8f, w * 0.28f), strokeWidth = stroke, cap = cap)
+        drawLine(color, Offset(w * 0.4f, w * 0.18f), Offset(w * 0.6f, w * 0.18f), strokeWidth = stroke, cap = cap)
+        drawRoundRect(
+            color, Offset(w * 0.28f, w * 0.34f), Size(w * 0.44f, w * 0.5f),
+            CornerRadius(w * 0.06f), style = Stroke(width = stroke),
+        )
+        drawLine(color, Offset(w * 0.42f, w * 0.46f), Offset(w * 0.42f, w * 0.72f), strokeWidth = stroke * 0.8f, cap = cap)
+        drawLine(color, Offset(w * 0.58f, w * 0.46f), Offset(w * 0.58f, w * 0.72f), strokeWidth = stroke * 0.8f, cap = cap)
+    }
+}
+
+/** The whole clipboard, in place of the top bar and the keys. */
+@Composable
+private fun ClipboardScreen(h: KbHost, pal: KbPalette, rowH: Dp) {
+    val cfg = h.cfg
+    var mode by remember { mutableIntStateOf(0) } // 0 paste, 1 pin or unpin, 2 delete
+    var more by remember { mutableStateOf(false) }
+    val none: (Rect, Offset) -> Unit = { _, _ -> }
+    val recent = h.clips.filter { !it.pinned }
+    val pinned = h.clips.filter { it.pinned }
+    val shownRecent = if (more) recent else recent.take(3)
+    val line = pal.accent.copy(alpha = 0.55f)
+    val total = 48.dp + rowH * (if (cfg.numberRow) 4.85f else 4f)
+
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(total),
+    ) {
+        Column(Modifier.fillMaxSize()) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    Modifier.size(44.dp).clickable { h.closeClipboard() },
+                    contentAlignment = Alignment.Center,
+                ) { KeyboardIcon(pal.accent, 24.dp) }
+                Box(
+                    Modifier
+                        .width(1.dp)
+                        .height(20.dp)
+                        .background(line),
                 )
-            } else {
-                LazyColumn(
-                    Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    items(clips, key = { it.id }) { c ->
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .clip(shape)
-                                .background(if (c.pinned) pal.special else pal.key),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                c.text,
-                                color = pal.text,
-                                fontSize = 15.sp,
-                                maxLines = 3,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clickable { h.pasteClip(c) }
-                                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                            )
-                            Box(
-                                Modifier.size(40.dp).clickable { h.pinClip(c) },
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(if (c.pinned) "★" else "☆", color = if (c.pinned) pal.accent else pal.sub, fontSize = 20.sp)
-                            }
-                            Box(
-                                Modifier.size(40.dp).clickable { h.deleteClip(c) },
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text("×", color = pal.sub, fontSize = 22.sp)
-                            }
+                Text(
+                    h.text(R.string.kb_clip_title),
+                    color = pal.accent,
+                    fontSize = 20.sp,
+                    maxLines = 1,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = 12.dp),
+                )
+                Box(
+                    Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(if (mode == 1) pal.accent.copy(alpha = 0.22f) else Color.Transparent)
+                        .clickable { mode = if (mode == 1) 0 else 1 },
+                    contentAlignment = Alignment.Center,
+                ) { PinIcon(pal.accent, 24.dp) }
+                Box(
+                    Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(if (mode == 2) pal.accent.copy(alpha = 0.22f) else Color.Transparent)
+                        .clickable { mode = if (mode == 2) 0 else 2 },
+                    contentAlignment = Alignment.Center,
+                ) { TrashIcon(pal.accent, 24.dp) }
+            }
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(3),
+                modifier = Modifier.fillMaxSize(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(start = 6.dp, end = 6.dp, bottom = 76.dp),
+            ) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    ClipSectionHeader(
+                        title = h.text(R.string.kb_clip_recent),
+                        action = when {
+                            mode == 2 && recent.isNotEmpty() -> h.text(R.string.kb_clip_delete_all)
+                            recent.size > 3 -> h.text(if (more) R.string.kb_clip_less else R.string.kb_clip_more)
+                            else -> ""
+                        },
+                        pal = pal,
+                    ) {
+                        if (mode == 2 && recent.isNotEmpty()) {
+                            h.clearClips()
+                        } else {
+                            more = !more
                         }
+                    }
+                }
+                if (recent.isEmpty() && pinned.isEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Text(
+                            h.text(R.string.kb_clip_empty),
+                            color = pal.sub,
+                            fontSize = 14.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp),
+                        )
+                    }
+                }
+                items(shownRecent, key = { it.id }) { c ->
+                    ClipCard(c, pal, mode, line) { clipAction(h, mode, c) }
+                }
+                if (pinned.isNotEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        ClipSectionHeader(h.text(R.string.kb_clip_pinned), "", pal) {}
+                    }
+                    items(pinned, key = { it.id }) { c ->
+                        ClipCard(c, pal, mode, line) { clipAction(h, mode, c) }
                     }
                 }
             }
         }
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .height(rowH),
-            verticalAlignment = Alignment.CenterVertically,
+        // The round delete button floating over the cards.
+        KeyCap(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 12.dp, bottom = 10.dp)
+                .size(58.dp)
+                .shadow(8.dp, CircleShape),
+            st = KeyStyle(
+                pal.key, pal.keyDown, 29.dp, 0.dp, 0.dp, 0.dp, Color.Transparent,
+                KB_KEYFX_DEFAULT, Color.Transparent, KB_MOTION_NONE,
+            ),
+            repeat = true, hasLong = false,
+            onDown = { h.feedback(KeyKind.BACKSPACE) },
+            onStart = none, onEnd = {},
+            onTap = { h.onBackspace() },
+            onLong = {}, onLongMove = {}, onLongEnd = {},
         ) {
-            KeyCap(
-                modifier = Modifier.weight(1.4f).fillMaxHeight(),
-                st = plainStyle(pal.special, pal.specialDown, cfg),
-                repeat = false, hasLong = false,
-                onDown = { h.feedback(KeyKind.LETTERS) },
-                onStart = none, onEnd = {},
-                onTap = { h.closeClipboard() },
-                onLong = {}, onLongMove = {}, onLongEnd = {},
-            ) {
-                Text(if (h.lang == "ar") "أب" else "ABC", color = pal.icon, fontSize = 14.sp, maxLines = 1)
-            }
-            Spacer(Modifier.weight(3f))
-            KeyCap(
-                modifier = Modifier.weight(2f).fillMaxHeight(),
-                st = plainStyle(pal.special, pal.specialDown, cfg),
-                repeat = false, hasLong = false,
-                onDown = { h.feedback(KeyKind.LETTERS) },
-                onStart = none, onEnd = {},
-                onTap = { h.clearClips() },
-                onLong = {}, onLongMove = {}, onLongEnd = {},
-            ) {
-                Text(h.text(R.string.kb_clip_clear_all), color = pal.icon, fontSize = 14.sp, maxLines = 1)
-            }
+            PathIcon(BACKSPACE_PATH, pal.accent, 26.dp)
+        }
+    }
+}
+
+private fun clipAction(h: KbHost, mode: Int, c: ClipItem) {
+    when (mode) {
+        1 -> h.pinClip(c)
+        2 -> h.deleteClip(c)
+        else -> h.pasteClip(c)
+    }
+}
+
+@Composable
+private fun ClipSectionHeader(title: String, action: String, pal: KbPalette, onAction: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 6.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(title, color = pal.accent, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+        if (action.isNotEmpty()) {
+            Text(
+                action,
+                color = pal.accent.copy(alpha = 0.8f),
+                fontSize = 15.sp,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(onClick = onAction)
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ClipCard(c: ClipItem, pal: KbPalette, mode: Int, line: Color, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(18.dp)
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .aspectRatio(0.9f)
+            .clip(shape)
+            .background(if (c.pinned) pal.accent.copy(alpha = 0.10f) else Color.Transparent)
+            .border(1.dp, line, shape)
+            .clickable(onClick = onClick)
+            .padding(12.dp),
+    ) {
+        Text(
+            c.text,
+            color = pal.text,
+            fontSize = 16.sp,
+            maxLines = 6,
+            overflow = TextOverflow.Ellipsis,
+            style = TextStyle(textDirection = TextDirection.Content, textAlign = TextAlign.Start),
+        )
+        if (mode != 0) {
+            Text(
+                if (mode == 2) "×" else if (c.pinned) "★" else "☆",
+                color = pal.accent,
+                fontSize = 22.sp,
+                modifier = Modifier.align(Alignment.BottomEnd),
+            )
         }
     }
 }
@@ -670,11 +849,7 @@ private fun SuggestionBar(h: KbHost, pal: KbPalette) {
                 .clickable { h.setToolbar(!open) },
             contentAlignment = Alignment.Center,
         ) {
-            if (open) {
-                Text("‹", color = pal.sub, fontSize = 26.sp)
-            } else {
-                DotsIcon(pal.sub, 22.dp)
-            }
+            ToolsToggleIcon(pal.sub, open)
         }
         if (open) {
             // The tools: settings, emoji (when moved here), clipboard, one-handed mode.
@@ -707,6 +882,7 @@ private fun SuggestionBar(h: KbHost, pal: KbPalette) {
                 val alts = h.alts
                 val sug = h.suggestions
                 val hint = h.hint
+                val justCopied = h.clipSuggestion
                 when {
                     alts.isNotEmpty() -> Row(Modifier.fillMaxSize()) {
                         alts.forEach { a ->
@@ -720,6 +896,26 @@ private fun SuggestionBar(h: KbHost, pal: KbPalette) {
                                 Text(a, color = pal.text, fontSize = 22.sp, maxLines = 1)
                             }
                         }
+                    }
+                    justCopied != null -> Row(
+                        Modifier
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(pal.key.copy(alpha = 0.9f))
+                            .border(1.dp, pal.sub.copy(alpha = 0.3f), RoundedCornerShape(24.dp))
+                            .clickable { h.useClipSuggestion() }
+                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        ClipboardIcon(pal.sub, 20.dp)
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            justCopied.text.replace('\n', ' ').take(40),
+                            color = pal.text,
+                            fontSize = 16.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.widthIn(max = 170.dp),
+                        )
                     }
                     sug.isNotEmpty() -> Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
                         sug.forEachIndexed { i, word ->

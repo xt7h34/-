@@ -56,6 +56,7 @@ class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRe
     private lateinit var clipStore: KbClipStore
     private var seenClipGen = 0
     private var pageBeforeClip = PG_LETTERS
+    private val dropClipSuggestion = Runnable { clipSuggestion = null }
     private val clipListener = ClipboardManager.OnPrimaryClipChangedListener { readClipboard() }
     private var uiContext: Context? = null
     private var seenWipe = 0
@@ -73,6 +74,9 @@ class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRe
     internal var customSymbols by mutableStateOf<List<String>>(emptyList())
     internal var toolbarOpen by mutableStateOf(false)
     internal var clips by mutableStateOf<List<ClipItem>>(emptyList())
+
+    /** What was just copied, offered in the top bar for a few seconds. */
+    internal var clipSuggestion by mutableStateOf<ClipItem?>(null)
 
     /** Everything that appears briefly while keys are pressed (bubbles, pictures, lights). */
     internal val fx = KbFx()
@@ -105,6 +109,7 @@ class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRe
         override val fx: KbFx get() = svc.fx
         override val toolbarOpen: Boolean get() = svc.toolbarOpen
         override val clips: List<ClipItem> get() = svc.clips
+        override val clipSuggestion: ClipItem? get() = svc.clipSuggestion
 
         override fun feedback(kind: KeyKind) = svc.feedback(kind)
         override fun typeChar(raw: String) = svc.typeChar(raw)
@@ -132,6 +137,7 @@ class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRe
         override fun deleteClip(c: ClipItem) = svc.deleteClip(c)
         override fun clearClips() = svc.clearClips()
         override fun setOneHanded(mode: Int) = svc.setOneHanded(mode)
+        override fun useClipSuggestion() = svc.useClipSuggestion()
         override fun text(id: Int): String = svc.str(id)
     }
 
@@ -278,6 +284,7 @@ class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRe
         if (shift == 1) shift = 0
         alts = emptyList()
         toolbarOpen = false
+        clipSuggestion = null
         updateAutoCap()
         scheduleRefresh()
     }
@@ -299,6 +306,7 @@ class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRe
         if (shift == 1) shift = 0
         alts = emptyList()
         toolbarOpen = false
+        clipSuggestion = null
         updateAutoCap()
         scheduleRefresh()
     }
@@ -397,6 +405,7 @@ class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRe
 
     internal fun showClipboard() {
         toolbarOpen = false
+        clipSuggestion = null
         pageBeforeClip = if (page == PG_EMOJI || page == PG_CLIP) PG_LETTERS else page
         page = PG_CLIP
         alts = emptyList()
@@ -412,6 +421,14 @@ class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRe
         val conn = ic ?: return
         conn.commitText(c.text, 1)
         closeClipboard()
+        scheduleRefresh()
+    }
+
+    internal fun useClipSuggestion() {
+        val c = clipSuggestion ?: return
+        clipSuggestion = null
+        val conn = ic ?: return
+        conn.commitText(c.text, 1)
         scheduleRefresh()
     }
 
@@ -443,7 +460,14 @@ class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRe
             // Password managers mark what they copy as sensitive. It is never saved.
             if (desc.extras?.getBoolean("android.content.extra.IS_SENSITIVE", false) == true) return
             val text = clip.getItemAt(0).coerceToText(this)?.toString() ?: return
-            if (clipStore.add(text, cfg)) clips = clipStore.list(cfg)
+            if (clipStore.add(text, cfg)) {
+                clips = clipStore.list(cfg)
+                if (!secure) {
+                    clipSuggestion = clips.firstOrNull { it.text == text.trim() }
+                    handler.removeCallbacks(dropClipSuggestion)
+                    handler.postDelayed(dropClipSuggestion, 30_000L)
+                }
+            }
         } catch (e: Exception) {
             // Reading the clipboard can be refused. Then nothing is saved.
         }
