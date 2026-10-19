@@ -35,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.LayoutDirection
@@ -52,7 +53,8 @@ import kotlin.math.roundToInt
 /** The real keyboard, inside the settings. Press its keys to see the colors, effects and motion. */
 @Composable
 private fun LivePreview(cfg: KbConfig) {
-    val host = remember(cfg) { PreviewHost(cfg) }
+    val ctx = LocalContext.current
+    val host = remember(cfg) { PreviewHost(cfg, ctx) }
     Section(stringResource(R.string.kb_preview_title)) {
         Text(
             stringResource(R.string.kb_preview_note),
@@ -100,6 +102,7 @@ internal fun KbLayoutTab(cfg: KbConfig, update: (KbConfig) -> Unit) {
     KbKeyEditor(cfg, update)
     SymbolsSection(cfg, update)
     HintsSection(cfg, update)
+    OneHandedSection(cfg, update)
 }
 
 // ───────────────────────── Choosing one of several ─────────────────────────
@@ -623,5 +626,36 @@ private fun HintsSection(cfg: KbConfig, update: (KbConfig) -> Unit) {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+}
+
+// ───────────────────────── One-handed mode ─────────────────────────
+
+@Composable
+private fun OneHandedSection(cfg: KbConfig, update: (KbConfig) -> Unit) {
+    Section(stringResource(R.string.kb_oh_title)) {
+        Text(
+            stringResource(R.string.kb_oh_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        ChoiceRow(
+            listOf(
+                stringResource(R.string.kb_oh_off),
+                stringResource(R.string.kb_oh_left),
+                stringResource(R.string.kb_oh_right),
+            ),
+            cfg.oneHanded,
+        ) { update(cfg.copy(oneHanded = it)) }
+        if (cfg.oneHanded != 0) {
+            Column {
+                Text(stringResource(R.string.kb_oh_width, cfg.oneHandedWidth))
+                Slider(
+                    value = cfg.oneHandedWidth.toFloat(),
+                    onValueChange = { update(cfg.copy(oneHandedWidth = it.roundToInt())) },
+                    valueRange = 60f..92f,
+                )
+            }
+        }
     }
 }

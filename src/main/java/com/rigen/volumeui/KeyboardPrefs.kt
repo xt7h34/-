@@ -125,6 +125,13 @@ internal data class KbConfig(
     // Each page's keys after the person edited them (size, position, added keys). "" = the default.
     // Pages: 0 Arabic letters, 1 English letters, 2 symbols 1, 3 symbols 2.
     val layouts: List<String> = List(KB_PAGES) { "" },
+    // One-handed mode: 0 off, 1 keyboard on the left, 2 keyboard on the right.
+    val oneHanded: Int = 0,
+    val oneHandedWidth: Int = 80,
+    // Clipboard history.
+    val clipOn: Boolean = true,
+    val clipMax: Int = 20,
+    val clipHours: Int = 0, // delete unpinned items after this many hours, 0 = never
 )
 
 internal object KbPrefs {
@@ -184,6 +191,11 @@ internal object KbPrefs {
             pictureInside = p.getBoolean("pic_inside", d.pictureInside),
             pictureMotion = p.getInt("pic_motion", d.pictureMotion).coerceIn(0, 3),
             layouts = List(KB_PAGES) { p.getString("layout2_$it", "") ?: "" },
+            oneHanded = p.getInt("one_handed", d.oneHanded).coerceIn(0, 2),
+            oneHandedWidth = p.getInt("one_handed_w", d.oneHandedWidth).coerceIn(60, 92),
+            clipOn = p.getBoolean("clip_on", d.clipOn),
+            clipMax = p.getInt("clip_max", d.clipMax).coerceIn(5, 50),
+            clipHours = p.getInt("clip_hours", d.clipHours).coerceIn(0, 24 * 30),
         )
     }
 
@@ -235,6 +247,11 @@ internal object KbPrefs {
             .putInt("c_picture", k.colPicture)
             .putBoolean("pic_inside", k.pictureInside)
             .putInt("pic_motion", k.pictureMotion)
+            .putInt("one_handed", k.oneHanded)
+            .putInt("one_handed_w", k.oneHandedWidth)
+            .putBoolean("clip_on", k.clipOn)
+            .putInt("clip_max", k.clipMax)
+            .putInt("clip_hours", k.clipHours)
             .apply {
                 for (i in 0 until KB_PAGES) putString("layout2_$i", k.layouts.getOrElse(i) { "" })
             }
@@ -283,6 +300,13 @@ internal object KbPrefs {
 
     fun bumpWipe(c: Context) {
         sp(c).edit().putInt("wipe_gen", wipeGen(c) + 1).apply()
+    }
+
+    /** Goes up each time the clipboard history is cleared from the settings. */
+    fun clipGen(c: Context): Int = sp(c).getInt("clip_gen", 0)
+
+    fun bumpClip(c: Context) {
+        sp(c).edit().putInt("clip_gen", clipGen(c) + 1).apply()
     }
 
     // ── Recent emoji ──

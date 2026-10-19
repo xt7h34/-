@@ -144,6 +144,8 @@ internal abstract class KbHost {
     abstract val recentVersion: Int
     abstract val customSymbols: List<String>
     abstract val fx: KbFx
+    abstract val toolbarOpen: Boolean
+    abstract val clips: List<ClipItem>
 
     abstract fun feedback(kind: KeyKind)
     abstract fun typeChar(raw: String)
@@ -163,10 +165,21 @@ internal abstract class KbHost {
     abstract fun openSettings()
     abstract fun typeEmoji(e: String)
     abstract fun pickSuggestion(word: String)
+    abstract fun setToolbar(open: Boolean)
+    abstract fun showClipboard()
+    abstract fun closeClipboard()
+    abstract fun pasteClip(c: ClipItem)
+    abstract fun pinClip(c: ClipItem)
+    abstract fun deleteClip(c: ClipItem)
+    abstract fun clearClips()
+    abstract fun setOneHanded(mode: Int)
+
+    /** A text of the keyboard, in the language chosen inside the app. */
+    abstract fun text(id: Int): String
 }
 
 /** The keyboard shown inside the settings. It types nothing, but every look and effect works. */
-internal class PreviewHost(override val cfg: KbConfig) : KbHost() {
+internal class PreviewHost(override val cfg: KbConfig, private val context: android.content.Context) : KbHost() {
     override var page by mutableIntStateOf(PG_LETTERS)
     override var lang by mutableStateOf("ar")
     override var shift by mutableIntStateOf(0)
@@ -177,6 +190,12 @@ internal class PreviewHost(override val cfg: KbConfig) : KbHost() {
     override val recentVersion: Int = 0
     override val customSymbols: List<String> = kbGraphemes(cfg.symbols).take(27)
     override val fx = KbFx()
+
+    override var toolbarOpen by mutableStateOf(false)
+    override val clips: List<ClipItem> = listOf(
+        ClipItem("1", "https://kanade.app", true, 2L),
+        ClipItem("2", "+20 100 000 0000", false, 1L),
+    )
 
     override fun feedback(kind: KeyKind) {}
     override fun typeChar(raw: String) {}
@@ -202,4 +221,13 @@ internal class PreviewHost(override val cfg: KbConfig) : KbHost() {
     override fun openSettings() {}
     override fun typeEmoji(e: String) {}
     override fun pickSuggestion(word: String) {}
+    override fun setToolbar(open: Boolean) { toolbarOpen = open }
+    override fun showClipboard() {}
+    override fun closeClipboard() {}
+    override fun pasteClip(c: ClipItem) {}
+    override fun pinClip(c: ClipItem) {}
+    override fun deleteClip(c: ClipItem) {}
+    override fun clearClips() {}
+    override fun setOneHanded(mode: Int) {}
+    override fun text(id: Int): String = context.getString(id)
 }

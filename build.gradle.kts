@@ -28,8 +28,8 @@ android {
         applicationId = "com.kanade"
         minSdk = 26
         targetSdk = 35
-        versionCode = 7
-        versionName = "1.6"
+        versionCode = 8
+        versionName = "1.7"
     }
 
     // Fixed debug key: every build is signed the same way, so a new APK installs over the old one.

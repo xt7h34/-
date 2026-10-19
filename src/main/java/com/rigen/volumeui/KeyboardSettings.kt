@@ -217,6 +217,51 @@ private fun KbGeneralTab(
                 }
             }
 
+            var confirmClip by remember { mutableStateOf(false) }
+            Section(stringResource(R.string.kb_clip_title)) {
+                SwitchRow(stringResource(R.string.kb_clip_on), cfg.clipOn) { update(cfg.copy(clipOn = it)) }
+                Text(
+                    stringResource(R.string.kb_clip_note),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (cfg.clipOn) {
+                    Column {
+                        Text(stringResource(R.string.kb_clip_max, cfg.clipMax))
+                        Slider(
+                            value = cfg.clipMax.toFloat(),
+                            onValueChange = { update(cfg.copy(clipMax = it.roundToInt())) },
+                            valueRange = 5f..50f,
+                        )
+                    }
+                    Text(stringResource(R.string.kb_clip_expire))
+                    val hours = intArrayOf(0, 1, 24, 168)
+                    ChoiceRow(
+                        listOf(
+                            stringResource(R.string.kb_clip_never),
+                            stringResource(R.string.kb_clip_1h),
+                            stringResource(R.string.kb_clip_1d),
+                            stringResource(R.string.kb_clip_7d),
+                        ),
+                        hours.indexOf(cfg.clipHours),
+                    ) { update(cfg.copy(clipHours = hours[it])) }
+                }
+                OutlinedButton(
+                    onClick = {
+                        if (!confirmClip) {
+                            confirmClip = true
+                        } else {
+                            KbClipStore.wipeFile(context)
+                            KbPrefs.bumpClip(context)
+                            confirmClip = false
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(if (confirmClip) R.string.kb_clip_clear_confirm else R.string.kb_clip_clear))
+                }
+            }
+
             Section(stringResource(R.string.kb_feedback_title)) {
                 SwitchRow(stringResource(R.string.kb_haptics), cfg.haptics) { update(cfg.copy(haptics = it)) }
                 SwitchRow(stringResource(R.string.kb_sound), cfg.sound) { update(cfg.copy(sound = it)) }

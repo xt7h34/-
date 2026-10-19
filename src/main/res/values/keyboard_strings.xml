@@ -170,7 +170,7 @@
     <string name="kb_alts_bubble">Show the extra letters in a bubble above the key</string>
     <string name="kb_alts_note">Hold a key, then slide to a letter and let go, or tap it. Off means they show in the top bar instead.</string>
     <string name="kb_emoji_bar">Put the emoji button in the top bar</string>
-    <string name="kb_emoji_bar_note">It leaves the bottom row, and sits next to the settings button in the top bar.</string>
+    <string name="kb_emoji_bar_note">It leaves the bottom row and appears in the top bar tools, beside the clipboard button. Open the tools with the three dots.</string>
 
     <string name="kb_ke_title">Edit the keys</string>
     <string name="kb_ke_note">Tap a key to select it. Then change how wide and how tall it is, move it, delete it, or add new keys. Everything can be undone.</string>
@@ -204,4 +204,24 @@
     <string name="kb_kind_lang">Language</string>
     <string name="kb_kind_emoji">Emoji</string>
     <string name="kb_kind_symbols">Symbols</string>
+
+    <string name="kb_clip_title">Clipboard</string>
+    <string name="kb_clip_on">Keep a history of what I copy</string>
+    <string name="kb_clip_note">Copied text is kept on this phone, encrypted. Text marked as sensitive, like passwords from a password manager, is never saved. Pin an item with the star to keep it.</string>
+    <string name="kb_clip_max">Items kept: %1$d</string>
+    <string name="kb_clip_expire">Delete items that are not pinned after</string>
+    <string name="kb_clip_never">Never</string>
+    <string name="kb_clip_1h">1 hour</string>
+    <string name="kb_clip_1d">1 day</string>
+    <string name="kb_clip_7d">7 days</string>
+    <string name="kb_clip_clear">Clear the clipboard history</string>
+    <string name="kb_clip_clear_confirm">Tap again to clear everything, pinned items too</string>
+    <string name="kb_clip_empty">Nothing copied yet. Text you copy will show up here.</string>
+    <string name="kb_clip_clear_all">Clear</string>
+    <string name="kb_oh_title">One-handed mode</string>
+    <string name="kb_oh_note">Moves the keyboard to one side so your thumb can reach every key. You can also turn it on from the three dots in the top bar.</string>
+    <string name="kb_oh_off">Off</string>
+    <string name="kb_oh_left">Left</string>
+    <string name="kb_oh_right">Right</string>
+    <string name="kb_oh_width">Keyboard width: %1$d%%</string>
 </resources>

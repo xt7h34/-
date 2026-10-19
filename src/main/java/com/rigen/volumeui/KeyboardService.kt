@@ -1,5 +1,6 @@
 package com.rigen.volumeui
 
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.inputmethodservice.InputMethodService
@@ -40,6 +41,7 @@ internal const val PG_SYM1 = 1
 internal const val PG_SYM2 = 2
 internal const val PG_EMOJI = 3
 internal const val PG_SYM3 = 4 // the person's own symbols
+internal const val PG_CLIP = 5 // the clipboard history
 
 class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner {
 
@@ -51,6 +53,10 @@ class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRe
 
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var learner: KbLearner
+    private lateinit var clipStore: KbClipStore
+    private var seenClipGen = 0
+    private var pageBeforeClip = PG_LETTERS
+    private val clipListener = ClipboardManager.OnPrimaryClipChangedListener { readClipboard() }
     private var uiContext: Context? = null
     private var seenWipe = 0
 
@@ -65,6 +71,8 @@ class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRe
     internal var enterLabel by mutableStateOf("")
     internal var recentVersion by mutableIntStateOf(0)
     internal var customSymbols by mutableStateOf<List<String>>(emptyList())
+    internal var toolbarOpen by mutableStateOf(false)
+    internal var clips by mutableStateOf<List<ClipItem>>(emptyList())
 
     /** Everything that appears briefly while keys are pressed (bubbles, pictures, lights). */
     internal val fx = KbFx()
@@ -95,6 +103,8 @@ class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRe
         override val recentVersion: Int get() = svc.recentVersion
         override val customSymbols: List<String> get() = svc.customSymbols
         override val fx: KbFx get() = svc.fx
+        override val toolbarOpen: Boolean get() = svc.toolbarOpen
+        override val clips: List<ClipItem> get() = svc.clips
 
         override fun feedback(kind: KeyKind) = svc.feedback(kind)
         override fun typeChar(raw: String) = svc.typeChar(raw)
@@ -114,6 +124,15 @@ class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRe
         override fun openSettings() = svc.openSettings()
         override fun typeEmoji(e: String) = svc.typeEmoji(e)
         override fun pickSuggestion(word: String) = svc.pickSuggestion(word)
+        override fun setToolbar(open: Boolean) = svc.setToolbar(open)
+        override fun showClipboard() = svc.showClipboard()
+        override fun closeClipboard() = svc.closeClipboard()
+        override fun pasteClip(c: ClipItem) = svc.pasteClip(c)
+        override fun pinClip(c: ClipItem) = svc.pinClip(c)
+        override fun deleteClip(c: ClipItem) = svc.deleteClip(c)
+        override fun clearClips() = svc.clearClips()
+        override fun setOneHanded(mode: Int) = svc.setOneHanded(mode)
+        override fun text(id: Int): String = svc.str(id)
     }
 
     // ───────────────────────── Lifecycle ─────────────────────────
@@ -126,11 +145,19 @@ class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRe
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
         learner = KbLearner(this).also { it.load() }
+        clipStore = KbClipStore(this).also { it.load() }
+        seenClipGen = KbPrefs.clipGen(this)
         seenWipe = KbPrefs.wipeGen(this)
         cfg = KbPrefs.load(this)
         applyConfig()
         lang = cfg.lang
         uiContext = Prefs.localized(this)
+        clips = clipStore.list(cfg)
+        try {
+            getSystemService(ClipboardManager::class.java)?.addPrimaryClipChangedListener(clipListener)
+        } catch (e: Exception) {
+            Diag.error(this, "KeyboardService.clipListener", e)
+        }
     }
 
     override fun onCreateInputView(): View {
@@ -158,6 +185,13 @@ class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRe
             learner.clearAll()
             seenWipe = KbPrefs.wipeGen(this)
         }
+        if (KbPrefs.clipGen(this) != seenClipGen) {
+            clipStore.clearAll()
+            seenClipGen = KbPrefs.clipGen(this)
+        }
+        toolbarOpen = false
+        readClipboard()
+        clips = clipStore.list(cfg)
 
         val type = info?.inputType ?: 0
         val cls = type and InputType.TYPE_MASK_CLASS
@@ -218,6 +252,11 @@ class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRe
 
     override fun onDestroy() {
         handler.removeCallbacksAndMessages(null)
+        try {
+            getSystemService(ClipboardManager::class.java)?.removePrimaryClipChangedListener(clipListener)
+        } catch (e: Exception) {
+            // The system is shutting the keyboard down anyway.
+        }
         learner.save(async = false)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
@@ -238,6 +277,7 @@ class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRe
         c.commitText(out, 1)
         if (shift == 1) shift = 0
         alts = emptyList()
+        toolbarOpen = false
         updateAutoCap()
         scheduleRefresh()
     }
@@ -258,6 +298,7 @@ class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRe
         c.commitText(" ", 1)
         if (shift == 1) shift = 0
         alts = emptyList()
+        toolbarOpen = false
         updateAutoCap()
         scheduleRefresh()
     }
@@ -347,6 +388,75 @@ class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRe
         customSymbols = kbGraphemes(cfg.symbols).take(27)
     }
 
+    // ───────────────────────── Toolbar, clipboard and one-handed mode ─────────────────────────
+
+    internal fun setToolbar(open: Boolean) {
+        toolbarOpen = open
+        alts = emptyList()
+    }
+
+    internal fun showClipboard() {
+        toolbarOpen = false
+        pageBeforeClip = if (page == PG_EMOJI || page == PG_CLIP) PG_LETTERS else page
+        page = PG_CLIP
+        alts = emptyList()
+        clips = clipStore.list(cfg)
+    }
+
+    internal fun closeClipboard() {
+        page = pageBeforeClip
+        updateAutoCap()
+    }
+
+    internal fun pasteClip(c: ClipItem) {
+        val conn = ic ?: return
+        conn.commitText(c.text, 1)
+        closeClipboard()
+        scheduleRefresh()
+    }
+
+    internal fun pinClip(c: ClipItem) {
+        clipStore.setPinned(c.id, !c.pinned)
+        clips = clipStore.list(cfg)
+    }
+
+    internal fun deleteClip(c: ClipItem) {
+        clipStore.delete(c.id)
+        clips = clipStore.list(cfg)
+    }
+
+    /** Clears what is not pinned. Pinned items are only removed one by one. */
+    internal fun clearClips() {
+        for (c in clipStore.list(cfg)) if (!c.pinned) clipStore.delete(c.id)
+        clips = clipStore.list(cfg)
+    }
+
+    /** Looks at what is on the clipboard and keeps it, unless it is marked as sensitive. */
+    private fun readClipboard() {
+        if (!cfg.clipOn) return
+        try {
+            val cm = getSystemService(ClipboardManager::class.java) ?: return
+            val clip = cm.primaryClip ?: return
+            if (clip.itemCount == 0) return
+            val desc = clip.description
+            if (!desc.hasMimeType("text/*")) return
+            // Password managers mark what they copy as sensitive. It is never saved.
+            if (desc.extras?.getBoolean("android.content.extra.IS_SENSITIVE", false) == true) return
+            val text = clip.getItemAt(0).coerceToText(this)?.toString() ?: return
+            if (clipStore.add(text, cfg)) clips = clipStore.list(cfg)
+        } catch (e: Exception) {
+            // Reading the clipboard can be refused. Then nothing is saved.
+        }
+    }
+
+    internal fun setOneHanded(mode: Int) {
+        // Start from what is saved, so a settings change made meanwhile is not lost.
+        val fresh = KbPrefs.load(this).copy(oneHanded = mode)
+        KbPrefs.save(this, fresh)
+        cfg = fresh
+        toolbarOpen = false
+    }
+
     internal fun toggleLang() {
         lang = if (lang == "ar") "en" else "ar"
         shift = 0
@@ -357,6 +467,7 @@ class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRe
     }
 
     internal fun showEmoji() {
+        toolbarOpen = false
         pageBeforeEmoji = if (page == PG_EMOJI) PG_LETTERS else page
         page = PG_EMOJI
         alts = emptyList()

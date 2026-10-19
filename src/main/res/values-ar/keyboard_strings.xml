@@ -170,7 +170,7 @@
     <string name="kb_alts_bubble">إظهار الحروف الإضافية في فقاعة فوق الزر</string>
     <string name="kb_alts_note">اضغط مطولاً على الزر ثم اسحب إلى الحرف وارفع إصبعك، أو اضغط عليه. وعند إيقافها تظهر في الشريط العلوي.</string>
     <string name="kb_emoji_bar">وضع زر الإيموجي في الشريط العلوي</string>
-    <string name="kb_emoji_bar_note">يغادر الصف السفلي ويستقر بجانب زر الإعدادات في الشريط العلوي.</string>
+    <string name="kb_emoji_bar_note">يغادر الصف السفلي ويظهر في أدوات الشريط العلوي بجانب زر الحافظة. افتح الأدوات بالنقاط الثلاث.</string>
 
     <string name="kb_ke_title">تعديل الأزرار</string>
     <string name="kb_ke_note">اضغط على زر لتحديده. ثم غيّر عرضه وطوله، أو انقله، أو احذفه، أو أضف أزراراً جديدة. ويمكنك التراجع عن أي خطوة.</string>
@@ -204,4 +204,24 @@
     <string name="kb_kind_lang">اللغة</string>
     <string name="kb_kind_emoji">إيموجي</string>
     <string name="kb_kind_symbols">الرموز</string>
+
+    <string name="kb_clip_title">الحافظة</string>
+    <string name="kb_clip_on">الاحتفاظ بسجل لما أنسخه</string>
+    <string name="kb_clip_note">النص المنسوخ يبقى على هذا الهاتف ومشفّراً. النص الذي يُعلَّم كحساس، مثل كلمات المرور من مدير كلمات المرور، لا يُحفظ أبداً. ثبّت عنصراً بالنجمة ليبقى.</string>
+    <string name="kb_clip_max">عدد العناصر المحفوظة: %1$d</string>
+    <string name="kb_clip_expire">حذف العناصر غير المثبّتة بعد</string>
+    <string name="kb_clip_never">أبداً</string>
+    <string name="kb_clip_1h">ساعة</string>
+    <string name="kb_clip_1d">يوم</string>
+    <string name="kb_clip_7d">7 أيام</string>
+    <string name="kb_clip_clear">مسح سجل الحافظة</string>
+    <string name="kb_clip_clear_confirm">اضغط مرة أخرى لمسح كل شيء، حتى المثبّت</string>
+    <string name="kb_clip_empty">لم تنسخ شيئاً بعد. النص الذي تنسخه سيظهر هنا.</string>
+    <string name="kb_clip_clear_all">مسح</string>
+    <string name="kb_oh_title">وضع اليد الواحدة</string>
+    <string name="kb_oh_note">ينقل لوحة المفاتيح إلى جانب واحد ليصل إبهامك إلى كل زر. ويمكنك تشغيله أيضاً من النقاط الثلاث في الشريط العلوي.</string>
+    <string name="kb_oh_off">إيقاف</string>
+    <string name="kb_oh_left">يسار</string>
+    <string name="kb_oh_right">يمين</string>
+    <string name="kb_oh_width">عرض لوحة المفاتيح: %1$d%%</string>
 </resources>

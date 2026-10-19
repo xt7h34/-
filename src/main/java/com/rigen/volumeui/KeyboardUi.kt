@@ -14,9 +14,11 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,9 +29,11 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -184,14 +188,25 @@ internal fun KeyboardRoot(h: KbHost, withInsets: Boolean = true) {
             fx.bursts.forEach { b ->
                 key(b.id) { BurstItem(b, pal.fx, cfg.fxSize) { fx.bursts.remove(b) } }
             }
-            Column(
+            val oh = cfg.oneHanded.coerceIn(0, 2)
+            val frac = cfg.oneHandedWidth / 100f
+            Row(
                 Modifier
                     .fillMaxWidth()
                     .then(if (withInsets) Modifier.navigationBarsPadding() else Modifier)
                     .padding(horizontal = 3.dp, vertical = 2.dp),
             ) {
-                SuggestionBar(h, pal)
-                if (h.page == PG_EMOJI) EmojiPanel(h, pal, rowH) else KeysPanel(h, pal, rowH)
+                // One-handed: the keyboard sits on one side, and a thin panel fills the other.
+                if (oh == 2) OneHandedSide(h, pal, Modifier.weight(1f - frac))
+                Column(Modifier.weight(if (oh == 0) 1f else frac)) {
+                    SuggestionBar(h, pal)
+                    when (h.page) {
+                        PG_EMOJI -> EmojiPanel(h, pal, rowH)
+                        PG_CLIP -> ClipboardPanel(h, pal, rowH)
+                        else -> KeysPanel(h, pal, rowH)
+                    }
+                }
+                if (oh == 1) OneHandedSide(h, pal, Modifier.weight(1f - frac))
             }
             // Drawn above the keys; only the extra letters take touches.
             val p = fx.press
@@ -455,10 +470,194 @@ private fun SmileyIcon(color: Color, iconSize: Dp) {
     }
 }
 
+@Composable
+private fun DotsIcon(color: Color, iconSize: Dp) {
+    Canvas(Modifier.size(iconSize)) {
+        val w = this.size.minDimension
+        for (i in 0 until 3) drawCircle(color, w * 0.09f, Offset(w * (0.2f + 0.3f * i), w / 2f))
+    }
+}
+
+@Composable
+private fun ClipboardIcon(color: Color, iconSize: Dp) {
+    Canvas(Modifier.size(iconSize)) {
+        val w = this.size.minDimension
+        val stroke = w * 0.085f
+        drawRoundRect(
+            color, Offset(w * 0.2f, w * 0.18f), Size(w * 0.6f, w * 0.7f),
+            CornerRadius(w * 0.08f), style = Stroke(width = stroke),
+        )
+        drawRoundRect(color, Offset(w * 0.36f, w * 0.08f), Size(w * 0.28f, w * 0.18f), CornerRadius(w * 0.05f))
+        drawLine(color, Offset(w * 0.34f, w * 0.5f), Offset(w * 0.66f, w * 0.5f), strokeWidth = stroke)
+        drawLine(color, Offset(w * 0.34f, w * 0.68f), Offset(w * 0.66f, w * 0.68f), strokeWidth = stroke)
+    }
+}
+
+/** Two arrows, left and right: move the keyboard to the other side. */
+@Composable
+private fun SwapIcon(color: Color, iconSize: Dp) {
+    Canvas(Modifier.size(iconSize)) {
+        val w = this.size.minDimension
+        val stroke = w * 0.09f
+        val cap = StrokeCap.Round
+        drawLine(color, Offset(w * 0.15f, w * 0.35f), Offset(w * 0.85f, w * 0.35f), strokeWidth = stroke, cap = cap)
+        drawLine(color, Offset(w * 0.85f, w * 0.35f), Offset(w * 0.68f, w * 0.2f), strokeWidth = stroke, cap = cap)
+        drawLine(color, Offset(w * 0.85f, w * 0.35f), Offset(w * 0.68f, w * 0.5f), strokeWidth = stroke, cap = cap)
+        drawLine(color, Offset(w * 0.85f, w * 0.68f), Offset(w * 0.15f, w * 0.68f), strokeWidth = stroke, cap = cap)
+        drawLine(color, Offset(w * 0.15f, w * 0.68f), Offset(w * 0.32f, w * 0.53f), strokeWidth = stroke, cap = cap)
+        drawLine(color, Offset(w * 0.15f, w * 0.68f), Offset(w * 0.32f, w * 0.83f), strokeWidth = stroke, cap = cap)
+    }
+}
+
+/** Four corners pointing out: make the keyboard full width again. */
+@Composable
+private fun ExpandIcon(color: Color, iconSize: Dp) {
+    Canvas(Modifier.size(iconSize)) {
+        val w = this.size.minDimension
+        val stroke = w * 0.09f
+        val cap = StrokeCap.Round
+        val a = w * 0.15f
+        val b = w * 0.85f
+        val l = w * 0.28f
+        drawLine(color, Offset(a, a), Offset(a + l, a), strokeWidth = stroke, cap = cap)
+        drawLine(color, Offset(a, a), Offset(a, a + l), strokeWidth = stroke, cap = cap)
+        drawLine(color, Offset(b, a), Offset(b - l, a), strokeWidth = stroke, cap = cap)
+        drawLine(color, Offset(b, a), Offset(b, a + l), strokeWidth = stroke, cap = cap)
+        drawLine(color, Offset(a, b), Offset(a + l, b), strokeWidth = stroke, cap = cap)
+        drawLine(color, Offset(a, b), Offset(a, b - l), strokeWidth = stroke, cap = cap)
+        drawLine(color, Offset(b, b), Offset(b - l, b), strokeWidth = stroke, cap = cap)
+        drawLine(color, Offset(b, b), Offset(b, b - l), strokeWidth = stroke, cap = cap)
+    }
+}
+
+/** The thin panel beside a one-handed keyboard: switch side, go back to full width, settings. */
+@Composable
+private fun OneHandedSide(h: KbHost, pal: KbPalette, modifier: Modifier) {
+    val cfg = h.cfg
+    Column(
+        modifier.fillMaxHeight(),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            Modifier.size(44.dp).clickable { h.setOneHanded(if (cfg.oneHanded == 1) 2 else 1) },
+            contentAlignment = Alignment.Center,
+        ) { SwapIcon(pal.sub, 24.dp) }
+        Box(
+            Modifier.size(44.dp).clickable { h.setOneHanded(0) },
+            contentAlignment = Alignment.Center,
+        ) { ExpandIcon(pal.sub, 24.dp) }
+        Box(
+            Modifier.size(44.dp).clickable { h.openSettings() },
+            contentAlignment = Alignment.Center,
+        ) { PathIcon(Glyph.SETTINGS.pathData, pal.sub, 22.dp) }
+    }
+}
+
+// ───────────────────────── Clipboard ─────────────────────────
+
+@Composable
+private fun ClipboardPanel(h: KbHost, pal: KbPalette, rowH: Dp) {
+    val cfg = h.cfg
+    val clips = h.clips
+    val none: (Rect, Offset) -> Unit = { _, _ -> }
+    val shape = RoundedCornerShape(cfg.keyRadius.coerceAtLeast(6).dp)
+
+    Column {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(rowH * 4),
+        ) {
+            if (clips.isEmpty()) {
+                Text(
+                    h.text(R.string.kb_clip_empty),
+                    color = pal.sub,
+                    fontSize = 14.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(24.dp),
+                )
+            } else {
+                LazyColumn(
+                    Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    items(clips, key = { it.id }) { c ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(shape)
+                                .background(if (c.pinned) pal.special else pal.key),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                c.text,
+                                color = pal.text,
+                                fontSize = 15.sp,
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { h.pasteClip(c) }
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                            )
+                            Box(
+                                Modifier.size(40.dp).clickable { h.pinClip(c) },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(if (c.pinned) "★" else "☆", color = if (c.pinned) pal.accent else pal.sub, fontSize = 20.sp)
+                            }
+                            Box(
+                                Modifier.size(40.dp).clickable { h.deleteClip(c) },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text("×", color = pal.sub, fontSize = 22.sp)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .height(rowH),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            KeyCap(
+                modifier = Modifier.weight(1.4f).fillMaxHeight(),
+                st = plainStyle(pal.special, pal.specialDown, cfg),
+                repeat = false, hasLong = false,
+                onDown = { h.feedback(KeyKind.LETTERS) },
+                onStart = none, onEnd = {},
+                onTap = { h.closeClipboard() },
+                onLong = {}, onLongMove = {}, onLongEnd = {},
+            ) {
+                Text(if (h.lang == "ar") "أب" else "ABC", color = pal.icon, fontSize = 14.sp, maxLines = 1)
+            }
+            Spacer(Modifier.weight(3f))
+            KeyCap(
+                modifier = Modifier.weight(2f).fillMaxHeight(),
+                st = plainStyle(pal.special, pal.specialDown, cfg),
+                repeat = false, hasLong = false,
+                onDown = { h.feedback(KeyKind.LETTERS) },
+                onStart = none, onEnd = {},
+                onTap = { h.clearClips() },
+                onLong = {}, onLongMove = {}, onLongEnd = {},
+            ) {
+                Text(h.text(R.string.kb_clip_clear_all), color = pal.icon, fontSize = 14.sp, maxLines = 1)
+            }
+        }
+    }
+}
+
 // ───────────────────────── Suggestions bar ─────────────────────────
 
 @Composable
 private fun SuggestionBar(h: KbHost, pal: KbPalette) {
+    val open = h.toolbarOpen
     Row(
         Modifier
             .fillMaxWidth()
@@ -468,86 +667,115 @@ private fun SuggestionBar(h: KbHost, pal: KbPalette) {
         Box(
             Modifier
                 .size(44.dp)
-                .clickable { h.openSettings() },
+                .clickable { h.setToolbar(!open) },
             contentAlignment = Alignment.Center,
         ) {
-            PathIcon(Glyph.SETTINGS.pathData, pal.sub, 20.dp)
+            if (open) {
+                Text("‹", color = pal.sub, fontSize = 26.sp)
+            } else {
+                DotsIcon(pal.sub, 22.dp)
+            }
         }
-        if (h.cfg.emojiInBar) {
+        if (open) {
+            // The tools: settings, emoji (when moved here), clipboard, one-handed mode.
+            Row(
+                Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                ToolButton(onClick = { h.openSettings() }) { PathIcon(Glyph.SETTINGS.pathData, pal.sub, 22.dp) }
+                if (h.cfg.emojiInBar) {
+                    ToolButton(onClick = { if (h.page == PG_EMOJI) h.closeEmoji() else h.showEmoji() }) {
+                        SmileyIcon(pal.sub, 24.dp)
+                    }
+                }
+                if (h.cfg.clipOn) {
+                    ToolButton(onClick = { h.showClipboard() }) { ClipboardIcon(pal.sub, 24.dp) }
+                }
+                ToolButton(onClick = { h.setOneHanded(if (h.cfg.oneHanded == 0) 1 else 0) }) {
+                    if (h.cfg.oneHanded == 0) SwapIcon(pal.sub, 24.dp) else ExpandIcon(pal.sub, 24.dp)
+                }
+            }
+        } else {
             Box(
                 Modifier
-                    .size(44.dp)
-                    .clickable { if (h.page == PG_EMOJI) h.closeEmoji() else h.showEmoji() },
+                    .weight(1f)
+                    .fillMaxHeight(),
                 contentAlignment = Alignment.Center,
             ) {
-                SmileyIcon(pal.sub, 22.dp)
-            }
-        }
-        Box(
-            Modifier
-                .weight(1f)
-                .fillMaxHeight(),
-            contentAlignment = Alignment.Center,
-        ) {
-            val alts = h.alts
-            val sug = h.suggestions
-            val hint = h.hint
-            when {
-                alts.isNotEmpty() -> Row(Modifier.fillMaxSize()) {
-                    alts.forEach { a ->
-                        Box(
-                            Modifier
-                                .weight(1f)
-                                .fillMaxHeight()
-                                .clickable { h.typeAlt(a) },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(a, color = pal.text, fontSize = 22.sp, maxLines = 1)
-                        }
-                    }
-                }
-                sug.isNotEmpty() -> Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
-                    sug.forEachIndexed { i, word ->
-                        if (i > 0) {
+                val alts = h.alts
+                val sug = h.suggestions
+                val hint = h.hint
+                when {
+                    alts.isNotEmpty() -> Row(Modifier.fillMaxSize()) {
+                        alts.forEach { a ->
                             Box(
                                 Modifier
-                                    .width(1.dp)
-                                    .fillMaxHeight(0.5f)
-                                    .background(pal.sub.copy(alpha = 0.35f)),
-                            )
-                        }
-                        Box(
-                            Modifier
-                                .weight(1f)
-                                .fillMaxHeight()
-                                .clickable { h.pickSuggestion(word) },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                word,
-                                color = pal.text,
-                                fontSize = 17.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.padding(horizontal = 6.dp),
-                            )
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .clickable { h.typeAlt(a) },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(a, color = pal.text, fontSize = 22.sp, maxLines = 1)
+                            }
                         }
                     }
+                    sug.isNotEmpty() -> Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+                        sug.forEachIndexed { i, word ->
+                            if (i > 0) {
+                                Box(
+                                    Modifier
+                                        .width(1.dp)
+                                        .fillMaxHeight(0.5f)
+                                        .background(pal.sub.copy(alpha = 0.35f)),
+                                )
+                            }
+                            Box(
+                                Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .clickable { h.pickSuggestion(word) },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    word,
+                                    color = pal.text,
+                                    fontSize = 17.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.padding(horizontal = 6.dp),
+                                )
+                            }
+                        }
+                    }
+                    hint != null -> Text(
+                        hint,
+                        color = pal.sub,
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 8.dp),
+                    )
                 }
-                hint != null -> Text(
-                    hint,
-                    color = pal.sub,
-                    fontSize = 12.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(horizontal = 8.dp),
-                )
             }
+            Spacer(Modifier.width(44.dp))
         }
-        Spacer(Modifier.width(44.dp))
     }
+}
+
+@Composable
+private fun RowScope.ToolButton(onClick: () -> Unit, content: @Composable BoxScope.() -> Unit) {
+    Box(
+        Modifier
+            .weight(1f)
+            .fillMaxHeight()
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+        content = content,
+    )
 }
 
 // ───────────────────────── Keys ─────────────────────────
