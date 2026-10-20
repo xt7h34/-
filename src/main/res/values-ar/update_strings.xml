@@ -18,7 +18,7 @@
     <string name="upd_noconfig">هذا الإصدار لا يعرف أين يبحث عن التحديثات. اكتب مستودع GitHub في الأسفل بالشكل owner/name.</string>
     <string name="upd_auto">البحث عن تحديثات عند فتح التطبيق</string>
     <string name="upd_repo">مصدر التحديث (owner/repository)</string>
-    <string name="upd_allow">للتثبيت، اسمح لكاناد بتثبيت التطبيقات في الشاشة التالية، ثم ارجع إلى هنا واضغط تثبيت الآن.</string>
+    <string name="upd_allow">للتثبيت، اسمح لكندا بتثبيت التطبيقات في الشاشة التالية، ثم ارجع إلى هنا واضغط تثبيت الآن.</string>
     <string name="upd_dialog_title">صدر إصدار جديد</string>
     <string name="upd_dialog_text">الإصدار %1$s جاهز. هل تريد تنزيله وتثبيته الآن؟</string>
 </resources>
