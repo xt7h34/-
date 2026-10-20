@@ -486,4 +486,5 @@
     <string name="sub_auto_last_low">آخر تجديد فشل: النيرو مش كفاية. هيحاول تاني لحد ما الرصيد يكفي.</string>
     <string name="sub_auto_last_err">آخر تجديد فشل. هيحاول تاني.</string>
     <string name="sub_auto_need_plan">اشترك في باقة الأول وبعدين تقدر تشغّل التجديد التلقائي.</string>
+    <string name="sub_upgrade_to">ترقية إلى %1$s \u2022 %2$s نيرو</string>
 </resources>

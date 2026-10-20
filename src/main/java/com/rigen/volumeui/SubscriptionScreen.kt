@@ -3,15 +3,24 @@ package com.rigen.volumeui
 import android.content.Context
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PageSize
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -20,6 +29,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -32,7 +42,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -247,6 +259,7 @@ fun SubscriptionPage(onBack: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SubscriptionBody(
     d: JSONObject,
@@ -303,29 +316,83 @@ private fun SubscriptionBody(
         )
     }
 
-    // ── The plans: the chosen one is bigger, the others step back ──
+    // ── Upgrade: only when a plan is running and a higher one exists ──
+    val upgrades = d.optJSONArray("upgrades").subObjects()
+    if (active && upgrades.isNotEmpty()) {
+        Section(stringResource(R.string.sub_upgrade_title)) {
+            Text(stringResource(R.string.sub_upgrade_note), style = MaterialTheme.typography.bodyMedium)
+            for (u in upgrades) {
+                val uTier = u.optString("tier")
+                val uPrice = u.optLong("price")
+                val uJson = tiers.firstOrNull { it.optString("tier") == uTier }
+                OutlinedButton(
+                    onClick = { onAsk(SubAction(SubMode.UPGRADE, uTier, "", 0, uPrice)) },
+                    enabled = !busy && balance >= uPrice,
+                    shape = RoundedCornerShape(50),
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                ) {
+                    Text(
+                        stringResource(
+                            R.string.sub_upgrade_to,
+                            uJson?.optString("emoji").orEmpty() + " " + subTierName(uTier, uJson?.optString("name").orEmpty()),
+                            subNum(uPrice),
+                        ),
+                    )
+                }
+            }
+        }
+    }
+
+    // ── The plans: a carousel. The centered card is the chosen one, the others peek from the sides ──
+    val pageW = 140
+    val pagerState = rememberPagerState(initialPage = tiers.indexOfFirst { it.optString("tier") == tier }.coerceAtLeast(0)) { tiers.size }
+    val pagerScope = rememberCoroutineScope()
+    LaunchedEffect(pagerState.currentPage) {
+        val key = tiers.getOrNull(pagerState.currentPage)?.optString("tier").orEmpty()
+        if (key.isNotEmpty() && key != tier) onTier(key)
+    }
+    val sidePad = ((LocalConfiguration.current.screenWidthDp - 72 - pageW) / 2).coerceAtLeast(0)
     Section(stringResource(R.string.sub_choose_plan)) {
+        HorizontalPager(
+            state = pagerState,
+            contentPadding = PaddingValues(horizontal = sidePad.dp),
+            pageSize = PageSize.Fixed(pageW.dp),
+            pageSpacing = 8.dp,
+            modifier = Modifier.fillMaxWidth(),
+        ) { page ->
+            val t = tiers[page]
+            val key = t.optString("tier")
+            val first = d.optJSONObject("options")?.optJSONArray(key).subObjects().firstOrNull()
+            SubTierCard(
+                emoji = t.optString("emoji"),
+                name = subTierName(key, t.optString("name")),
+                from = first?.let { stringResource(R.string.sub_from, subNum(it.optLong("price"))) }.orEmpty(),
+                badge = when {
+                    key == curTier -> stringResource(R.string.sub_badge_current)
+                    key == "pro" -> stringResource(R.string.sub_badge_popular)
+                    key == "elite" -> stringResource(R.string.sub_badge_top)
+                    else -> ""
+                },
+                selected = pagerState.currentPage == page,
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { pagerScope.launch { pagerState.animateScrollToPage(page) } },
+            )
+        }
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            for (t in tiers) {
-                val key = t.optString("tier")
-                val first = d.optJSONObject("options")?.optJSONArray(key).subObjects().firstOrNull()
-                SubTierCard(
-                    emoji = t.optString("emoji"),
-                    name = subTierName(key, t.optString("name")),
-                    from = first?.let { stringResource(R.string.sub_from, subNum(it.optLong("price"))) }.orEmpty(),
-                    badge = when {
-                        key == curTier -> stringResource(R.string.sub_badge_current)
-                        key == "pro" -> stringResource(R.string.sub_badge_popular)
-                        key == "elite" -> stringResource(R.string.sub_badge_top)
-                        else -> ""
-                    },
-                    selected = key == tier,
-                    modifier = Modifier.weight(1f),
-                    onClick = { onTier(key) },
+            for (i in tiers.indices) {
+                Box(
+                    modifier = Modifier
+                        .padding(horizontal = 3.dp)
+                        .size(if (pagerState.currentPage == i) 9.dp else 7.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (pagerState.currentPage == i) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.outlineVariant,
+                        ),
                 )
             }
         }

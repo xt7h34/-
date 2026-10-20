@@ -639,4 +639,5 @@
     <string name="sub_auto_last_low">The last renewal failed: not enough Nero. It will try again until you have enough.</string>
     <string name="sub_auto_last_err">The last renewal failed. It will try again.</string>
     <string name="sub_auto_need_plan">Get a plan first, then you can turn auto-renew on.</string>
+    <string name="sub_upgrade_to">Upgrade to %1$s \u2022 %2$s Nero</string>
 </resources>
