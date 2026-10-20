@@ -198,6 +198,8 @@ fun AccountPage(onOpen: (String) -> Unit, onBack: () -> Unit) {
     var mailError by remember { mutableStateOf("") }
     var chEmail by remember { mutableStateOf("") }
     var chPass by remember { mutableStateOf("") }
+    var chAnswer by remember { mutableStateOf("") }
+    var askQuestion by remember { mutableStateOf("") } // set when the bot asks for the security answer
     var chCode by remember { mutableStateOf("") }
 
     // What the bot says about the rewards and the prayer times, and which reminders are on.
@@ -223,6 +225,7 @@ fun AccountPage(onOpen: (String) -> Unit, onBack: () -> Unit) {
             mailStep = 0
             chEmail = ""
             chPass = ""
+            chAnswer = ""
             chCode = ""
             ClockWidgets.updateAll(ctx)
             step = Step.Done
@@ -245,6 +248,7 @@ fun AccountPage(onOpen: (String) -> Unit, onBack: () -> Unit) {
                 val ns = Session(s.token, p)
                 AccountStore.save(ctx, ns)
                 session = ns
+                askQuestion = ""
             }
         }
     }
@@ -290,6 +294,7 @@ fun AccountPage(onOpen: (String) -> Unit, onBack: () -> Unit) {
             val ns = Session(s.token, pr)
             AccountStore.save(ctx, ns)
             session = ns
+            askQuestion = ""
             return true
         }
         return false
@@ -586,6 +591,7 @@ fun AccountPage(onOpen: (String) -> Unit, onBack: () -> Unit) {
                     }
                     Section(stringResource(R.string.acc_email_section)) {
                         val masked = session?.profile?.optString("email").orEmpty()
+                        val question = askQuestion.ifBlank { session?.profile?.optString("question").orEmpty() }
                         Text(
                             if (masked.isNotBlank()) masked else stringResource(R.string.acc_email_none),
                             style = MaterialTheme.typography.bodyLarge,
@@ -613,6 +619,13 @@ fun AccountPage(onOpen: (String) -> Unit, onBack: () -> Unit) {
                             1 -> {
                                 Field(stringResource(R.string.acc_email_new), chEmail, { chEmail = it }, KeyboardType.Email)
                                 Field(stringResource(R.string.acc_pass_confirm), chPass, { chPass = it }, secret = true)
+                                if (question.isNotBlank()) {
+                                    Text(
+                                        stringResource(R.string.acc_question_label, question),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                    )
+                                    Field(stringResource(R.string.acc_answer), chAnswer, { chAnswer = it })
+                                }
                                 Text(
                                     stringResource(R.string.acc_email_change_hint),
                                     style = MaterialTheme.typography.bodySmall,
@@ -626,7 +639,7 @@ fun AccountPage(onOpen: (String) -> Unit, onBack: () -> Unit) {
                                             mailError = ""
                                             val r = KanadeApi.call(
                                                 "/me/email/start",
-                                                JSONObject().put("email", chEmail.trim()).put("password", chPass),
+                                                JSONObject().put("email", chEmail.trim()).put("password", chPass).put("answer", chAnswer),
                                                 session?.token,
                                             )
                                             busy = false
@@ -635,17 +648,21 @@ fun AccountPage(onOpen: (String) -> Unit, onBack: () -> Unit) {
                                                 chCode = ""
                                                 mailStep = 2
                                             } else {
+                                                if (r.body?.optBoolean("needAnswer") == true) {
+                                                    askQuestion = r.body?.optString("question").orEmpty()
+                                                }
                                                 mailError = r.message(ctx)
                                             }
                                         }
                                     },
-                                    enabled = !busy && chEmail.isNotBlank() && chPass.isNotEmpty(),
+                                    enabled = !busy && chEmail.isNotBlank() && chPass.isNotEmpty() && (question.isBlank() || chAnswer.isNotBlank()),
                                     modifier = Modifier.fillMaxWidth(),
                                 ) { Text(stringResource(R.string.acc_email_send)) }
                                 TextButton(
                                     onClick = {
                                         mailStep = 0
                                         chPass = ""
+                                        chAnswer = ""
                                     },
                                 ) { Text(stringResource(R.string.acc_cancel)) }
                             }
@@ -677,6 +694,7 @@ fun AccountPage(onOpen: (String) -> Unit, onBack: () -> Unit) {
                                                 mailStep = 0
                                                 chEmail = ""
                                                 chPass = ""
+                                                chAnswer = ""
                                                 chCode = ""
                                             } else {
                                                 mailError = r.message(ctx)
@@ -690,6 +708,7 @@ fun AccountPage(onOpen: (String) -> Unit, onBack: () -> Unit) {
                                     onClick = {
                                         mailStep = 0
                                         chPass = ""
+                                        chAnswer = ""
                                     },
                                 ) { Text(stringResource(R.string.acc_cancel)) }
                             }
@@ -701,6 +720,13 @@ fun AccountPage(onOpen: (String) -> Unit, onBack: () -> Unit) {
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                                 Field(stringResource(R.string.acc_pass_confirm), chPass, { chPass = it }, secret = true)
+                                if (question.isNotBlank()) {
+                                    Text(
+                                        stringResource(R.string.acc_question_label, question),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                    )
+                                    Field(stringResource(R.string.acc_answer), chAnswer, { chAnswer = it })
+                                }
                                 ErrorText(mailError)
                                 Button(
                                     onClick = {
@@ -709,7 +735,7 @@ fun AccountPage(onOpen: (String) -> Unit, onBack: () -> Unit) {
                                             mailError = ""
                                             val r = KanadeApi.call(
                                                 "/me/email/remove",
-                                                JSONObject().put("password", chPass),
+                                                JSONObject().put("password", chPass).put("answer", chAnswer),
                                                 session?.token,
                                             )
                                             busy = false
@@ -717,18 +743,23 @@ fun AccountPage(onOpen: (String) -> Unit, onBack: () -> Unit) {
                                             if (applyProfile(r)) {
                                                 mailStep = 0
                                                 chPass = ""
+                                                chAnswer = ""
                                             } else {
+                                                if (r.body?.optBoolean("needAnswer") == true) {
+                                                    askQuestion = r.body?.optString("question").orEmpty()
+                                                }
                                                 mailError = r.message(ctx)
                                             }
                                         }
                                     },
-                                    enabled = !busy && chPass.isNotEmpty(),
+                                    enabled = !busy && chPass.isNotEmpty() && (question.isBlank() || chAnswer.isNotBlank()),
                                     modifier = Modifier.fillMaxWidth(),
                                 ) { Text(stringResource(R.string.acc_email_remove)) }
                                 TextButton(
                                     onClick = {
                                         mailStep = 0
                                         chPass = ""
+                                        chAnswer = ""
                                     },
                                 ) { Text(stringResource(R.string.acc_cancel)) }
                             }

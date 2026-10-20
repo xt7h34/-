@@ -412,6 +412,8 @@
     <string name="acc_email_remove">Remove email</string>
     <string name="acc_email_new">New email</string>
     <string name="acc_pass_confirm">Your password (to confirm)</string>
+    <string name="acc_answer">Security answer</string>
+    <string name="acc_question_label">Security question: %1$s</string>
     <string name="acc_email_change_hint">A code goes to the new email. A security alert goes to your WhatsApp, and to the old email if there is one.</string>
     <string name="acc_email_code_hint">We sent a 6-digit code to the new email. It works for 10 minutes.</string>
     <string name="acc_email_send">Send the code to this email</string>

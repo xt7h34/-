@@ -369,6 +369,8 @@
     <string name="acc_email_remove">حذف الإيميل</string>
     <string name="acc_email_new">الإيميل الجديد</string>
     <string name="acc_pass_confirm">الباسوورد بتاعك (للتأكيد)</string>
+    <string name="acc_answer">إجابة سؤال الأمان</string>
+    <string name="acc_question_label">سؤال الأمان: %1$s</string>
     <string name="acc_email_change_hint">هيوصل كود على الإيميل الجديد. وتنبيه أمني هيوصل على واتساب بتاعك، وعلى الإيميل القديم لو فيه.</string>
     <string name="acc_email_code_hint">بعتنا كود من 6 أرقام على الإيميل الجديد. صالح 10 دقايق.</string>
     <string name="acc_email_send">ابعت الكود للإيميل ده</string>
