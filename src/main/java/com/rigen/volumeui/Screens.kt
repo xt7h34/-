@@ -770,6 +770,14 @@ private fun HomePage(serviceEnabled: Boolean, onOpen: (String) -> Unit) {
 
                 SettingsGroup {
                     SettingsItem(
+                        Glyph.LOCK, ICON_GREEN,
+                        stringResource(R.string.vault_title),
+                        stringResource(R.string.vault_summary),
+                    ) { onOpen("vault") }
+                }
+
+                SettingsGroup {
+                    SettingsItem(
                         Glyph.PALETTE, ICON_PINK,
                         stringResource(R.string.item_app_title),
                         stringResource(R.string.item_app_summary),
@@ -1958,6 +1966,7 @@ class MainActivity : ComponentActivity() {
                 PAGE_TYCOON -> TycoonPage(goBack)
                 // ── Keyboard ──
                 PAGE_KEYBOARD -> KeyboardPage(goBack)
+                "vault" -> VaultPage(goBack)
                 // ── Home ──
                 else -> HomePage(serviceEnabled) { page = it }
             }
