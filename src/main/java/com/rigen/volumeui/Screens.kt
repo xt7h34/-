@@ -846,7 +846,7 @@ private fun searchIndex(): List<SearchEntry> {
         SearchEntry(stringResource(R.string.ty_title), stringResource(R.string.games_title), PAGE_TYCOON),
         // ── From the first file: account pages ──
         SearchEntry(stringResource(R.string.habits_title), stringResource(R.string.account_title), PAGE_HABITS),
-        SearchEntry(stringResource(R.string.pass_title), stringResource(R.string.account_title), PAGE_PASS),
+        SearchEntry(stringResource(R.string.sub_title), stringResource(R.string.account_title), PAGE_SUBSCRIPTION),
         SearchEntry(stringResource(R.string.linked_title), stringResource(R.string.account_title), PAGE_LINKED),
     )
 }
@@ -1928,7 +1928,7 @@ class MainActivity : ComponentActivity() {
                 PAGE_PANEL, PAGE_BEHAVIOR, PAGE_STATION, PAGE_APPS -> PAGE_VOLUME
                 PAGE_CLOCK_TIME, PAGE_ALARMS, PAGE_TIMER, PAGE_STOPWATCH, PAGE_SLEEP -> PAGE_CLOCK
                 PAGE_BLOCKS, PAGE_2048, PAGE_MEMORY, PAGE_STACK, PAGE_TYCOON -> PAGE_GAMES
-                PAGE_HABITS, PAGE_PASS, PAGE_LINKED -> PAGE_ACCOUNT
+                PAGE_HABITS, PAGE_SUBSCRIPTION, PAGE_LINKED -> PAGE_ACCOUNT
                 else -> PAGE_HOME
             }
             BackHandler(enabled = page != PAGE_HOME) { page = parent }
@@ -1955,7 +1955,7 @@ class MainActivity : ComponentActivity() {
                 // ── Account ──
                 PAGE_ACCOUNT -> AccountPage({ page = it }, goBack)
                 PAGE_HABITS -> HabitsPage(goBack)
-                PAGE_PASS -> PassPage(goBack)
+                PAGE_SUBSCRIPTION -> SubscriptionPage(goBack)
                 PAGE_LINKED -> LinkedAccountsPage(goBack)
                 // ── Games ──
                 PAGE_GAMES -> GameHubPage({ page = it }, goBack)
