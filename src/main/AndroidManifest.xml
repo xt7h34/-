@@ -169,6 +169,26 @@
                 android:resource="@xml/keyboard_method" />
         </service>
 
+        <!-- Kanade Pass autofill: offered in the system's autofill settings. -->
+        <service
+            android:name=".KanadeAutofillService"
+            android:exported="true"
+            android:label="@string/af_label"
+            android:permission="android.permission.BIND_AUTOFILL_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.autofill.AutofillService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.autofill"
+                android:resource="@xml/autofill_service" />
+        </service>
+
+        <activity
+            android:name=".AutofillAuthActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true" />
+
         <!-- Gives the installer read access to the downloaded update, and nothing else. -->
         <provider
             android:name="androidx.core.content.FileProvider"
