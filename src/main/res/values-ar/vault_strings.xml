@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="vault_title">خزنة كاناد</string>
+    <string name="vault_title">خزنة كندا</string>
     <string name="vault_summary">كلمات مرورك، مقفلة على هذا الهاتف</string>
     <string name="vault_setup_intro">أنشئ كلمة مرور رئيسية. تقفل كل ما في الخزنة، على هذا الهاتف فقط.</string>
     <string name="vault_setup_warn">إذا نسيت كلمة المرور الرئيسية فلا أحد يستطيع استرجاع كلمات مرورك، ولا حتى نحن. احفظ نسخة احتياطية.</string>
@@ -18,7 +18,7 @@
     <string name="vault_unlock">فتح</string>
     <string name="vault_wrong">كلمة المرور الرئيسية خاطئة.</string>
     <string name="vault_wait">محاولات كثيرة. انتظر %1$d ثانية.</string>
-    <string name="vault_bio_title">فتح خزنة كاناد</string>
+    <string name="vault_bio_title">فتح خزنة كندا</string>
     <string name="vault_cancel">إلغاء</string>
     <string name="vault_use_bio">استخدام البصمة</string>
     <string name="vault_add">إضافة</string>
