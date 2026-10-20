@@ -124,7 +124,7 @@ fun VaultPage(onBack: () -> Unit) {
 // ───────────────────────── Fields ─────────────────────────
 
 @Composable
-private fun SecretField(label: String, value: String, modifier: Modifier = Modifier.fillMaxWidth(), onChange: (String) -> Unit) {
+internal fun SecretField(label: String, value: String, modifier: Modifier = Modifier.fillMaxWidth(), onChange: (String) -> Unit) {
     var show by remember { mutableStateOf(false) }
     OutlinedTextField(
         value = value,
@@ -209,7 +209,7 @@ private fun VaultSetup(onCreated: () -> Unit) {
 // ───────────────────────── Locked ─────────────────────────
 
 @Composable
-private fun VaultLocked() {
+internal fun VaultLocked() {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var pw by remember { mutableStateOf("") }
@@ -334,6 +334,7 @@ private fun EntryDialog(initial: VaultEntry, isNew: Boolean, onClose: () -> Unit
     var user by remember { mutableStateOf(initial.user) }
     var pw by remember { mutableStateOf(initial.password) }
     var url by remember { mutableStateOf(initial.url) }
+    var app by remember { mutableStateOf(initial.app) }
     var notes by remember { mutableStateOf(initial.notes) }
     var generating by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
@@ -373,6 +374,11 @@ private fun EntryDialog(initial: VaultEntry, isNew: Boolean, onClose: () -> Unit
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
+                    value = app, onValueChange = { app = it.trim().take(200) },
+                    label = { Text(stringResource(R.string.vault_f_app)) }, singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
                     value = notes, onValueChange = { notes = it.take(2000) },
                     label = { Text(stringResource(R.string.vault_f_notes)) }, minLines = 2,
                     modifier = Modifier.fillMaxWidth(),
@@ -382,7 +388,7 @@ private fun EntryDialog(initial: VaultEntry, isNew: Boolean, onClose: () -> Unit
         confirmButton = {
             TextButton(
                 onClick = {
-                    Vault.upsert(ctx, initial.copy(title = title.trim(), user = user.trim(), password = pw, url = url.trim(), notes = notes))
+                    Vault.upsert(ctx, initial.copy(title = title.trim(), user = user.trim(), password = pw, url = url.trim(), notes = notes, app = app))
                     onClose()
                 },
                 enabled = title.isNotBlank(),
@@ -493,7 +499,39 @@ private fun VaultSettings(onDestroyed: () -> Unit) {
         }
     }
 
+    val autofill = remember { ctx.getSystemService(android.view.autofill.AutofillManager::class.java) }
+    var autofillOn by remember { mutableStateOf(autofill?.hasEnabledAutofillServices() == true) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            autofillOn = autofill?.hasEnabledAutofillServices() == true
+            delay(1500)
+        }
+    }
+
     Section(stringResource(R.string.vault_settings)) {
+        Text(stringResource(R.string.vault_af), style = MaterialTheme.typography.titleSmall)
+        Text(
+            stringResource(if (autofillOn) R.string.vault_af_on else R.string.vault_af_off),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (!autofillOn) {
+            Button(
+                onClick = {
+                    try {
+                        ctx.startActivity(
+                            android.content.Intent(
+                                android.provider.Settings.ACTION_REQUEST_SET_AUTOFILL_SERVICE,
+                                android.net.Uri.parse("package:${ctx.packageName}"),
+                            ),
+                        )
+                    } catch (e: Exception) {
+                        ctx.startActivity(android.content.Intent(android.provider.Settings.ACTION_SETTINGS))
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text(stringResource(R.string.vault_af_enable)) }
+        }
         SwitchRow(stringResource(R.string.vault_lock_leave), lockLeave) {
             lockLeave = it
             VaultPrefs.setLockOnLeave(ctx, it)

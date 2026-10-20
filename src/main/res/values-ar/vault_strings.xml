@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="vault_title">خزنة كندا</string>
+    <string name="vault_title">كندا باس</string>
     <string name="vault_summary">كلمات مرورك، مقفلة على هذا الهاتف</string>
     <string name="vault_setup_intro">أنشئ كلمة مرور رئيسية. تقفل كل ما في الخزنة، على هذا الهاتف فقط.</string>
     <string name="vault_setup_warn">إذا نسيت كلمة المرور الرئيسية فلا أحد يستطيع استرجاع كلمات مرورك، ولا حتى نحن. احفظ نسخة احتياطية.</string>
@@ -18,7 +18,7 @@
     <string name="vault_unlock">فتح</string>
     <string name="vault_wrong">كلمة المرور الرئيسية خاطئة.</string>
     <string name="vault_wait">محاولات كثيرة. انتظر %1$d ثانية.</string>
-    <string name="vault_bio_title">فتح خزنة كندا</string>
+    <string name="vault_bio_title">فتح كندا باس</string>
     <string name="vault_cancel">إلغاء</string>
     <string name="vault_use_bio">استخدام البصمة</string>
     <string name="vault_add">إضافة</string>
@@ -64,4 +64,21 @@
     <string name="vault_destroy">حذف الخزنة</string>
     <string name="vault_destroy_confirm">اضغط مرة أخرى لحذف الخزنة وكل كلمات المرور فيها نهائياً</string>
     <string name="vault_privacy">كل شيء يبقى على هذا الهاتف ومشفّراً. لا يُرسل شيء إلى أي مكان. لقطات الشاشة محجوبة أثناء فتح الخزنة، وتُقفل عند مغادرتك.</string>
+
+    <string name="vault_f_app">التطبيق المرتبط (اسم الحزمة، اختياري)</string>
+    <string name="vault_af">الملء التلقائي في التطبيقات الأخرى</string>
+    <string name="vault_af_on">كندا باس هو خدمة الملء التلقائي لديك. يملأ ويحفظ بيانات الدخول في التطبيقات والمواقع الأخرى.</string>
+    <string name="vault_af_off">فعّله لملء وحفظ بيانات الدخول في التطبيقات والمواقع الأخرى. سيطلب منك أندرويد التأكيد.</string>
+    <string name="vault_af_enable">تفعيل الملء التلقائي</string>
+    <string name="af_label">كندا باس</string>
+    <string name="af_unlock">فتح كندا باس</string>
+    <string name="af_fill_for">ملء بيانات الدخول إلى %1$s</string>
+    <string name="af_matching">حسابات مطابقة</string>
+    <string name="af_others">حسابات أخرى</string>
+    <string name="af_none">لا يوجد حساب محفوظ لهذا بعد. اختر حساباً لملئه، وسيتذكره كندا باس لهذا التطبيق.</string>
+    <string name="af_save_title">الحفظ في كندا باس؟</string>
+    <string name="af_save_new">حفظ بيانات الدخول إلى %1$s.</string>
+    <string name="af_save_update">سيُحدَّث الحساب المحفوظ لـ %1$s بكلمة المرور هذه.</string>
+    <string name="af_saved">تم الحفظ في كندا باس.</string>
+    <string name="af_expired">انتهت صلاحية طلب الحفظ هذا. سجّل الدخول مرة أخرى واختر حفظ.</string>
 </resources>

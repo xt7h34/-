@@ -26,6 +26,8 @@ internal data class VaultEntry(
     val url: String,
     val notes: String,
     val ts: Long,
+    /** The package name of the app this account is for, so autofill can find it. */
+    val app: String = "",
 ) {
     companion object {
         fun blank() = VaultEntry(UUID.randomUUID().toString(), "", "", "", "", "", System.currentTimeMillis())
@@ -233,7 +235,7 @@ internal object Vault {
             out.add(
                 VaultEntry(
                     o.getString("id"), o.optString("t"), o.optString("u"), o.optString("p"),
-                    o.optString("l"), o.optString("n"), o.optLong("s"),
+                    o.optString("l"), o.optString("n"), o.optLong("s"), o.optString("a"),
                 ),
             )
         }
@@ -245,7 +247,7 @@ internal object Vault {
         for (e in list) {
             arr.put(
                 JSONObject().put("id", e.id).put("t", e.title).put("u", e.user).put("p", e.password)
-                    .put("l", e.url).put("n", e.notes).put("s", e.ts),
+                    .put("l", e.url).put("n", e.notes).put("s", e.ts).put("a", e.app),
             )
         }
         val (iv, ct) = VaultCrypto.encrypt(k, JSONObject().put("entries", arr).toString().toByteArray())
@@ -262,4 +264,27 @@ internal object Vault {
             tmp.delete()
         }
     }
+}
+
+// ───────────────────────── Which account is for which app or site ─────────────────────────
+
+/** The site name inside an address, without "www". */
+internal fun vaultHost(url: String): String? {
+    val t = url.trim().lowercase()
+    if (t.isEmpty()) return null
+    val withScheme = if (t.contains("://")) t else "https://$t"
+    val host = try {
+        java.net.URI(withScheme).host
+    } catch (e: Exception) {
+        null
+    } ?: return null
+    return host.removePrefix("www.")
+}
+
+/** An account matches an app by its package name, or a website by its address. */
+internal fun vaultMatches(e: VaultEntry, pkg: String, domain: String?): Boolean {
+    if (pkg.isNotEmpty() && e.app.isNotEmpty() && e.app == pkg) return true
+    if (domain.isNullOrEmpty()) return false
+    val h = vaultHost(e.url) ?: return false
+    return domain == h || domain.endsWith(".$h")
 }
