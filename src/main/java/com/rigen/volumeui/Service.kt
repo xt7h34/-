@@ -182,10 +182,16 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
     // Which app is in front, for the per-app rules.
     private var foregroundPackage: String? = null
     private var floatingTimer: FloatingTimer? = null
+    private var reelsBadge: ReelsBadge? = null
 
     /** Called by the Clock section whenever the timer starts, pauses, ends or its settings change. */
     fun refreshFloatingTimer() {
         handler.post { floatingTimer?.refresh() }
+    }
+
+    /** Called by the Reels page when the counter, the on-screen brain or the counted apps change. */
+    fun refreshReelsBadge() {
+        handler.post { reelsBadge?.refresh() }
     }
     private val launchableCache = mutableMapOf<String, Boolean>()
 
@@ -251,6 +257,7 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
         super.onServiceConnected()
         instance = this
         floatingTimer = FloatingTimer(this)
+        reelsBadge = ReelsBadge(this)
         Diag.mark(this, "svc_connected")
     }
 
@@ -268,13 +275,21 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         try {
-            if (event == null || event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+            if (event == null) return
+            if (event.eventType == AccessibilityEvent.TYPE_VIEW_SCROLLED) {
+                handleScroll(event)
+                return
+            }
+            if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
             val pkg = event.packageName?.toString() ?: return
             if (pkg == packageName) {
                 // Our own overlay windows (the floating timer, the volume panel) fire window events
                 // too. If those counted as "our app is in front", the floating timer would remove
                 // itself the moment it appeared. Only the real app screen counts.
-                if (event.className?.toString() == MainActivity::class.java.name) floatingTimer?.onForeground(pkg)
+                if (event.className?.toString() == MainActivity::class.java.name) {
+                    floatingTimer?.onForeground(pkg)
+                    reelsBadge?.onForeground(pkg)
+                }
                 return
             }
             // Ignore the system UI and anything that is not a normal app (keyboards...).
@@ -282,9 +297,34 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
             if (!isLaunchable(pkg)) return
             foregroundPackage = pkg
             floatingTimer?.onForeground(pkg)
+            ReelsEngine.onForeground(pkg)
+            reelsBadge?.onForeground(pkg)
         } catch (e: Throwable) {
             logError("onAccessibilityEvent", e)
         }
+    }
+
+    /**
+     * Counts short videos from scroll events in the apps we track. Only the kind of scroll is looked at
+     * (never the screen content), and the events of every other app are dropped right away.
+     */
+    private fun handleScroll(event: AccessibilityEvent) {
+        val pkg = event.packageName?.toString() ?: return
+        if (ReelsStore.appOf(pkg) == null) return
+        if (!ReelsStore.enabled(this) && !ReelsStore.diagOn(this)) return
+        val api28 = Build.VERSION.SDK_INT >= 28
+        val sample = ReelsSample(
+            pkg = pkg,
+            className = event.className?.toString() ?: "",
+            from = event.fromIndex,
+            to = event.toIndex,
+            items = event.itemCount,
+            scrollY = event.scrollY,
+            deltaY = if (api28) event.scrollDeltaY else 0,
+            deltaX = if (api28) event.scrollDeltaX else 0,
+            screenH = resources.displayMetrics.heightPixels,
+        )
+        ReelsEngine.onScroll(applicationContext, sample, System.currentTimeMillis())
     }
 
     private fun isLaunchable(pkg: String): Boolean =
@@ -918,6 +958,8 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
         removePanel()
         floatingTimer?.remove()
         floatingTimer = null
+        reelsBadge?.remove()
+        reelsBadge = null
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)

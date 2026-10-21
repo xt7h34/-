@@ -754,6 +754,12 @@ private fun HomePage(serviceEnabled: Boolean, onOpen: (String) -> Unit) {
 
                 SettingsGroup {
                     SettingsItem(
+                        Glyph.BRAIN, ICON_PINK,
+                        stringResource(R.string.reels_title),
+                        stringResource(R.string.reels_summary),
+                    ) { onOpen(PAGE_REELS) }
+                    ItemDivider()
+                    SettingsItem(
                         Glyph.GAMES, ICON_PURPLE,
                         stringResource(R.string.games_title),
                         stringResource(R.string.games_summary),
@@ -1929,6 +1935,7 @@ class MainActivity : ComponentActivity() {
                 PAGE_CLOCK_TIME, PAGE_ALARMS, PAGE_TIMER, PAGE_STOPWATCH, PAGE_SLEEP -> PAGE_CLOCK
                 PAGE_BLOCKS, PAGE_2048, PAGE_MEMORY, PAGE_STACK, PAGE_TYCOON -> PAGE_GAMES
                 PAGE_HABITS, PAGE_SUBSCRIPTION, PAGE_LINKED -> PAGE_ACCOUNT
+                PAGE_REELS_DIAG -> PAGE_REELS
                 else -> PAGE_HOME
             }
             BackHandler(enabled = page != PAGE_HOME) { page = parent }
@@ -1964,6 +1971,9 @@ class MainActivity : ComponentActivity() {
                 PAGE_MEMORY -> MemoryGamePage(goBack)
                 PAGE_STACK -> StackGamePage(goBack)
                 PAGE_TYCOON -> TycoonPage(goBack)
+                // ── Reels counter ──
+                PAGE_REELS -> ReelsPage(serviceEnabled, { page = it }, goBack)
+                PAGE_REELS_DIAG -> ReelsDiagPage(goBack)
                 // ── Keyboard ──
                 PAGE_KEYBOARD -> KeyboardPage(goBack)
                 "vault" -> VaultPage(goBack)

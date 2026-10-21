@@ -68,6 +68,9 @@ const val PAGE_STACK = "stack"
 const val PAGE_TYCOON = "tycoon"
 // Keyboard page
 const val PAGE_KEYBOARD = "keyboard"
+// Reels counter pages
+const val PAGE_REELS = "reels"
+const val PAGE_REELS_DIAG = "reels_diag"
 
 // Looks of the volume panel.
 const val STYLE_CLASSIC = 0
@@ -136,6 +139,7 @@ enum class Glyph(val pathData: String) {
     LOCK("M18,8h-1V6c0,-2.76 -2.24,-5 -5,-5S7,3.24 7,6v2H6c-1.1,0 -2,0.9 -2,2v10c0,1.1 0.9,2 2,2h12c1.1,0 2,-0.9 2,-2V10c0,-1.1 -0.9,-2 -2,-2zM12,17c-1.1,0 -2,-0.9 -2,-2s0.9,-2 2,-2 2,0.9 2,2 -0.9,2 -2,2zM9,8V6c0,-1.66 1.34,-3 3,-3s3,1.34 3,3v2H9z"),
     KEYBOARD("M20,5H4c-1.1,0 -1.99,0.9 -1.99,2L2,17c0,1.1 0.9,2 2,2h16c1.1,0 2,-0.9 2,-2V7c0,-1.1 -0.9,-2 -2,-2zM11,8h2v2h-2V8zM11,11h2v2h-2v-2zM8,8h2v2H8V8zM8,11h2v2H8v-2zM7,13H5v-2h2v2zM7,10H5V8h2v2zM16,17H8v-2h8v2zM16,13h-2v-2h2v2zM16,10h-2V8h2v2zM19,13h-2v-2h2v2zM19,10h-2V8h2v2z"),
     FACTORY("M2,20V9l6,4V9l6,4V5h4v15z"),
+    BRAIN("M12,3.2c-1.5,-1.3 -3.9,-1.1 -5,0.6c-1.8,0.1 -3.1,1.8 -2.7,3.5c-1.2,1 -1.4,2.9 -0.5,4.2c-0.7,1.5 -0.1,3.3 1.3,4.1c0.2,1.8 1.9,3.1 3.6,2.7c0.8,1.1 2.3,1.5 3.3,0.8zM12,3.2c1.5,-1.3 3.9,-1.1 5,0.6c1.8,0.1 3.1,1.8 2.7,3.5c1.2,1 1.4,2.9 0.5,4.2c0.7,1.5 0.1,3.3 -1.3,4.1c-0.2,1.8 -1.9,3.1 -3.6,2.7c-0.8,1.1 -2.3,1.5 -3.3,0.8z"),
 }
 
 class StreamInfo(val stream: Int, val glyph: Glyph, val labelRes: Int)
