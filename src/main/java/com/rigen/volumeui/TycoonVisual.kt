@@ -117,10 +117,12 @@ private class Iso(val ox: Float, val oy: Float, val u: Float) {
     fun o(gx: Float, gy: Float, gz: Float = 0f) = Offset(x(gx, gy), y(gx, gy, gz))
 }
 
-private fun DrawScope.poly(vararg p: Offset, color: Color) {
+private fun DrawScope.poly(a: Offset, b: Offset, c: Offset, d: Offset, color: Color) {
     val path = Path()
-    path.moveTo(p[0].x, p[0].y)
-    for (i in 1 until p.size) path.lineTo(p[i].x, p[i].y)
+    path.moveTo(a.x, a.y)
+    path.lineTo(b.x, b.y)
+    path.lineTo(c.x, c.y)
+    path.lineTo(d.x, d.y)
     path.close()
     drawPath(path, color)
 }
