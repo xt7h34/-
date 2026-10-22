@@ -73,22 +73,26 @@ object ReelsStore {
     private fun sp(c: Context) =
         c.applicationContext.getSharedPreferences("kanade_reels", Context.MODE_PRIVATE)
 
-    private fun changed() {
+    /** Something changed: redraw the open screens, the floating brain, the lock and the widget. */
+    private fun changed(c: Context) {
         tick++
-        VolumeAccessibilityService.instance?.refreshReelsBadge()
+        val svc = VolumeAccessibilityService.instance
+        svc?.refreshReelsBadge()
+        svc?.refreshReelsLock()
+        ReelsWidgetUpdater.requestUpdate(c)
     }
 
     // ── Settings (counting is off until the person turns it on) ──
     fun enabled(c: Context): Boolean = sp(c).getBoolean("on", false)
     fun setEnabled(c: Context, v: Boolean) {
         sp(c).edit().putBoolean("on", v).apply()
-        changed()
+        changed(c)
     }
 
     fun overlay(c: Context): Boolean = sp(c).getBoolean("overlay", true)
     fun setOverlay(c: Context, v: Boolean) {
         sp(c).edit().putBoolean("overlay", v).apply()
-        changed()
+        changed(c)
     }
 
     fun apps(c: Context): Set<String> =
@@ -98,26 +102,73 @@ object ReelsStore {
         val s = apps(c).toMutableSet()
         if (on) s.add(key) else s.remove(key)
         sp(c).edit().putString("apps", s.joinToString(",")).apply()
-        changed()
+        changed(c)
     }
 
     fun limit(c: Context): Int = sp(c).getInt("limit", 100)
     fun setLimit(c: Context, v: Int) {
         sp(c).edit().putInt("limit", v.coerceIn(10, 1000)).apply()
-        changed()
+        changed(c)
     }
 
     fun secPerReel(c: Context): Int = sp(c).getInt("sec", 25)
     fun setSecPerReel(c: Context, v: Int) {
         sp(c).edit().putInt("sec", v.coerceIn(5, 120)).apply()
-        changed()
+        changed(c)
     }
 
     /** Calibration mode: keeps a short in-memory log of the scroll events (never saved). */
     fun diagOn(c: Context): Boolean = sp(c).getBoolean("diag", false)
     fun setDiagOn(c: Context, v: Boolean) {
         sp(c).edit().putBoolean("diag", v).apply()
-        changed()
+        changed(c)
+    }
+
+    // ── Lock when the daily limit is reached ──
+    /** After a lock ends, this many more videos are allowed before the next lock. */
+    const val LOCK_GRACE = 10
+
+    fun lockOn(c: Context): Boolean = sp(c).getBoolean("lock", false)
+    fun setLockOn(c: Context, v: Boolean) {
+        sp(c).edit().putBoolean("lock", v).apply()
+        changed(c)
+    }
+
+    fun lockMinutes(c: Context): Int = sp(c).getInt("lockMin", 60)
+    fun setLockMinutes(c: Context, v: Int) {
+        sp(c).edit().putInt("lockMin", v.coerceIn(5, 720)).apply()
+        changed(c)
+    }
+
+    fun lockUntil(c: Context): Long = sp(c).getLong("lockUntil", 0L)
+
+    fun isLocked(c: Context, now: Long): Boolean = lockOn(c) && lockUntil(c) > now
+
+    /**
+     * Starts the lock when today's [total] reached the limit (or, after a lock ended, the limit plus
+     * the videos watched since). Returns true if the apps are locked right now.
+     */
+    fun startLockIfNeeded(c: Context, total: Int, now: Long): Boolean {
+        if (!lockOn(c)) return false
+        if (lockUntil(c) > now) return true
+        val p = sp(c)
+        val day = dayKey(now)
+        val lim = limit(c)
+        val at = if (p.getString("lockDay", "") == day) p.getInt("lockAt", lim) else lim
+        if (total < at) return false
+        p.edit()
+            .putLong("lockUntil", now + lockMinutes(c) * 60_000L)
+            .putString("lockDay", day)
+            .putInt("lockAt", total + LOCK_GRACE)
+            .apply()
+        return true
+    }
+
+    // ── Sharing the daily totals with the bot (off until turned on) ──
+    fun syncOn(c: Context): Boolean = sp(c).getBoolean("sync", false)
+    fun setSyncOn(c: Context, v: Boolean) {
+        sp(c).edit().putBoolean("sync", v).apply()
+        changed(c)
     }
 
     fun appOf(pkg: String): ReelsApp? = REELS_APPS.firstOrNull { pkg in it.packages }
@@ -212,8 +263,11 @@ object ReelsStore {
 
         save(c, ReelsDay(key, counts, hours, sess, now))
         if (sess.size == 1 && sess[0].count == 1) prune(c)
-        changed()
-        return counts.values.sum()
+        val total = counts.values.sum()
+        startLockIfNeeded(c, total, now)
+        changed(c)
+        ReelsSync.request(c)
+        return total
     }
 
     /** Forgets days older than [KEEP_DAYS] (runs once a day, on the first video of the day). */
@@ -233,7 +287,7 @@ object ReelsStore {
         val e = p.edit()
         p.all.keys.filter { it.startsWith("d_") }.forEach { e.remove(it) }
         e.apply()
-        changed()
+        changed(c)
     }
 }
 

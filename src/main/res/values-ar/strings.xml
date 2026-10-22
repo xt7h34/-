@@ -537,4 +537,24 @@
     <string name="rw_empty">لسه مفيش حاجة اتعدّت. فعّل العدّاد واتفرج شوية.</string>
     <string name="rw_share">مشاركة</string>
     <string name="rw_share_text">مخي في الفترة دي: %1$d فيديو قصير، وضاع حوالي %2$d دقيقة. اتعدّت بـ Kanade.</string>
+    <string name="reels_lock_section">القفل</string>
+    <string name="reels_lock_enable">اقفل التطبيقات لما توصل للحد</string>
+    <string name="reels_lock_minutes">مدة القفل (دقيقة)</string>
+    <string name="reels_lock_title">وصلت حدك اليومي</string>
+    <string name="reels_lock_sub">اتفرجت على %1$d فيديو قصير النهاردة. خد استراحة.</string>
+    <string name="reels_lock_left_label">لحد ما يتفتح تاني</string>
+    <string name="reels_lock_home">ارجع للهوم</string>
+    <string name="reels_lock_status">مقفول لحد %1$s</string>
+    <string name="reels_left_n">فاضل %1$d</string>
+    <string name="reels_sync_title">البوت</string>
+    <string name="reels_sync_enable">شارك إجمالي يومي مع البوت</string>
+    <string name="reels_sync_hint">بيتبعت العدد اليومي بس، ومش اللي بتتفرج عليه. بيخليك تشوف ترتيبك في البوت وفي Wrapped. ولما تقفله البوت بيمسح اللي كان محتفظ بيه.</string>
+    <string name="reels_sync_signin">سجّل دخول بحساب كندا الأول (صفحة الحساب)</string>
+    <string name="reels_loading">بجيب ترتيبك...</string>
+    <string name="rw_label_everyone">أنت مقابل كل مستخدمي كندا</string>
+    <string name="rw_everyone_pre">اتفرجت أكتر من</string>
+    <string name="rw_everyone_post">من مستخدمي كندا</string>
+    <string name="widget_reels_label">مخ كندا</string>
+    <string name="widget_reels_desc">عدد الفيديوهات القصيرة النهاردة وحالة مخك.</string>
+    <string name="widget_reels_off">العدّاد مقفول</string>
 </resources>

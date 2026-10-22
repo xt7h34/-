@@ -183,6 +183,7 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
     private var foregroundPackage: String? = null
     private var floatingTimer: FloatingTimer? = null
     private var reelsBadge: ReelsBadge? = null
+    private var reelsLock: ReelsLock? = null
 
     /** Called by the Clock section whenever the timer starts, pauses, ends or its settings change. */
     fun refreshFloatingTimer() {
@@ -192,6 +193,11 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
     /** Called by the Reels page when the counter, the on-screen brain or the counted apps change. */
     fun refreshReelsBadge() {
         handler.post { reelsBadge?.refresh() }
+    }
+
+    /** Called when the lock starts, ends or is switched on or off. */
+    fun refreshReelsLock() {
+        handler.post { reelsLock?.refresh() }
     }
     private val launchableCache = mutableMapOf<String, Boolean>()
 
@@ -258,6 +264,7 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
         instance = this
         floatingTimer = FloatingTimer(this)
         reelsBadge = ReelsBadge(this)
+        reelsLock = ReelsLock(this)
         Diag.mark(this, "svc_connected")
     }
 
@@ -289,6 +296,7 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
                 if (event.className?.toString() == MainActivity::class.java.name) {
                     floatingTimer?.onForeground(pkg)
                     reelsBadge?.onForeground(pkg)
+                    reelsLock?.onForeground(pkg)
                 }
                 return
             }
@@ -299,6 +307,7 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
             floatingTimer?.onForeground(pkg)
             ReelsEngine.onForeground(pkg)
             reelsBadge?.onForeground(pkg)
+            reelsLock?.onForeground(pkg)
         } catch (e: Throwable) {
             logError("onAccessibilityEvent", e)
         }
@@ -960,6 +969,8 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
         floatingTimer = null
         reelsBadge?.remove()
         reelsBadge = null
+        reelsLock?.remove()
+        reelsLock = null
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)

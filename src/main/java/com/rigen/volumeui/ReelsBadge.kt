@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -160,7 +161,9 @@ private fun ReelsBadgeContent(onDrag: (Float, Float) -> Unit, onOpen: () -> Unit
     val ctx = LocalContext.current
     val t = ReelsStore.tick // read so the badge redraws on every new count
     val today = remember(t) { ReelsStore.today(ctx) }
-    val level = reelsLevel(today.total, ReelsStore.limit(ctx))
+    val limit = ReelsStore.limit(ctx)
+    val level = reelsLevel(today.total, limit)
+    val remaining = limit - today.total
 
     // A small pop each time the count goes up.
     val pop = remember { Animatable(1f) }
@@ -208,6 +211,16 @@ private fun ReelsBadgeContent(onDrag: (Float, Float) -> Unit, onOpen: () -> Unit
                     color = Color.White,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Black,
+                )
+            }
+            // A heads-up when the limit is close.
+            if (remaining in 1..maxOf(5, limit / 10)) {
+                Text(
+                    text = stringResource(R.string.reels_left_n, remaining),
+                    color = Color(0xFFFFB74D),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.offset(y = (-4).dp),
                 )
             }
         }

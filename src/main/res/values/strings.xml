@@ -690,4 +690,24 @@
     <string name="rw_empty">Nothing counted yet. Turn the counter on and scroll a bit.</string>
     <string name="rw_share">Share</string>
     <string name="rw_share_text">My brain this period: %1$d short videos, about %2$d minutes gone. Counted with Kanade.</string>
+    <string name="reels_lock_section">Lock</string>
+    <string name="reels_lock_enable">Lock the apps when the limit is reached</string>
+    <string name="reels_lock_minutes">Lock for (minutes)</string>
+    <string name="reels_lock_title">Daily limit reached</string>
+    <string name="reels_lock_sub">You watched %1$d short videos today. Take a break.</string>
+    <string name="reels_lock_left_label">until it opens again</string>
+    <string name="reels_lock_home">Go home</string>
+    <string name="reels_lock_status">Locked until %1$s</string>
+    <string name="reels_left_n">%1$d left</string>
+    <string name="reels_sync_title">Bot</string>
+    <string name="reels_sync_enable">Share my daily totals with the bot</string>
+    <string name="reels_sync_hint">Only the daily counts are sent, never what you watch. It lets you see your rank in the bot and in Wrapped. Turning it off deletes what the bot kept.</string>
+    <string name="reels_sync_signin">Sign in to your Kanade account first (Account page)</string>
+    <string name="reels_loading">Getting your rank...</string>
+    <string name="rw_label_everyone">YOU VS EVERYONE ON KANADE</string>
+    <string name="rw_everyone_pre">You scrolled more than</string>
+    <string name="rw_everyone_post">of Kanade users</string>
+    <string name="widget_reels_label">Kanade brain</string>
+    <string name="widget_reels_desc">Your short-video count for today and how your brain feels.</string>
+    <string name="widget_reels_off">Counter is off</string>
 </resources>

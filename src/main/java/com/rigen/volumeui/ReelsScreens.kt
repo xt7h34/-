@@ -38,6 +38,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -62,6 +64,7 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import kotlin.math.abs
+import kotlinx.coroutines.launch
 
 // ═════════════════════════════ The Reels page ═════════════════════════════
 
@@ -77,15 +80,44 @@ fun ReelsPage(serviceEnabled: Boolean, onOpen: (String) -> Unit, goBack: () -> U
     val sec = remember(t) { ReelsStore.secPerReel(ctx) }
     val week = remember(t) { ReelsStore.lastDays(ctx, 7) }
     var wrapped by remember { mutableIntStateOf(0) } // 0 = closed, 1 = today, 2 = this week
+    val scope = rememberCoroutineScope()
+    val syncOn = remember(t) { ReelsStore.syncOn(ctx) }
+    val lockOn = remember(t) { ReelsStore.lockOn(ctx) }
+    val lockMin = remember(t) { ReelsStore.lockMinutes(ctx) }
+    val lockUntil = remember(t) { ReelsStore.lockUntil(ctx) }
+    val signedIn = remember(t) { AccountStore.load(ctx) != null }
+    var rank by remember { mutableStateOf<Int?>(null) }
+    var rankReady by remember { mutableStateOf(false) }
+
+    // Before the story opens, ask the bot how this person ranks (only when sharing is on).
+    LaunchedEffect(wrapped) {
+        if (wrapped != 0) {
+            rankReady = false
+            rank = null
+            if (syncOn && signedIn) rank = ReelsSync.pushAndRank(ctx, if (wrapped == 2) "week" else "day")
+            rankReady = true
+        }
+    }
 
     if (wrapped != 0) {
         BackHandler { wrapped = 0 }
-        val data = if (wrapped == 1) {
-            ReelsWrappedData(listOf(today), ReelsStore.lastDays(ctx, 1, 1), sec, limit)
+        if (!rankReady) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(Color(0xFF14141C)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(stringResource(R.string.reels_loading), color = Color.White, fontSize = 18.sp)
+            }
         } else {
-            ReelsWrappedData(week, ReelsStore.lastDays(ctx, 7, 7), sec, limit)
+            val data = if (wrapped == 1) {
+                ReelsWrappedData(listOf(today), ReelsStore.lastDays(ctx, 1, 1), sec, limit, rank)
+            } else {
+                ReelsWrappedData(week, ReelsStore.lastDays(ctx, 7, 7), sec, limit, rank)
+            }
+            ReelsWrapped(data) { wrapped = 0 }
         }
-        ReelsWrapped(data) { wrapped = 0 }
         return
     }
 
@@ -220,6 +252,41 @@ fun ReelsPage(serviceEnabled: Boolean, onOpen: (String) -> Unit, goBack: () -> U
                     stringResource(R.string.reels_sec), sec.toString(),
                     onMinus = { ReelsStore.setSecPerReel(ctx, sec - 5) },
                     onPlus = { ReelsStore.setSecPerReel(ctx, sec + 5) },
+                )
+            }
+
+            Section(stringResource(R.string.reels_lock_section)) {
+                SwitchRow(stringResource(R.string.reels_lock_enable), lockOn) { ReelsStore.setLockOn(ctx, it) }
+                ReelsStepper(
+                    stringResource(R.string.reels_lock_minutes), lockMin.toString(),
+                    onMinus = { ReelsStore.setLockMinutes(ctx, lockMin - 15) },
+                    onPlus = { ReelsStore.setLockMinutes(ctx, lockMin + 15) },
+                )
+                if (lockOn && lockUntil > System.currentTimeMillis()) {
+                    Text(
+                        stringResource(
+                            R.string.reels_lock_status,
+                            SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(lockUntil)),
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            Section(stringResource(R.string.reels_sync_title)) {
+                SwitchRow(stringResource(R.string.reels_sync_enable), syncOn) { on ->
+                    if (!on || signedIn) {
+                        ReelsStore.setSyncOn(ctx, on)
+                        scope.launch {
+                            if (on) ReelsSync.pushNow(ctx) else ReelsSync.clearRemote(ctx)
+                        }
+                    }
+                }
+                Text(
+                    stringResource(if (signedIn) R.string.reels_sync_hint else R.string.reels_sync_signin),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
@@ -358,6 +425,8 @@ class ReelsWrappedData(
     val prev: List<ReelsDay>,
     val secPerReel: Int,
     val limit: Int,
+    /** "You scrolled more than N% of the people on Kanade", or null when the bot has no answer. */
+    val everyone: Int? = null,
 )
 
 private class RwStats(d: ReelsWrappedData) {
@@ -375,6 +444,7 @@ private class RwStats(d: ReelsWrappedData) {
     val minutes: Int = (total.toLong() * d.secPerReel / 60L).toInt()
     val peak: Int = hours.indices.maxByOrNull { hours[it] } ?: 0
     val limit: Int = d.limit
+    val everyone: Int? = d.everyone
     val level: Int = reelsLevel(if (d.days.size > 1) total / d.days.size else total, d.limit)
 }
 
@@ -387,6 +457,7 @@ private const val RW_PEAK = 5
 private const val RW_LONGEST = 6
 private const val RW_VS = 7
 private const val RW_VERDICT = 8
+private const val RW_EVERYONE = 9
 
 private val RW_CREAM = Color(0xFFFAE8BD)
 private val RW_RED = Color(0xFFE85555)
@@ -395,7 +466,11 @@ private fun rwKinds(s: RwStats): List<Int> =
     if (s.total == 0) {
         listOf(RW_EMPTY)
     } else {
-        listOf(RW_TOTAL, RW_WHERE, RW_PULLED, RW_TIME, RW_PEAK, RW_LONGEST, RW_VS, RW_VERDICT)
+        listOfNotNull(
+            RW_TOTAL, RW_WHERE, RW_PULLED, RW_TIME, RW_PEAK, RW_LONGEST, RW_VS,
+            if (s.everyone != null) RW_EVERYONE else null,
+            RW_VERDICT,
+        )
     }
 
 private fun rwBrush(kind: Int): Brush {
@@ -408,6 +483,7 @@ private fun rwBrush(kind: Int): Brush {
         RW_LONGEST -> 0xFF7A2E6B to 0xFF260F22
         RW_VS -> 0xFF2F5D3A to 0xFF0F2214
         RW_VERDICT -> 0xFF5A1F24 to 0xFF1D0B0D
+        RW_EVERYONE -> 0xFF7A3B12 to 0xFF24120A
         else -> 0xFF303040 to 0xFF14141C
     }
     return Brush.verticalGradient(listOf(Color(colors.first), Color(colors.second)))
@@ -721,6 +797,14 @@ private fun RwSlide(kind: Int, s: RwStats) {
                 RwBig("${abs(pct)}%", if (up) RW_RED else Color(0xFF6FE08A), 96)
                 RwCaption(stringResource(if (up) R.string.rw_vs_more else R.string.rw_vs_less))
             }
+        }
+
+        RW_EVERYONE -> RwLayout(stringResource(R.string.rw_label_everyone)) {
+            ReelsBrainFace(s.level, Modifier.size(180.dp))
+            Spacer(Modifier.height(16.dp))
+            RwCaption(stringResource(R.string.rw_everyone_pre))
+            RwBig("${s.everyone ?: 0}%", RW_RED, 112)
+            RwCaption(stringResource(R.string.rw_everyone_post))
         }
 
         else -> RwLayout(stringResource(R.string.rw_label_verdict)) {

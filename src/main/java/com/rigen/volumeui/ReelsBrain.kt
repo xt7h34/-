@@ -25,6 +25,14 @@ fun reelsLevel(total: Int, limit: Int): Int {
     }
 }
 
+/** The text that says how the brain feels at this [level]. */
+fun reelsMoodRes(level: Int): Int = when (level) {
+    0 -> R.string.reels_mood_0
+    1 -> R.string.reels_mood_1
+    2 -> R.string.reels_mood_2
+    else -> R.string.reels_mood_3
+}
+
 fun reelsLevelColor(level: Int): Color = when (level) {
     0 -> Color(0xFF34A853)
     1 -> Color(0xFFF29900)

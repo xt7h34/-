@@ -1,0 +1,2741 @@
+--- a/RELEASE_NOTES.md
++++ b/RELEASE_NOTES.md
+@@ -1,5 +1,8 @@
+-الإصدار 1.15
++الإصدار 1.17
+ 
+-- جديد: Kanade Subscription، شراء باقة كندا (بلس / برو / إليت) بالنيرو من داخل التطبيق.
+-- ترقية الباقة بدفع الفرق فقط، وتجديدها مع إضافة المدة على المتبقي.
+-- تجديد تلقائي اختياري: قبل انتهاء الباقة بدقايق تتجدد من رصيد النيرو، وتقدر توقفه في أي وقت.
++- قفل الحد اليومي: لما توصل لحدك في عدّاد الريلز، التطبيقات اللي بتعدّها بتتقفل بشاشة فيها مؤقت وبترجّعك للهوم، لمدة تحددها.
++- بعد ما القفل يخلص ليك كام فيديو إضافي قبل ما يقفل تاني، وتنبيه "فاضل N" قبل الحد.
++- ويدجت المخ للشاشة الرئيسية: عدد النهاردة وحالة المخ، والضغط عليه بيفتح عدّاد الريلز.
++- مزامنة اختيارية مع البوت: بيتبعت إجمالي اليوم بس (مش اللي بتتفرج عليه). في البوت اكتب .ريلز لحالتك و.عفن لترتيب مستخدمي كندا.
++- شريحة جديدة في Wrapped: "أنت مقابل كل مستخدمي كندا" (بتظهر لما المزامنة تكون شغالة).
++- مهم: حدّث التطبيق مع تحديث البوت عشان المزامنة تشتغل.
+--- a/build.gradle.kts
++++ b/build.gradle.kts
+@@ -28,8 +28,8 @@
+         applicationId = "com.kanade"
+         minSdk = 26
+         targetSdk = 35
+-        versionCode = 16
+-        versionName = "1.15"
++        versionCode = 18
++        versionName = "1.17"
+         // Where the app looks for newer versions. The build passes it in (-PupdateRepo=owner/name).
+         buildConfigField("String", "UPDATE_REPO", "\"${project.findProperty("updateRepo") ?: ""}\"")
+     }
+--- a/src/main/AndroidManifest.xml
++++ b/src/main/AndroidManifest.xml
+@@ -77,6 +77,18 @@
+         </receiver>
+ 
+         <receiver
++            android:name=".ReelsWidget"
++            android:exported="false"
++            android:label="@string/widget_reels_label">
++            <intent-filter>
++                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
++            </intent-filter>
++            <meta-data
++                android:name="android.appwidget.provider"
++                android:resource="@xml/widget_reels" />
++        </receiver>
++
++        <receiver
+             android:name=".HabitsWidget"
+             android:exported="false"
+             android:label="@string/widget_habits_label">
+--- a/src/main/java/com/rigen/volumeui/KanadeAccount.kt
++++ b/src/main/java/com/rigen/volumeui/KanadeAccount.kt
+@@ -198,6 +198,8 @@
+     var mailError by remember { mutableStateOf("") }
+     var chEmail by remember { mutableStateOf("") }
+     var chPass by remember { mutableStateOf("") }
++    var chAnswer by remember { mutableStateOf("") }
++    var askQuestion by remember { mutableStateOf("") } // set when the bot asks for the security answer
+     var chCode by remember { mutableStateOf("") }
+ 
+     // What the bot says about the rewards and the prayer times, and which reminders are on.
+@@ -223,6 +225,7 @@
+             mailStep = 0
+             chEmail = ""
+             chPass = ""
++            chAnswer = ""
+             chCode = ""
+             ClockWidgets.updateAll(ctx)
+             step = Step.Done
+@@ -245,6 +248,7 @@
+                 val ns = Session(s.token, p)
+                 AccountStore.save(ctx, ns)
+                 session = ns
++                askQuestion = ""
+             }
+         }
+     }
+@@ -290,6 +294,7 @@
+             val ns = Session(s.token, pr)
+             AccountStore.save(ctx, ns)
+             session = ns
++            askQuestion = ""
+             return true
+         }
+         return false
+@@ -586,6 +591,7 @@
+                     }
+                     Section(stringResource(R.string.acc_email_section)) {
+                         val masked = session?.profile?.optString("email").orEmpty()
++                        val question = askQuestion.ifBlank { session?.profile?.optString("question").orEmpty() }
+                         Text(
+                             if (masked.isNotBlank()) masked else stringResource(R.string.acc_email_none),
+                             style = MaterialTheme.typography.bodyLarge,
+@@ -613,6 +619,13 @@
+                             1 -> {
+                                 Field(stringResource(R.string.acc_email_new), chEmail, { chEmail = it }, KeyboardType.Email)
+                                 Field(stringResource(R.string.acc_pass_confirm), chPass, { chPass = it }, secret = true)
++                                if (question.isNotBlank()) {
++                                    Text(
++                                        stringResource(R.string.acc_question_label, question),
++                                        style = MaterialTheme.typography.bodyMedium,
++                                    )
++                                    Field(stringResource(R.string.acc_answer), chAnswer, { chAnswer = it })
++                                }
+                                 Text(
+                                     stringResource(R.string.acc_email_change_hint),
+                                     style = MaterialTheme.typography.bodySmall,
+@@ -626,7 +639,7 @@
+                                             mailError = ""
+                                             val r = KanadeApi.call(
+                                                 "/me/email/start",
+-                                                JSONObject().put("email", chEmail.trim()).put("password", chPass),
++                                                JSONObject().put("email", chEmail.trim()).put("password", chPass).put("answer", chAnswer),
+                                                 session?.token,
+                                             )
+                                             busy = false
+@@ -635,17 +648,21 @@
+                                                 chCode = ""
+                                                 mailStep = 2
+                                             } else {
++                                                if (r.body?.optBoolean("needAnswer") == true) {
++                                                    askQuestion = r.body?.optString("question").orEmpty()
++                                                }
+                                                 mailError = r.message(ctx)
+                                             }
+                                         }
+                                     },
+-                                    enabled = !busy && chEmail.isNotBlank() && chPass.isNotEmpty(),
++                                    enabled = !busy && chEmail.isNotBlank() && chPass.isNotEmpty() && (question.isBlank() || chAnswer.isNotBlank()),
+                                     modifier = Modifier.fillMaxWidth(),
+                                 ) { Text(stringResource(R.string.acc_email_send)) }
+                                 TextButton(
+                                     onClick = {
+                                         mailStep = 0
+                                         chPass = ""
++                                        chAnswer = ""
+                                     },
+                                 ) { Text(stringResource(R.string.acc_cancel)) }
+                             }
+@@ -677,6 +694,7 @@
+                                                 mailStep = 0
+                                                 chEmail = ""
+                                                 chPass = ""
++                                                chAnswer = ""
+                                                 chCode = ""
+                                             } else {
+                                                 mailError = r.message(ctx)
+@@ -690,6 +708,7 @@
+                                     onClick = {
+                                         mailStep = 0
+                                         chPass = ""
++                                        chAnswer = ""
+                                     },
+                                 ) { Text(stringResource(R.string.acc_cancel)) }
+                             }
+@@ -701,6 +720,13 @@
+                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                 )
+                                 Field(stringResource(R.string.acc_pass_confirm), chPass, { chPass = it }, secret = true)
++                                if (question.isNotBlank()) {
++                                    Text(
++                                        stringResource(R.string.acc_question_label, question),
++                                        style = MaterialTheme.typography.bodyMedium,
++                                    )
++                                    Field(stringResource(R.string.acc_answer), chAnswer, { chAnswer = it })
++                                }
+                                 ErrorText(mailError)
+                                 Button(
+                                     onClick = {
+@@ -709,7 +735,7 @@
+                                             mailError = ""
+                                             val r = KanadeApi.call(
+                                                 "/me/email/remove",
+-                                                JSONObject().put("password", chPass),
++                                                JSONObject().put("password", chPass).put("answer", chAnswer),
+                                                 session?.token,
+                                             )
+                                             busy = false
+@@ -717,18 +743,23 @@
+                                             if (applyProfile(r)) {
+                                                 mailStep = 0
+                                                 chPass = ""
++                                                chAnswer = ""
+                                             } else {
++                                                if (r.body?.optBoolean("needAnswer") == true) {
++                                                    askQuestion = r.body?.optString("question").orEmpty()
++                                                }
+                                                 mailError = r.message(ctx)
+                                             }
+                                         }
+                                     },
+-                                    enabled = !busy && chPass.isNotEmpty(),
++                                    enabled = !busy && chPass.isNotEmpty() && (question.isBlank() || chAnswer.isNotBlank()),
+                                     modifier = Modifier.fillMaxWidth(),
+                                 ) { Text(stringResource(R.string.acc_email_remove)) }
+                                 TextButton(
+                                     onClick = {
+                                         mailStep = 0
+                                         chPass = ""
++                                        chAnswer = ""
+                                     },
+                                 ) { Text(stringResource(R.string.acc_cancel)) }
+                             }
+--- a/src/main/java/com/rigen/volumeui/Model.kt
++++ b/src/main/java/com/rigen/volumeui/Model.kt
+@@ -68,6 +68,9 @@
+ const val PAGE_TYCOON = "tycoon"
+ // Keyboard page
+ const val PAGE_KEYBOARD = "keyboard"
++// Reels counter pages
++const val PAGE_REELS = "reels"
++const val PAGE_REELS_DIAG = "reels_diag"
+ 
+ // Looks of the volume panel.
+ const val STYLE_CLASSIC = 0
+@@ -136,6 +139,7 @@
+     LOCK("M18,8h-1V6c0,-2.76 -2.24,-5 -5,-5S7,3.24 7,6v2H6c-1.1,0 -2,0.9 -2,2v10c0,1.1 0.9,2 2,2h12c1.1,0 2,-0.9 2,-2V10c0,-1.1 -0.9,-2 -2,-2zM12,17c-1.1,0 -2,-0.9 -2,-2s0.9,-2 2,-2 2,0.9 2,2 -0.9,2 -2,2zM9,8V6c0,-1.66 1.34,-3 3,-3s3,1.34 3,3v2H9z"),
+     KEYBOARD("M20,5H4c-1.1,0 -1.99,0.9 -1.99,2L2,17c0,1.1 0.9,2 2,2h16c1.1,0 2,-0.9 2,-2V7c0,-1.1 -0.9,-2 -2,-2zM11,8h2v2h-2V8zM11,11h2v2h-2v-2zM8,8h2v2H8V8zM8,11h2v2H8v-2zM7,13H5v-2h2v2zM7,10H5V8h2v2zM16,17H8v-2h8v2zM16,13h-2v-2h2v2zM16,10h-2V8h2v2zM19,13h-2v-2h2v2zM19,10h-2V8h2v2z"),
+     FACTORY("M2,20V9l6,4V9l6,4V5h4v15z"),
++    BRAIN("M12,3.2c-1.5,-1.3 -3.9,-1.1 -5,0.6c-1.8,0.1 -3.1,1.8 -2.7,3.5c-1.2,1 -1.4,2.9 -0.5,4.2c-0.7,1.5 -0.1,3.3 1.3,4.1c0.2,1.8 1.9,3.1 3.6,2.7c0.8,1.1 2.3,1.5 3.3,0.8zM12,3.2c1.5,-1.3 3.9,-1.1 5,0.6c1.8,0.1 3.1,1.8 2.7,3.5c1.2,1 1.4,2.9 0.5,4.2c0.7,1.5 0.1,3.3 -1.3,4.1c-0.2,1.8 -1.9,3.1 -3.6,2.7c-0.8,1.1 -2.3,1.5 -3.3,0.8z"),
+ }
+ 
+ class StreamInfo(val stream: Int, val glyph: Glyph, val labelRes: Int)
+--- a/src/main/java/com/rigen/volumeui/ReelsBadge.kt
++++ b/src/main/java/com/rigen/volumeui/ReelsBadge.kt
+@@ -0,0 +1,228 @@
++package com.rigen.volumeui
++
++import android.content.Context
++import android.content.Intent
++import android.graphics.PixelFormat
++import android.os.Handler
++import android.os.Looper
++import android.view.Gravity
++import android.view.WindowManager
++import android.widget.FrameLayout
++import androidx.compose.animation.core.Animatable
++import androidx.compose.animation.core.tween
++import androidx.compose.foundation.background
++import androidx.compose.foundation.gestures.detectDragGestures
++import androidx.compose.foundation.gestures.detectTapGestures
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.offset
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.layout.size
++import androidx.compose.foundation.shape.CircleShape
++import androidx.compose.foundation.shape.RoundedCornerShape
++import androidx.compose.material3.Text
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.LaunchedEffect
++import androidx.compose.runtime.remember
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.draw.clip
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.graphics.graphicsLayer
++import androidx.compose.ui.input.pointer.pointerInput
++import androidx.compose.ui.platform.ComposeView
++import androidx.compose.ui.platform.LocalContext
++import androidx.compose.ui.res.stringResource
++import androidx.compose.ui.text.font.FontWeight
++import androidx.compose.ui.unit.dp
++import androidx.compose.ui.unit.sp
++import androidx.lifecycle.setViewTreeLifecycleOwner
++import androidx.savedstate.setViewTreeSavedStateRegistryOwner
++
++/**
++ * The brain with today's counter that floats at the top of the screen while a counted app (Instagram,
++ * YouTube...) is in front. It lives in the accessibility service like the floating timer, so it needs
++ * no "draw over other apps" permission. It can be dragged, and a tap opens the Reels page.
++ */
++class ReelsBadge(private val service: VolumeAccessibilityService) {
++    private val wm = service.getSystemService(Context.WINDOW_SERVICE) as WindowManager
++    private val main = Handler(Looper.getMainLooper())
++    private var root: FrameLayout? = null
++    private var compose: ComposeView? = null
++    private var params: WindowManager.LayoutParams? = null
++    private var frontKey: String? = null
++    private var lastX = 0
++    private var lastY = -1
++
++    fun onForeground(pkg: String) {
++        frontKey = ReelsStore.appOf(pkg)?.key
++        refresh()
++    }
++
++    fun refresh() {
++        val key = frontKey
++        val should = key != null &&
++            ReelsStore.enabled(service) &&
++            ReelsStore.overlay(service) &&
++            ReelsStore.apps(service).contains(key)
++        if (should) show() else remove()
++    }
++
++    private fun dp(v: Int): Int = (v * service.resources.displayMetrics.density).toInt()
++
++    private fun show() {
++        if (root != null) return
++        try {
++            val lp = WindowManager.LayoutParams(
++                WindowManager.LayoutParams.WRAP_CONTENT,
++                WindowManager.LayoutParams.WRAP_CONTENT,
++                WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
++                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
++                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
++                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
++                PixelFormat.TRANSLUCENT,
++            )
++            lp.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
++            lp.x = lastX
++            lp.y = if (lastY >= 0) lastY else dp(10)
++
++            val view = ComposeView(service).apply {
++                setViewTreeLifecycleOwner(service)
++                setViewTreeSavedStateRegistryOwner(service)
++                setContent {
++                    ReelsBadgeContent(
++                        onDrag = { dx, dy -> moveBy(dx, dy) },
++                        onOpen = { openReels() },
++                    )
++                }
++            }
++            val container = FrameLayout(service)
++            container.setViewTreeLifecycleOwner(service)
++            container.setViewTreeSavedStateRegistryOwner(service)
++            container.addView(
++                view,
++                FrameLayout.LayoutParams(
++                    FrameLayout.LayoutParams.WRAP_CONTENT,
++                    FrameLayout.LayoutParams.WRAP_CONTENT,
++                ),
++            )
++            wm.addView(container, lp)
++            root = container
++            compose = view
++            params = lp
++        } catch (e: Exception) {
++            Diag.error(service, "Could not show the reels badge", e)
++        }
++    }
++
++    private fun moveBy(dx: Float, dy: Float) {
++        val r = root ?: return
++        val lp = params ?: return
++        lp.x += dx.toInt()
++        lp.y += dy.toInt()
++        lastX = lp.x
++        lastY = lp.y
++        try {
++            wm.updateViewLayout(r, lp)
++        } catch (e: Exception) {
++            // The window is already gone.
++        }
++    }
++
++    private fun openReels() {
++        try {
++            service.startActivity(
++                Intent(service, MainActivity::class.java)
++                    .putExtra(EXTRA_PAGE, PAGE_REELS)
++                    .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
++            )
++        } catch (e: Exception) {
++            Diag.error(service, "Could not open the reels page", e)
++        }
++    }
++
++    fun remove() {
++        val r = root ?: return
++        val c = compose
++        root = null
++        compose = null
++        params = null
++        try {
++            wm.removeView(r)
++            c?.disposeComposition()
++        } catch (e: Exception) {
++            Diag.error(service, "Could not hide the reels badge", e)
++        }
++    }
++}
++
++@Composable
++private fun ReelsBadgeContent(onDrag: (Float, Float) -> Unit, onOpen: () -> Unit) {
++    val ctx = LocalContext.current
++    val t = ReelsStore.tick // read so the badge redraws on every new count
++    val today = remember(t) { ReelsStore.today(ctx) }
++    val limit = ReelsStore.limit(ctx)
++    val level = reelsLevel(today.total, limit)
++    val remaining = limit - today.total
++
++    // A small pop each time the count goes up.
++    val pop = remember { Animatable(1f) }
++    LaunchedEffect(today.total) {
++        pop.snapTo(1.25f)
++        pop.animateTo(1f, tween(220))
++    }
++
++    Box(
++        modifier = Modifier
++            .pointerInput(Unit) {
++                detectDragGestures { change, drag ->
++                    change.consume()
++                    onDrag(drag.x, drag.y)
++                }
++            }
++            .pointerInput(Unit) {
++                detectTapGestures(onTap = { onOpen() })
++            },
++        contentAlignment = Alignment.TopCenter,
++    ) {
++        Column(horizontalAlignment = Alignment.CenterHorizontally) {
++            Box(
++                modifier = Modifier
++                    .size(48.dp)
++                    .graphicsLayer {
++                        scaleX = pop.value
++                        scaleY = pop.value
++                    }
++                    .clip(CircleShape)
++                    .background(Color(0xCC1B0F12)),
++                contentAlignment = Alignment.Center,
++            ) {
++                ReelsBrainFace(level, Modifier.size(38.dp))
++            }
++            Box(
++                modifier = Modifier
++                    .offset(y = (-8).dp)
++                    .clip(RoundedCornerShape(50))
++                    .background(reelsLevelColor(level))
++                    .padding(horizontal = 11.dp, vertical = 2.dp),
++            ) {
++                Text(
++                    text = today.total.toString(),
++                    color = Color.White,
++                    fontSize = 16.sp,
++                    fontWeight = FontWeight.Black,
++                )
++            }
++            // A heads-up when the limit is close.
++            if (remaining in 1..maxOf(5, limit / 10)) {
++                Text(
++                    text = stringResource(R.string.reels_left_n, remaining),
++                    color = Color(0xFFFFB74D),
++                    fontSize = 12.sp,
++                    fontWeight = FontWeight.Bold,
++                    modifier = Modifier.offset(y = (-4).dp),
++                )
++            }
++        }
++    }
++}
+--- a/src/main/java/com/rigen/volumeui/ReelsBrain.kt
++++ b/src/main/java/com/rigen/volumeui/ReelsBrain.kt
+@@ -0,0 +1,174 @@
++package com.rigen.volumeui
++
++import androidx.compose.foundation.Canvas
++import androidx.compose.runtime.Composable
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.geometry.Offset
++import androidx.compose.ui.geometry.Size
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.graphics.Path
++import androidx.compose.ui.graphics.StrokeCap
++import androidx.compose.ui.graphics.StrokeJoin
++import androidx.compose.ui.graphics.drawscope.Stroke
++
++/**
++ * How the brain feels, from today's count and the daily limit:
++ * 0 = fine, 1 = tired (half the limit), 2 = cracking (the limit), 3 = fried (double the limit).
++ */
++fun reelsLevel(total: Int, limit: Int): Int {
++    val l = limit.coerceAtLeast(10)
++    return when {
++        total < l / 2 -> 0
++        total < l -> 1
++        total < l * 2 -> 2
++        else -> 3
++    }
++}
++
++/** The text that says how the brain feels at this [level]. */
++fun reelsMoodRes(level: Int): Int = when (level) {
++    0 -> R.string.reels_mood_0
++    1 -> R.string.reels_mood_1
++    2 -> R.string.reels_mood_2
++    else -> R.string.reels_mood_3
++}
++
++fun reelsLevelColor(level: Int): Color = when (level) {
++    0 -> Color(0xFF34A853)
++    1 -> Color(0xFFF29900)
++    2 -> Color(0xFFE5484D)
++    else -> Color(0xFFB3261E)
++}
++
++/** A little cartoon brain whose face and color get worse with [level] (see [reelsLevel]). */
++@Composable
++fun ReelsBrainFace(level: Int, modifier: Modifier = Modifier) {
++    Canvas(modifier) {
++        val w = size.width
++        val h = size.height
++        val body = when (level) {
++            0 -> Color(0xFFF4B5C6)
++            1 -> Color(0xFFDDB9C0)
++            2 -> Color(0xFFBBA9AD)
++            else -> Color(0xFF857173)
++        }
++        val ink = Color(0xFF2A1A1D)
++        val fold = Color(0x33000000)
++        val stroke = w * 0.03f
++
++        val cx = w / 2f
++        val cy = h * 0.5f
++
++        // The body: a bumpy cloud made of circles.
++        val r = w * 0.17f
++        val bumps = listOf(
++            Offset(cx - w * 0.24f, cy - h * 0.22f),
++            Offset(cx, cy - h * 0.29f),
++            Offset(cx + w * 0.24f, cy - h * 0.22f),
++            Offset(cx - w * 0.31f, cy),
++            Offset(cx + w * 0.31f, cy),
++            Offset(cx - w * 0.22f, cy + h * 0.2f),
++            Offset(cx + w * 0.22f, cy + h * 0.2f),
++        )
++        bumps.forEach { drawCircle(body, r, it) }
++        drawCircle(body, w * 0.34f, Offset(cx, cy))
++
++        // Folds of the brain.
++        drawLine(fold, Offset(cx, cy - h * 0.38f), Offset(cx, cy - h * 0.24f), stroke, StrokeCap.Round)
++        drawArc(
++            color = fold, startAngle = 200f, sweepAngle = 110f, useCenter = false,
++            topLeft = Offset(cx - w * 0.36f, cy - h * 0.32f), size = Size(w * 0.26f, h * 0.2f),
++            style = Stroke(stroke, cap = StrokeCap.Round),
++        )
++        drawArc(
++            color = fold, startAngle = 230f, sweepAngle = 110f, useCenter = false,
++            topLeft = Offset(cx + w * 0.1f, cy - h * 0.32f), size = Size(w * 0.26f, h * 0.2f),
++            style = Stroke(stroke, cap = StrokeCap.Round),
++        )
++
++        // Eyes. A heavier eyelid the worse the brain feels; a fried brain gets crossed-out eyes.
++        val eyeR = w * 0.085f
++        val eyeY = cy - h * 0.04f
++        val eyeXs = listOf(cx - w * 0.14f, cx + w * 0.14f)
++        if (level >= 3) {
++            eyeXs.forEach { ex ->
++                val d = eyeR * 0.8f
++                drawLine(ink, Offset(ex - d, eyeY - d), Offset(ex + d, eyeY + d), stroke, StrokeCap.Round)
++                drawLine(ink, Offset(ex - d, eyeY + d), Offset(ex + d, eyeY - d), stroke, StrokeCap.Round)
++            }
++        } else {
++            val lid = when (level) {
++                0 -> 0f
++                1 -> 0.35f
++                else -> 0.55f
++            }
++            eyeXs.forEach { ex ->
++                drawCircle(Color.White, eyeR, Offset(ex, eyeY))
++                drawCircle(ink, eyeR * 0.5f, Offset(ex, eyeY + eyeR * 0.15f))
++                if (lid > 0f) {
++                    drawRect(body, Offset(ex - eyeR, eyeY - eyeR), Size(eyeR * 2f, eyeR * 2f * lid))
++                    drawLine(
++                        ink, Offset(ex - eyeR, eyeY - eyeR + eyeR * 2f * lid),
++                        Offset(ex + eyeR, eyeY - eyeR + eyeR * 2f * lid), stroke * 0.7f, StrokeCap.Round,
++                    )
++                }
++            }
++            if (level >= 1) {
++                // Dark circles under the eyes.
++                eyeXs.forEach { ex ->
++                    drawArc(
++                        color = Color(0x66000000), startAngle = 20f, sweepAngle = 140f, useCenter = false,
++                        topLeft = Offset(ex - eyeR, eyeY - eyeR * 0.1f), size = Size(eyeR * 2f, eyeR * 2f),
++                        style = Stroke(stroke * 0.8f, cap = StrokeCap.Round),
++                    )
++                }
++            }
++        }
++
++        // Mouth.
++        val my = cy + h * 0.17f
++        when (level) {
++            0 -> drawArc(
++                color = ink, startAngle = 20f, sweepAngle = 140f, useCenter = false,
++                topLeft = Offset(cx - w * 0.1f, my - h * 0.06f), size = Size(w * 0.2f, h * 0.12f),
++                style = Stroke(stroke, cap = StrokeCap.Round),
++            )
++            1 -> drawLine(ink, Offset(cx - w * 0.07f, my), Offset(cx + w * 0.07f, my), stroke, StrokeCap.Round)
++            2 -> drawArc(
++                color = ink, startAngle = 200f, sweepAngle = 140f, useCenter = false,
++                topLeft = Offset(cx - w * 0.1f, my - h * 0.01f), size = Size(w * 0.2f, h * 0.12f),
++                style = Stroke(stroke, cap = StrokeCap.Round),
++            )
++            else -> {
++                val wavy = Path().apply {
++                    moveTo(cx - w * 0.1f, my)
++                    lineTo(cx - w * 0.05f, my + h * 0.025f)
++                    lineTo(cx, my - h * 0.025f)
++                    lineTo(cx + w * 0.05f, my + h * 0.025f)
++                    lineTo(cx + w * 0.1f, my)
++                }
++                drawPath(wavy, ink, style = Stroke(stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
++            }
++        }
++
++        // Cracks once the limit is passed.
++        if (level >= 2) {
++            val crack = Color(0xFF8E1B1B)
++            val p = Path().apply {
++                moveTo(cx - w * 0.05f, cy - h * 0.42f)
++                lineTo(cx + w * 0.03f, cy - h * 0.32f)
++                lineTo(cx - w * 0.04f, cy - h * 0.24f)
++                lineTo(cx + w * 0.04f, cy - h * 0.16f)
++            }
++            drawPath(p, crack, style = Stroke(stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
++            if (level >= 3) {
++                val p2 = Path().apply {
++                    moveTo(cx + w * 0.3f, cy - h * 0.14f)
++                    lineTo(cx + w * 0.22f, cy - h * 0.06f)
++                    lineTo(cx + w * 0.27f, cy + h * 0.02f)
++                }
++                drawPath(p2, crack, style = Stroke(stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
++            }
++        }
++    }
++}
+--- a/src/main/java/com/rigen/volumeui/ReelsLock.kt
++++ b/src/main/java/com/rigen/volumeui/ReelsLock.kt
+@@ -0,0 +1,216 @@
++package com.rigen.volumeui
++
++import android.accessibilityservice.AccessibilityService
++import android.content.Context
++import android.graphics.PixelFormat
++import android.os.Handler
++import android.os.Looper
++import android.view.WindowManager
++import android.widget.FrameLayout
++import androidx.compose.foundation.background
++import androidx.compose.foundation.clickable
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.Spacer
++import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.foundation.layout.height
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.layout.size
++import androidx.compose.foundation.shape.RoundedCornerShape
++import androidx.compose.material3.Text
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.LaunchedEffect
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableLongStateOf
++import androidx.compose.runtime.remember
++import androidx.compose.runtime.setValue
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.draw.clip
++import androidx.compose.ui.graphics.Brush
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.platform.ComposeView
++import androidx.compose.ui.platform.LocalContext
++import androidx.compose.ui.res.stringResource
++import androidx.compose.ui.text.font.FontWeight
++import androidx.compose.ui.text.style.TextAlign
++import androidx.compose.ui.unit.dp
++import androidx.compose.ui.unit.sp
++import androidx.lifecycle.setViewTreeLifecycleOwner
++import androidx.savedstate.setViewTreeSavedStateRegistryOwner
++import kotlinx.coroutines.delay
++import java.util.Locale
++
++/**
++ * The lock screen that covers a counted app once the daily limit is reached. It lives in the
++ * accessibility service like the floating timer, so it needs no extra permission. While the lock is
++ * on it covers the app, counts down, and sends the person back to the home screen after a moment.
++ */
++class ReelsLock(private val service: VolumeAccessibilityService) {
++    private val wm = service.getSystemService(Context.WINDOW_SERVICE) as WindowManager
++    private val main = Handler(Looper.getMainLooper())
++    private var root: FrameLayout? = null
++    private var compose: ComposeView? = null
++    private var frontKey: String? = null
++
++    private val autoHome = Runnable { if (root != null) goHome() }
++
++    fun onForeground(pkg: String) {
++        frontKey = ReelsStore.appOf(pkg)?.key
++        refresh()
++    }
++
++    fun refresh() {
++        val key = frontKey
++        val should = key != null &&
++            ReelsStore.apps(service).contains(key) &&
++            ReelsStore.isLocked(service, System.currentTimeMillis())
++        if (should) show() else remove()
++    }
++
++    private fun goHome() {
++        try {
++            service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME)
++        } catch (e: Exception) {
++            Diag.error(service, "Could not go home from the reels lock", e)
++        }
++    }
++
++    private fun show() {
++        if (root != null) return
++        try {
++            val lp = WindowManager.LayoutParams(
++                WindowManager.LayoutParams.MATCH_PARENT,
++                WindowManager.LayoutParams.MATCH_PARENT,
++                WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
++                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
++                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
++                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
++                PixelFormat.TRANSLUCENT,
++            )
++            val view = ComposeView(service).apply {
++                setViewTreeLifecycleOwner(service)
++                setViewTreeSavedStateRegistryOwner(service)
++                setContent {
++                    ReelsLockContent(onHome = { goHome() }, onExpired = { refresh() })
++                }
++            }
++            val container = FrameLayout(service)
++            container.setViewTreeLifecycleOwner(service)
++            container.setViewTreeSavedStateRegistryOwner(service)
++            container.addView(
++                view,
++                FrameLayout.LayoutParams(
++                    FrameLayout.LayoutParams.MATCH_PARENT,
++                    FrameLayout.LayoutParams.MATCH_PARENT,
++                ),
++            )
++            wm.addView(container, lp)
++            root = container
++            compose = view
++            main.postDelayed(autoHome, 3500)
++        } catch (e: Exception) {
++            Diag.error(service, "Could not show the reels lock", e)
++        }
++    }
++
++    fun remove() {
++        main.removeCallbacks(autoHome)
++        val r = root ?: return
++        val c = compose
++        root = null
++        compose = null
++        try {
++            wm.removeView(r)
++            c?.disposeComposition()
++        } catch (e: Exception) {
++            Diag.error(service, "Could not hide the reels lock", e)
++        }
++    }
++}
++
++private fun reelsClock(ms: Long): String {
++    val s = (ms / 1000L).toInt()
++    val h = s / 3600
++    val m = (s % 3600) / 60
++    val ss = s % 60
++    return if (h > 0) {
++        String.format(Locale.US, "%d:%02d:%02d", h, m, ss)
++    } else {
++        String.format(Locale.US, "%d:%02d", m, ss)
++    }
++}
++
++@Composable
++private fun ReelsLockContent(onHome: () -> Unit, onExpired: () -> Unit) {
++    val ctx = LocalContext.current
++    var left by remember {
++        mutableLongStateOf(maxOf(0L, ReelsStore.lockUntil(ctx) - System.currentTimeMillis()))
++    }
++    LaunchedEffect(Unit) {
++        while (true) {
++            left = maxOf(0L, ReelsStore.lockUntil(ctx) - System.currentTimeMillis())
++            if (left <= 0L) {
++                onExpired()
++                break
++            }
++            delay(1000)
++        }
++    }
++
++    Box(
++        Modifier
++            .fillMaxSize()
++            .background(Brush.verticalGradient(listOf(Color(0xFF3A1519), Color(0xFF120708)))),
++        contentAlignment = Alignment.Center,
++    ) {
++        Column(
++            Modifier.padding(32.dp),
++            horizontalAlignment = Alignment.CenterHorizontally,
++        ) {
++            ReelsBrainFace(3, Modifier.size(180.dp))
++            Spacer(Modifier.height(24.dp))
++            Text(
++                stringResource(R.string.reels_lock_title),
++                color = Color.White,
++                fontSize = 28.sp,
++                fontWeight = FontWeight.Black,
++                textAlign = TextAlign.Center,
++            )
++            Spacer(Modifier.height(8.dp))
++            Text(
++                stringResource(R.string.reels_lock_sub, ReelsStore.limit(ctx)),
++                color = Color(0xB3FFFFFF),
++                fontSize = 16.sp,
++                textAlign = TextAlign.Center,
++            )
++            Spacer(Modifier.height(28.dp))
++            Text(
++                reelsClock(left),
++                color = Color(0xFFFAE8BD),
++                fontSize = 56.sp,
++                fontWeight = FontWeight.Black,
++            )
++            Text(
++                stringResource(R.string.reels_lock_left_label),
++                color = Color(0xB3FFFFFF),
++                fontSize = 14.sp,
++            )
++            Spacer(Modifier.height(32.dp))
++            Box(
++                Modifier
++                    .clip(RoundedCornerShape(50))
++                    .background(Color(0x33FFFFFF))
++                    .clickable(onClick = onHome)
++                    .padding(horizontal = 32.dp, vertical = 14.dp),
++            ) {
++                Text(
++                    stringResource(R.string.reels_lock_home),
++                    color = Color.White,
++                    fontSize = 17.sp,
++                    fontWeight = FontWeight.Medium,
++                )
++            }
++        }
++    }
++}
+--- a/src/main/java/com/rigen/volumeui/ReelsScreens.kt
++++ b/src/main/java/com/rigen/volumeui/ReelsScreens.kt
+@@ -0,0 +1,831 @@
++package com.rigen.volumeui
++
++import android.content.Intent
++import android.provider.Settings
++import androidx.activity.compose.BackHandler
++import androidx.compose.animation.Crossfade
++import androidx.compose.animation.core.Animatable
++import androidx.compose.animation.core.LinearEasing
++import androidx.compose.animation.core.tween
++import androidx.compose.foundation.Image
++import androidx.compose.foundation.background
++import androidx.compose.foundation.border
++import androidx.compose.foundation.clickable
++import androidx.compose.foundation.gestures.detectTapGestures
++import androidx.compose.foundation.layout.Arrangement
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.ColumnScope
++import androidx.compose.foundation.layout.Row
++import androidx.compose.foundation.layout.Spacer
++import androidx.compose.foundation.layout.fillMaxHeight
++import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.height
++import androidx.compose.foundation.layout.navigationBarsPadding
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.layout.size
++import androidx.compose.foundation.layout.statusBarsPadding
++import androidx.compose.foundation.layout.width
++import androidx.compose.foundation.shape.CircleShape
++import androidx.compose.foundation.shape.RoundedCornerShape
++import androidx.compose.material3.Card
++import androidx.compose.material3.CardDefaults
++import androidx.compose.material3.MaterialTheme
++import androidx.compose.material3.Text
++import androidx.compose.material3.TextButton
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.LaunchedEffect
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableIntStateOf
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.runtime.rememberCoroutineScope
++import androidx.compose.runtime.remember
++import androidx.compose.runtime.setValue
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.draw.clip
++import androidx.compose.ui.graphics.Brush
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.graphics.ImageBitmap
++import androidx.compose.ui.graphics.asImageBitmap
++import androidx.compose.ui.input.pointer.pointerInput
++import androidx.compose.ui.platform.LocalContext
++import androidx.compose.ui.res.stringResource
++import androidx.compose.ui.text.font.FontFamily
++import androidx.compose.ui.text.font.FontWeight
++import androidx.compose.ui.text.style.TextAlign
++import androidx.compose.ui.unit.Dp
++import androidx.compose.ui.unit.dp
++import androidx.compose.ui.unit.sp
++import androidx.core.graphics.drawable.toBitmap
++import java.text.SimpleDateFormat
++import java.util.Calendar
++import java.util.Date
++import java.util.Locale
++import kotlin.math.abs
++import kotlinx.coroutines.launch
++
++// ═════════════════════════════ The Reels page ═════════════════════════════
++
++@Composable
++fun ReelsPage(serviceEnabled: Boolean, onOpen: (String) -> Unit, goBack: () -> Unit) {
++    val ctx = LocalContext.current
++    val t = ReelsStore.tick
++    val today = remember(t) { ReelsStore.today(ctx) }
++    val enabled = remember(t) { ReelsStore.enabled(ctx) }
++    val overlay = remember(t) { ReelsStore.overlay(ctx) }
++    val appsOn = remember(t) { ReelsStore.apps(ctx) }
++    val limit = remember(t) { ReelsStore.limit(ctx) }
++    val sec = remember(t) { ReelsStore.secPerReel(ctx) }
++    val week = remember(t) { ReelsStore.lastDays(ctx, 7) }
++    var wrapped by remember { mutableIntStateOf(0) } // 0 = closed, 1 = today, 2 = this week
++    val scope = rememberCoroutineScope()
++    val syncOn = remember(t) { ReelsStore.syncOn(ctx) }
++    val lockOn = remember(t) { ReelsStore.lockOn(ctx) }
++    val lockMin = remember(t) { ReelsStore.lockMinutes(ctx) }
++    val lockUntil = remember(t) { ReelsStore.lockUntil(ctx) }
++    val signedIn = remember(t) { AccountStore.load(ctx) != null }
++    var rank by remember { mutableStateOf<Int?>(null) }
++    var rankReady by remember { mutableStateOf(false) }
++
++    // Before the story opens, ask the bot how this person ranks (only when sharing is on).
++    LaunchedEffect(wrapped) {
++        if (wrapped != 0) {
++            rankReady = false
++            rank = null
++            if (syncOn && signedIn) rank = ReelsSync.pushAndRank(ctx, if (wrapped == 2) "week" else "day")
++            rankReady = true
++        }
++    }
++
++    if (wrapped != 0) {
++        BackHandler { wrapped = 0 }
++        if (!rankReady) {
++            Box(
++                Modifier
++                    .fillMaxSize()
++                    .background(Color(0xFF14141C)),
++                contentAlignment = Alignment.Center,
++            ) {
++                Text(stringResource(R.string.reels_loading), color = Color.White, fontSize = 18.sp)
++            }
++        } else {
++            val data = if (wrapped == 1) {
++                ReelsWrappedData(listOf(today), ReelsStore.lastDays(ctx, 1, 1), sec, limit, rank)
++            } else {
++                ReelsWrappedData(week, ReelsStore.lastDays(ctx, 7, 7), sec, limit, rank)
++            }
++            ReelsWrapped(data) { wrapped = 0 }
++        }
++        return
++    }
++
++    val level = reelsLevel(today.total, limit)
++    val levelColor = reelsLevelColor(level)
++    val mood = when (level) {
++        0 -> R.string.reels_mood_0
++        1 -> R.string.reels_mood_1
++        2 -> R.string.reels_mood_2
++        else -> R.string.reels_mood_3
++    }
++
++    PageScaffold(stringResource(R.string.reels_title), goBack) { padding ->
++        PageColumn(padding) {
++            if (!serviceEnabled) {
++                SettingsGroup {
++                    SettingsItem(
++                        glyph = Glyph.ACCESS,
++                        iconColor = ICON_ORANGE,
++                        title = stringResource(R.string.service_off),
++                        summary = stringResource(R.string.reels_service_needed),
++                    ) {
++                        ctx.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
++                    }
++                }
++            }
++
++            // Today at a glance.
++            Card(
++                modifier = Modifier.fillMaxWidth(),
++                shape = RoundedCornerShape(28.dp),
++                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
++            ) {
++                Column(
++                    Modifier
++                        .fillMaxWidth()
++                        .padding(20.dp),
++                    horizontalAlignment = Alignment.CenterHorizontally,
++                ) {
++                    ReelsBrainFace(level, Modifier.size(120.dp))
++                    Spacer(Modifier.height(8.dp))
++                    Text(
++                        today.total.toString(),
++                        fontSize = 56.sp,
++                        fontWeight = FontWeight.Black,
++                        color = levelColor,
++                    )
++                    Text(
++                        stringResource(R.string.reels_of_limit, limit),
++                        style = MaterialTheme.typography.bodyMedium,
++                        color = MaterialTheme.colorScheme.onSurfaceVariant,
++                    )
++                    Spacer(Modifier.height(10.dp))
++                    Text(stringResource(mood), style = MaterialTheme.typography.titleMedium)
++                    Spacer(Modifier.height(12.dp))
++                    val frac = (today.total.toFloat() / limit.toFloat()).coerceIn(0f, 1f)
++                    Box(
++                        Modifier
++                            .fillMaxWidth()
++                            .height(8.dp)
++                            .clip(RoundedCornerShape(4.dp))
++                            .background(MaterialTheme.colorScheme.outlineVariant),
++                    ) {
++                        Box(
++                            Modifier
++                                .fillMaxHeight()
++                                .fillMaxWidth(frac)
++                                .background(levelColor),
++                        )
++                    }
++                }
++            }
++
++            Section(stringResource(R.string.reels_title)) {
++                SwitchRow(stringResource(R.string.reels_enable), enabled) { ReelsStore.setEnabled(ctx, it) }
++                SwitchRow(stringResource(R.string.reels_overlay), overlay) { ReelsStore.setOverlay(ctx, it) }
++            }
++
++            Section(stringResource(R.string.reels_apps)) {
++                REELS_APPS.forEach { app ->
++                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
++                        ReelsAppIcon(app, 36.dp)
++                        Spacer(Modifier.width(12.dp))
++                        Column(Modifier.weight(1f)) {
++                            Text(app.label)
++                            Text(
++                                stringResource(R.string.reels_today_count, today.counts[app.key] ?: 0),
++                                style = MaterialTheme.typography.bodySmall,
++                                color = MaterialTheme.colorScheme.onSurfaceVariant,
++                            )
++                        }
++                        KanadeSwitch(appsOn.contains(app.key)) { ReelsStore.setApp(ctx, app.key, it) }
++                    }
++                }
++            }
++
++            Section(stringResource(R.string.reels_week)) {
++                val maxV = (week.maxOfOrNull { it.total } ?: 0).coerceAtLeast(1)
++                Row(
++                    Modifier
++                        .fillMaxWidth()
++                        .height(112.dp),
++                    horizontalArrangement = Arrangement.SpaceEvenly,
++                    verticalAlignment = Alignment.Bottom,
++                ) {
++                    week.forEach { d ->
++                        Column(
++                            horizontalAlignment = Alignment.CenterHorizontally,
++                            verticalArrangement = Arrangement.Bottom,
++                        ) {
++                            Text(d.total.toString(), fontSize = 10.sp)
++                            Box(
++                                Modifier
++                                    .width(22.dp)
++                                    .height((d.total.toFloat() / maxV.toFloat() * 64f + 3f).dp)
++                                    .clip(RoundedCornerShape(6.dp))
++                                    .background(reelsLevelColor(reelsLevel(d.total, limit))),
++                            )
++                            Text(reelsDayLabel(d.key), fontSize = 10.sp)
++                        }
++                    }
++                }
++            }
++
++            Section(stringResource(R.string.reels_settings)) {
++                ReelsStepper(
++                    stringResource(R.string.reels_limit), limit.toString(),
++                    onMinus = { ReelsStore.setLimit(ctx, limit - 25) },
++                    onPlus = { ReelsStore.setLimit(ctx, limit + 25) },
++                )
++                ReelsStepper(
++                    stringResource(R.string.reels_sec), sec.toString(),
++                    onMinus = { ReelsStore.setSecPerReel(ctx, sec - 5) },
++                    onPlus = { ReelsStore.setSecPerReel(ctx, sec + 5) },
++                )
++            }
++
++            Section(stringResource(R.string.reels_lock_section)) {
++                SwitchRow(stringResource(R.string.reels_lock_enable), lockOn) { ReelsStore.setLockOn(ctx, it) }
++                ReelsStepper(
++                    stringResource(R.string.reels_lock_minutes), lockMin.toString(),
++                    onMinus = { ReelsStore.setLockMinutes(ctx, lockMin - 15) },
++                    onPlus = { ReelsStore.setLockMinutes(ctx, lockMin + 15) },
++                )
++                if (lockOn && lockUntil > System.currentTimeMillis()) {
++                    Text(
++                        stringResource(
++                            R.string.reels_lock_status,
++                            SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(lockUntil)),
++                        ),
++                        style = MaterialTheme.typography.bodySmall,
++                        color = MaterialTheme.colorScheme.onSurfaceVariant,
++                    )
++                }
++            }
++
++            Section(stringResource(R.string.reels_sync_title)) {
++                SwitchRow(stringResource(R.string.reels_sync_enable), syncOn) { on ->
++                    if (!on || signedIn) {
++                        ReelsStore.setSyncOn(ctx, on)
++                        scope.launch {
++                            if (on) ReelsSync.pushNow(ctx) else ReelsSync.clearRemote(ctx)
++                        }
++                    }
++                }
++                Text(
++                    stringResource(if (signedIn) R.string.reels_sync_hint else R.string.reels_sync_signin),
++                    style = MaterialTheme.typography.bodySmall,
++                    color = MaterialTheme.colorScheme.onSurfaceVariant,
++                )
++            }
++
++            SettingsGroup {
++                SettingsItem(
++                    Glyph.BRAIN, ICON_PINK,
++                    stringResource(R.string.reels_wrapped_day),
++                ) { wrapped = 1 }
++                ItemDivider()
++                SettingsItem(
++                    Glyph.BRAIN, ICON_PURPLE,
++                    stringResource(R.string.reels_wrapped_week),
++                ) { wrapped = 2 }
++                ItemDivider()
++                SettingsItem(
++                    Glyph.TUNE, ICON_BLUE,
++                    stringResource(R.string.reels_diag_title),
++                ) { onOpen(PAGE_REELS_DIAG) }
++            }
++        }
++    }
++}
++
++@Composable
++private fun ReelsStepper(label: String, value: String, onMinus: () -> Unit, onPlus: () -> Unit) {
++    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
++        Text(label, Modifier.weight(1f))
++        ReelsStepButton("−", onMinus)
++        Text(value, Modifier.width(56.dp), textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
++        ReelsStepButton("+", onPlus)
++    }
++}
++
++@Composable
++private fun ReelsStepButton(symbol: String, onClick: () -> Unit) {
++    Box(
++        Modifier
++            .size(36.dp)
++            .clip(CircleShape)
++            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
++            .clickable(onClick = onClick),
++        contentAlignment = Alignment.Center,
++    ) {
++        Text(symbol, fontSize = 20.sp)
++    }
++}
++
++private fun reelsDayLabel(key: String): String = try {
++    val d = SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(key)
++    SimpleDateFormat("EEE", Locale.getDefault()).format(d!!)
++} catch (e: Exception) {
++    key.takeLast(2)
++}
++
++/** The real icon of the app when it is installed, otherwise a colored circle with its first letter. */
++@Composable
++private fun ReelsAppIcon(app: ReelsApp, size: Dp) {
++    val ctx = LocalContext.current
++    val bmp: ImageBitmap? = remember(app.key) {
++        var found: ImageBitmap? = null
++        for (p in app.packages) {
++            try {
++                found = ctx.packageManager.getApplicationIcon(p).toBitmap(96, 96).asImageBitmap()
++                break
++            } catch (e: Exception) {
++                // Not installed (or not visible): try the next package name.
++            }
++        }
++        found
++    }
++    if (bmp != null) {
++        Image(bmp, null, Modifier.size(size).clip(RoundedCornerShape(size * 0.22f)))
++    } else {
++        Box(
++            Modifier
++                .size(size)
++                .clip(CircleShape)
++                .background(Color(app.color)),
++            contentAlignment = Alignment.Center,
++        ) {
++            Text(app.label.take(1), color = Color.White, fontWeight = FontWeight.Bold)
++        }
++    }
++}
++
++// ═════════════════════════════ Calibration page ═════════════════════════════
++
++@Composable
++fun ReelsDiagPage(goBack: () -> Unit) {
++    val ctx = LocalContext.current
++    val t = ReelsStore.tick
++    val lt = ReelsEngine.logTick
++    val on = remember(t) { ReelsStore.diagOn(ctx) }
++    val lines = remember(lt) { ReelsEngine.log.take(60).toList() }
++
++    PageScaffold(stringResource(R.string.reels_diag_title), goBack) { padding ->
++        PageColumn(padding) {
++            Section(stringResource(R.string.reels_diag_title)) {
++                SwitchRow(stringResource(R.string.reels_diag_record), on) { ReelsStore.setDiagOn(ctx, it) }
++                Text(
++                    stringResource(R.string.reels_diag_hint),
++                    style = MaterialTheme.typography.bodySmall,
++                    color = MaterialTheme.colorScheme.onSurfaceVariant,
++                )
++                Row {
++                    TextButton(onClick = { ReelsEngine.clearLog() }) {
++                        Text(stringResource(R.string.reels_diag_clear))
++                    }
++                    TextButton(onClick = { ReelsStore.clearAll(ctx) }) {
++                        Text(stringResource(R.string.reels_reset))
++                    }
++                }
++            }
++            Section(stringResource(R.string.reels_diag_log)) {
++                if (lines.isEmpty()) {
++                    Text(
++                        stringResource(R.string.reels_diag_empty),
++                        style = MaterialTheme.typography.bodySmall,
++                        color = MaterialTheme.colorScheme.onSurfaceVariant,
++                    )
++                } else {
++                    lines.forEach {
++                        Text(it, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
++                    }
++                }
++            }
++        }
++    }
++}
++
++// ═════════════════════════════ Reels Wrapped (the story) ═════════════════════════════
++
++/** [days] are the days being shown; [prev] is the same number of days right before them. */
++class ReelsWrappedData(
++    val days: List<ReelsDay>,
++    val prev: List<ReelsDay>,
++    val secPerReel: Int,
++    val limit: Int,
++    /** "You scrolled more than N% of the people on Kanade", or null when the bot has no answer. */
++    val everyone: Int? = null,
++)
++
++private class RwStats(d: ReelsWrappedData) {
++    val total: Int = d.days.sumOf { it.total }
++    val prevTotal: Int = d.prev.sumOf { it.total }
++    val byApp: List<Pair<ReelsApp, Int>> = REELS_APPS
++        .map { a -> a to d.days.sumOf { it.counts[a.key] ?: 0 } }
++        .filter { it.second > 0 }
++        .sortedByDescending { it.second }
++    val hours: IntArray = IntArray(24).also { arr ->
++        d.days.forEach { day -> for (i in 0 until 24) arr[i] = arr[i] + day.hours[i] }
++    }
++    val opens: Int = d.days.sumOf { it.opens }
++    val longest: Int = d.days.maxOfOrNull { it.longest } ?: 0
++    val minutes: Int = (total.toLong() * d.secPerReel / 60L).toInt()
++    val peak: Int = hours.indices.maxByOrNull { hours[it] } ?: 0
++    val limit: Int = d.limit
++    val everyone: Int? = d.everyone
++    val level: Int = reelsLevel(if (d.days.size > 1) total / d.days.size else total, d.limit)
++}
++
++private const val RW_EMPTY = 0
++private const val RW_TOTAL = 1
++private const val RW_WHERE = 2
++private const val RW_PULLED = 3
++private const val RW_TIME = 4
++private const val RW_PEAK = 5
++private const val RW_LONGEST = 6
++private const val RW_VS = 7
++private const val RW_VERDICT = 8
++private const val RW_EVERYONE = 9
++
++private val RW_CREAM = Color(0xFFFAE8BD)
++private val RW_RED = Color(0xFFE85555)
++
++private fun rwKinds(s: RwStats): List<Int> =
++    if (s.total == 0) {
++        listOf(RW_EMPTY)
++    } else {
++        listOfNotNull(
++            RW_TOTAL, RW_WHERE, RW_PULLED, RW_TIME, RW_PEAK, RW_LONGEST, RW_VS,
++            if (s.everyone != null) RW_EVERYONE else null,
++            RW_VERDICT,
++        )
++    }
++
++private fun rwBrush(kind: Int): Brush {
++    val colors = when (kind) {
++        RW_TOTAL -> 0xFF4A2C30 to 0xFF1E1114
++        RW_WHERE -> 0xFF4338B8 to 0xFF17124A
++        RW_PULLED -> 0xFF3A7D6E to 0xFF10261F
++        RW_TIME -> 0xFF8A4B1F to 0xFF2B1608
++        RW_PEAK -> 0xFF1E5E8C to 0xFF0B2236
++        RW_LONGEST -> 0xFF7A2E6B to 0xFF260F22
++        RW_VS -> 0xFF2F5D3A to 0xFF0F2214
++        RW_VERDICT -> 0xFF5A1F24 to 0xFF1D0B0D
++        RW_EVERYONE -> 0xFF7A3B12 to 0xFF24120A
++        else -> 0xFF303040 to 0xFF14141C
++    }
++    return Brush.verticalGradient(listOf(Color(colors.first), Color(colors.second)))
++}
++
++private fun rwHourLabel(h: Int): String {
++    val cal = Calendar.getInstance()
++    cal.set(Calendar.HOUR_OF_DAY, h)
++    cal.set(Calendar.MINUTE, 0)
++    return SimpleDateFormat("h a", Locale.getDefault()).format(cal.time)
++}
++
++@Composable
++fun ReelsWrapped(data: ReelsWrappedData, onClose: () -> Unit) {
++    val ctx = LocalContext.current
++    val stats = remember(data) { RwStats(data) }
++    val kinds = remember(stats) { rwKinds(stats) }
++    var index by remember { mutableIntStateOf(0) }
++    val progress = remember { Animatable(0f) }
++    val last = kinds.size - 1
++    val dateText = remember { SimpleDateFormat("EEE, d MMM", Locale.getDefault()).format(Date()) }
++    val shareText = stringResource(R.string.rw_share_text, stats.total, stats.minutes)
++
++    // Each slide plays for a few seconds, then the story moves on by itself.
++    LaunchedEffect(index) {
++        progress.snapTo(0f)
++        progress.animateTo(1f, tween(5000, easing = LinearEasing))
++        if (index < last) index += 1
++    }
++
++    Box(
++        Modifier
++            .fillMaxSize()
++            .pointerInput(kinds) {
++                detectTapGestures { pos ->
++                    if (pos.x < size.width / 3f) {
++                        if (index > 0) index -= 1
++                    } else if (index < last) {
++                        index += 1
++                    }
++                }
++            },
++    ) {
++        Crossfade(targetState = index, animationSpec = tween(300)) { i ->
++            Box(
++                Modifier
++                    .fillMaxSize()
++                    .background(rwBrush(kinds[i])),
++            ) {
++                RwSlide(kinds[i], stats)
++            }
++        }
++
++        Column(
++            Modifier
++                .fillMaxSize()
++                .statusBarsPadding()
++                .navigationBarsPadding(),
++        ) {
++            Row(
++                Modifier
++                    .fillMaxWidth()
++                    .padding(horizontal = 16.dp, vertical = 12.dp),
++                horizontalArrangement = Arrangement.spacedBy(5.dp),
++            ) {
++                kinds.indices.forEach { i ->
++                    val f = if (i < index) 1f else if (i == index) progress.value else 0f
++                    Box(
++                        Modifier
++                            .weight(1f)
++                            .height(3.dp)
++                            .clip(RoundedCornerShape(2.dp))
++                            .background(Color(0x33FFFFFF)),
++                    ) {
++                        Box(
++                            Modifier
++                                .fillMaxHeight()
++                                .fillMaxWidth(f)
++                                .background(Color.White),
++                        )
++                    }
++                }
++            }
++            Row(
++                Modifier
++                    .fillMaxWidth()
++                    .padding(horizontal = 16.dp),
++                verticalAlignment = Alignment.CenterVertically,
++            ) {
++                Column(Modifier.weight(1f)) {
++                    Text(
++                        stringResource(R.string.rw_title),
++                        color = Color.White,
++                        fontSize = 20.sp,
++                        fontWeight = FontWeight.Bold,
++                    )
++                    Text(dateText, color = Color(0xB3FFFFFF), fontSize = 14.sp)
++                }
++                Box(
++                    Modifier
++                        .size(44.dp)
++                        .clip(CircleShape)
++                        .background(Color(0x33FFFFFF))
++                        .clickable(onClick = onClose),
++                    contentAlignment = Alignment.Center,
++                ) {
++                    PathIcon(Glyph.CLOSE.pathData, Color.White, 22.dp)
++                }
++            }
++            Spacer(Modifier.weight(1f))
++            Box(
++                Modifier
++                    .fillMaxWidth()
++                    .padding(bottom = 24.dp),
++                contentAlignment = Alignment.Center,
++            ) {
++                Box(
++                    Modifier
++                        .clip(RoundedCornerShape(50))
++                        .border(1.dp, Color(0x66FFFFFF), RoundedCornerShape(50))
++                        .clickable {
++                            try {
++                                val send = Intent(Intent.ACTION_SEND)
++                                    .setType("text/plain")
++                                    .putExtra(Intent.EXTRA_TEXT, shareText)
++                                ctx.startActivity(Intent.createChooser(send, null))
++                            } catch (e: Exception) {
++                                // No app can share text: nothing to do.
++                            }
++                        }
++                        .padding(horizontal = 32.dp, vertical = 14.dp),
++                ) {
++                    Text(
++                        stringResource(R.string.rw_share),
++                        color = Color.White,
++                        fontSize = 17.sp,
++                        fontWeight = FontWeight.Medium,
++                    )
++                }
++            }
++        }
++    }
++}
++
++@Composable
++private fun RwLayout(label: String, content: @Composable ColumnScope.() -> Unit) {
++    Column(
++        Modifier
++            .fillMaxSize()
++            .padding(horizontal = 24.dp),
++        horizontalAlignment = Alignment.CenterHorizontally,
++        verticalArrangement = Arrangement.Center,
++    ) {
++        Text(
++            label,
++            color = Color(0xB3FFFFFF),
++            fontSize = 15.sp,
++            fontWeight = FontWeight.Medium,
++            letterSpacing = 2.sp,
++            textAlign = TextAlign.Center,
++        )
++        Spacer(Modifier.height(20.dp))
++        content()
++    }
++}
++
++@Composable
++private fun RwBig(text: String, color: Color = RW_CREAM, size: Int = 104) {
++    Text(
++        text,
++        color = color,
++        fontSize = size.sp,
++        fontWeight = FontWeight.Black,
++        textAlign = TextAlign.Center,
++    )
++}
++
++@Composable
++private fun RwCaption(text: String) {
++    Text(
++        text,
++        color = Color.White,
++        fontSize = 24.sp,
++        fontWeight = FontWeight.Bold,
++        textAlign = TextAlign.Center,
++    )
++}
++
++@Composable
++private fun RwSlide(kind: Int, s: RwStats) {
++    when (kind) {
++        RW_EMPTY -> RwLayout(stringResource(R.string.rw_title)) {
++            ReelsBrainFace(0, Modifier.size(180.dp))
++            Spacer(Modifier.height(16.dp))
++            RwCaption(stringResource(R.string.rw_empty))
++        }
++
++        RW_TOTAL -> RwLayout(stringResource(R.string.rw_label_total)) {
++            ReelsBrainFace(s.level, Modifier.size(200.dp))
++            Spacer(Modifier.height(12.dp))
++            RwBig(s.total.toString(), RW_RED, 96)
++            RwCaption(stringResource(R.string.rw_videos))
++        }
++
++        RW_WHERE -> RwLayout(stringResource(R.string.rw_label_where)) {
++            val top = s.byApp.first()
++            ReelsAppIcon(top.first, 96.dp)
++            Spacer(Modifier.height(8.dp))
++            RwBig("${top.second * 100 / s.total}%", RW_CREAM, 88)
++            RwCaption(top.first.label)
++            Spacer(Modifier.height(24.dp))
++            Row(horizontalArrangement = Arrangement.spacedBy(36.dp)) {
++                s.byApp.drop(1).take(3).forEach { (app, n) ->
++                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
++                        ReelsAppIcon(app, 56.dp)
++                        Spacer(Modifier.height(6.dp))
++                        Text(
++                            "${n * 100 / s.total}%",
++                            color = Color.White,
++                            fontSize = 26.sp,
++                            fontWeight = FontWeight.Black,
++                        )
++                        Text(app.label, color = Color(0xB3FFFFFF), fontSize = 14.sp)
++                    }
++                }
++            }
++            Spacer(Modifier.height(28.dp))
++            Row(
++                Modifier
++                    .fillMaxWidth()
++                    .height(24.dp)
++                    .clip(RoundedCornerShape(12.dp)),
++            ) {
++                s.byApp.forEach { (app, n) ->
++                    Box(
++                        Modifier
++                            .weight(n.toFloat())
++                            .fillMaxHeight()
++                            .background(Color(app.color)),
++                    )
++                }
++            }
++        }
++
++        RW_PULLED -> RwLayout(stringResource(R.string.rw_label_pulled)) {
++            RwBig(s.opens.toString())
++            RwCaption(stringResource(R.string.rw_opened))
++            Spacer(Modifier.height(28.dp))
++            val maxH = (s.hours.maxOrNull() ?: 0).coerceAtLeast(1)
++            Row(
++                Modifier
++                    .fillMaxWidth()
++                    .height(44.dp)
++                    .clip(RoundedCornerShape(12.dp))
++                    .background(Color(0x33FFFFFF)),
++            ) {
++                for (h in 0 until 24) {
++                    val a = if (s.hours[h] == 0) 0f else 0.3f + 0.7f * (s.hours[h].toFloat() / maxH.toFloat())
++                    Box(
++                        Modifier
++                            .weight(1f)
++                            .fillMaxHeight()
++                            .background(RW_CREAM.copy(alpha = a)),
++                    )
++                }
++            }
++            Spacer(Modifier.height(8.dp))
++            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
++                listOf(0, 6, 12, 18, 0).forEach {
++                    Text(rwHourLabel(it), color = Color(0xB3FFFFFF), fontSize = 12.sp)
++                }
++            }
++        }
++
++        RW_TIME -> RwLayout(stringResource(R.string.rw_label_time)) {
++            val m = s.minutes
++            val text = if (m >= 60) {
++                stringResource(R.string.rw_hm, m / 60, m % 60)
++            } else {
++                stringResource(R.string.rw_min, m)
++            }
++            RwBig(text, RW_CREAM, 56)
++            if (m >= 20) {
++                Spacer(Modifier.height(12.dp))
++                RwCaption(stringResource(R.string.rw_time_eq, (m / 45).coerceAtLeast(1)))
++            }
++        }
++
++        RW_PEAK -> RwLayout(stringResource(R.string.rw_label_peak)) {
++            RwBig(rwHourLabel(s.peak), RW_CREAM, 80)
++            Spacer(Modifier.height(12.dp))
++            RwCaption(stringResource(R.string.rw_peak_hint))
++        }
++
++        RW_LONGEST -> RwLayout(stringResource(R.string.rw_label_longest)) {
++            RwBig(s.longest.toString())
++            RwCaption(stringResource(R.string.rw_longest_unit))
++        }
++
++        RW_VS -> RwLayout(stringResource(R.string.rw_label_vs)) {
++            if (s.prevTotal == 0) {
++                RwCaption(stringResource(R.string.rw_vs_none))
++            } else {
++                val pct = (s.total - s.prevTotal) * 100 / s.prevTotal
++                val up = pct >= 0
++                Text(
++                    if (up) "▲" else "▼",
++                    color = if (up) RW_RED else Color(0xFF6FE08A),
++                    fontSize = 40.sp,
++                )
++                RwBig("${abs(pct)}%", if (up) RW_RED else Color(0xFF6FE08A), 96)
++                RwCaption(stringResource(if (up) R.string.rw_vs_more else R.string.rw_vs_less))
++            }
++        }
++
++        RW_EVERYONE -> RwLayout(stringResource(R.string.rw_label_everyone)) {
++            ReelsBrainFace(s.level, Modifier.size(180.dp))
++            Spacer(Modifier.height(16.dp))
++            RwCaption(stringResource(R.string.rw_everyone_pre))
++            RwBig("${s.everyone ?: 0}%", RW_RED, 112)
++            RwCaption(stringResource(R.string.rw_everyone_post))
++        }
++
++        else -> RwLayout(stringResource(R.string.rw_label_verdict)) {
++            ReelsBrainFace(s.level, Modifier.size(220.dp))
++            Spacer(Modifier.height(16.dp))
++            RwCaption(
++                stringResource(
++                    when (s.level) {
++                        0 -> R.string.reels_mood_0
++                        1 -> R.string.reels_mood_1
++                        2 -> R.string.reels_mood_2
++                        else -> R.string.reels_mood_3
++                    },
++                ),
++            )
++            Spacer(Modifier.height(8.dp))
++            Text(
++                stringResource(R.string.rw_limit_line, s.limit),
++                color = Color(0xB3FFFFFF),
++                fontSize = 16.sp,
++            )
++        }
++    }
++}
+--- a/src/main/java/com/rigen/volumeui/ReelsStore.kt
++++ b/src/main/java/com/rigen/volumeui/ReelsStore.kt
+@@ -0,0 +1,365 @@
++package com.rigen.volumeui
++
++import android.content.Context
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableIntStateOf
++import androidx.compose.runtime.setValue
++import org.json.JSONArray
++import org.json.JSONObject
++import java.text.SimpleDateFormat
++import java.util.Calendar
++import java.util.Date
++import java.util.Locale
++import kotlin.math.abs
++
++/** An app we can count short videos in. [color] is an ARGB value used for charts. */
++class ReelsApp(val key: String, val label: String, val packages: List<String>, val color: Long)
++
++val REELS_APPS = listOf(
++    ReelsApp("yt", "YouTube", listOf("com.google.android.youtube"), 0xFFEA3323),
++    ReelsApp("ig", "Instagram", listOf("com.instagram.android"), 0xFFEC5B8C),
++    ReelsApp("tt", "TikTok", listOf("com.zhiliaoapp.musically", "com.ss.android.ugc.trill"), 0xFF6CF0E8),
++    ReelsApp("fb", "Facebook", listOf("com.facebook.katana", "com.facebook.lite"), 0xFF4C8DFF),
++    ReelsApp("sc", "Snapchat", listOf("com.snapchat.android"), 0xFFFFD84D),
++)
++
++/** A stretch of watching: it starts at [start] and [count] videos went by before a long pause. */
++class ReelsSession(val start: Long, val count: Int)
++
++/** Everything counted on one calendar day. */
++class ReelsDay(
++    val key: String,
++    val counts: Map<String, Int>,
++    val hours: IntArray,
++    val sessions: List<ReelsSession>,
++    val lastAt: Long,
++) {
++    val total: Int get() = counts.values.sum()
++    val opens: Int get() = sessions.size
++    val longest: Int get() = sessions.maxOfOrNull { it.count } ?: 0
++}
++
++/** What the accessibility service saw in one scroll event (no screen content is ever read). */
++class ReelsSample(
++    val pkg: String,
++    val className: String,
++    val from: Int,
++    val to: Int,
++    val items: Int,
++    val scrollY: Int,
++    val deltaY: Int,
++    val deltaX: Int,
++    val screenH: Int,
++)
++
++class ReelsVerdict(val counted: Boolean, val reason: String)
++
++/**
++ * Settings and counts, kept on this phone only (SharedPreferences, like the clock). Every change
++ * bumps [tick] so the open screens and the floating badge redraw by themselves.
++ */
++object ReelsStore {
++    var tick by mutableIntStateOf(0)
++        private set
++
++    /** A pause longer than this ends a "session" (one time you opened reels). */
++    const val SESSION_GAP_MS = 120_000L
++
++    /** Two videos can't really be swiped faster than this, so closer events are one swipe. */
++    const val MIN_GAP_MS = 450L
++
++    private const val KEEP_DAYS = 90
++
++    private fun sp(c: Context) =
++        c.applicationContext.getSharedPreferences("kanade_reels", Context.MODE_PRIVATE)
++
++    /** Something changed: redraw the open screens, the floating brain, the lock and the widget. */
++    private fun changed(c: Context) {
++        tick++
++        val svc = VolumeAccessibilityService.instance
++        svc?.refreshReelsBadge()
++        svc?.refreshReelsLock()
++        ReelsWidgetUpdater.requestUpdate(c)
++    }
++
++    // ── Settings (counting is off until the person turns it on) ──
++    fun enabled(c: Context): Boolean = sp(c).getBoolean("on", false)
++    fun setEnabled(c: Context, v: Boolean) {
++        sp(c).edit().putBoolean("on", v).apply()
++        changed(c)
++    }
++
++    fun overlay(c: Context): Boolean = sp(c).getBoolean("overlay", true)
++    fun setOverlay(c: Context, v: Boolean) {
++        sp(c).edit().putBoolean("overlay", v).apply()
++        changed(c)
++    }
++
++    fun apps(c: Context): Set<String> =
++        (sp(c).getString("apps", "yt,ig,tt") ?: "").split(",").filter { it.isNotBlank() }.toSet()
++
++    fun setApp(c: Context, key: String, on: Boolean) {
++        val s = apps(c).toMutableSet()
++        if (on) s.add(key) else s.remove(key)
++        sp(c).edit().putString("apps", s.joinToString(",")).apply()
++        changed(c)
++    }
++
++    fun limit(c: Context): Int = sp(c).getInt("limit", 100)
++    fun setLimit(c: Context, v: Int) {
++        sp(c).edit().putInt("limit", v.coerceIn(10, 1000)).apply()
++        changed(c)
++    }
++
++    fun secPerReel(c: Context): Int = sp(c).getInt("sec", 25)
++    fun setSecPerReel(c: Context, v: Int) {
++        sp(c).edit().putInt("sec", v.coerceIn(5, 120)).apply()
++        changed(c)
++    }
++
++    /** Calibration mode: keeps a short in-memory log of the scroll events (never saved). */
++    fun diagOn(c: Context): Boolean = sp(c).getBoolean("diag", false)
++    fun setDiagOn(c: Context, v: Boolean) {
++        sp(c).edit().putBoolean("diag", v).apply()
++        changed(c)
++    }
++
++    // ── Lock when the daily limit is reached ──
++    /** After a lock ends, this many more videos are allowed before the next lock. */
++    const val LOCK_GRACE = 10
++
++    fun lockOn(c: Context): Boolean = sp(c).getBoolean("lock", false)
++    fun setLockOn(c: Context, v: Boolean) {
++        sp(c).edit().putBoolean("lock", v).apply()
++        changed(c)
++    }
++
++    fun lockMinutes(c: Context): Int = sp(c).getInt("lockMin", 60)
++    fun setLockMinutes(c: Context, v: Int) {
++        sp(c).edit().putInt("lockMin", v.coerceIn(5, 720)).apply()
++        changed(c)
++    }
++
++    fun lockUntil(c: Context): Long = sp(c).getLong("lockUntil", 0L)
++
++    fun isLocked(c: Context, now: Long): Boolean = lockOn(c) && lockUntil(c) > now
++
++    /**
++     * Starts the lock when today's [total] reached the limit (or, after a lock ended, the limit plus
++     * the videos watched since). Returns true if the apps are locked right now.
++     */
++    fun startLockIfNeeded(c: Context, total: Int, now: Long): Boolean {
++        if (!lockOn(c)) return false
++        if (lockUntil(c) > now) return true
++        val p = sp(c)
++        val day = dayKey(now)
++        val lim = limit(c)
++        val at = if (p.getString("lockDay", "") == day) p.getInt("lockAt", lim) else lim
++        if (total < at) return false
++        p.edit()
++            .putLong("lockUntil", now + lockMinutes(c) * 60_000L)
++            .putString("lockDay", day)
++            .putInt("lockAt", total + LOCK_GRACE)
++            .apply()
++        return true
++    }
++
++    // ── Sharing the daily totals with the bot (off until turned on) ──
++    fun syncOn(c: Context): Boolean = sp(c).getBoolean("sync", false)
++    fun setSyncOn(c: Context, v: Boolean) {
++        sp(c).edit().putBoolean("sync", v).apply()
++        changed(c)
++    }
++
++    fun appOf(pkg: String): ReelsApp? = REELS_APPS.firstOrNull { pkg in it.packages }
++
++    // ── Days ──
++    private fun fmt() = SimpleDateFormat("yyyy-MM-dd", Locale.US)
++
++    fun dayKey(ms: Long): String = fmt().format(Date(ms))
++
++    fun dayKeyOffset(daysAgo: Int): String {
++        val cal = Calendar.getInstance()
++        cal.add(Calendar.DAY_OF_YEAR, -daysAgo)
++        return fmt().format(cal.time)
++    }
++
++    private fun empty(key: String) = ReelsDay(key, emptyMap(), IntArray(24), emptyList(), 0L)
++
++    fun day(c: Context, key: String): ReelsDay {
++        val raw = sp(c).getString("d_$key", null) ?: return empty(key)
++        return try {
++            parse(key, JSONObject(raw))
++        } catch (e: Exception) {
++            empty(key)
++        }
++    }
++
++    fun today(c: Context): ReelsDay = day(c, dayKey(System.currentTimeMillis()))
++
++    /** The last [n] days, oldest first, ending today. [skip] drops that many of the newest days. */
++    fun lastDays(c: Context, n: Int, skip: Int = 0): List<ReelsDay> =
++        (n - 1 + skip downTo skip).map { day(c, dayKeyOffset(it)) }
++
++    private fun parse(key: String, o: JSONObject): ReelsDay {
++        val counts = HashMap<String, Int>()
++        val co = o.optJSONObject("c")
++        if (co != null) {
++            val names = co.keys()
++            while (names.hasNext()) {
++                val k = names.next()
++                counts[k] = co.optInt(k, 0)
++            }
++        }
++        val hours = IntArray(24)
++        val ha = o.optJSONArray("h")
++        if (ha != null) {
++            for (i in 0 until minOf(24, ha.length())) hours[i] = ha.optInt(i, 0)
++        }
++        val sess = ArrayList<ReelsSession>()
++        val sa = o.optJSONArray("s")
++        if (sa != null) {
++            for (i in 0 until sa.length()) {
++                val p = sa.optJSONArray(i) ?: continue
++                sess.add(ReelsSession(p.optLong(0, 0L), p.optInt(1, 0)))
++            }
++        }
++        return ReelsDay(key, counts, hours, sess, o.optLong("l", 0L))
++    }
++
++    private fun save(c: Context, d: ReelsDay) {
++        val o = JSONObject()
++        val co = JSONObject()
++        d.counts.forEach { (k, v) -> co.put(k, v) }
++        o.put("c", co)
++        val ha = JSONArray()
++        d.hours.forEach { ha.put(it) }
++        o.put("h", ha)
++        val sa = JSONArray()
++        d.sessions.forEach { sa.put(JSONArray().put(it.start).put(it.count)) }
++        o.put("s", sa)
++        o.put("l", d.lastAt)
++        sp(c).edit().putString("d_${d.key}", o.toString()).apply()
++    }
++
++    /** Counts one short video for [appKey]. Returns today's new total. */
++    fun record(c: Context, appKey: String, now: Long): Int {
++        val key = dayKey(now)
++        val d = day(c, key)
++        val counts = d.counts.toMutableMap()
++        counts[appKey] = (counts[appKey] ?: 0) + 1
++
++        val hours = d.hours.copyOf()
++        val hour = Calendar.getInstance().apply { timeInMillis = now }.get(Calendar.HOUR_OF_DAY)
++        hours[hour] = hours[hour] + 1
++
++        val sess = d.sessions.toMutableList()
++        if (sess.isEmpty() || now - d.lastAt > SESSION_GAP_MS) {
++            sess.add(ReelsSession(now, 1))
++        } else {
++            val last = sess.removeAt(sess.size - 1)
++            sess.add(ReelsSession(last.start, last.count + 1))
++        }
++
++        save(c, ReelsDay(key, counts, hours, sess, now))
++        if (sess.size == 1 && sess[0].count == 1) prune(c)
++        val total = counts.values.sum()
++        startLockIfNeeded(c, total, now)
++        changed(c)
++        ReelsSync.request(c)
++        return total
++    }
++
++    /** Forgets days older than [KEEP_DAYS] (runs once a day, on the first video of the day). */
++    private fun prune(c: Context) {
++        val p = sp(c)
++        val cutoff = dayKeyOffset(KEEP_DAYS)
++        val old = p.all.keys.filter { it.startsWith("d_") && it.substring(2) < cutoff }
++        if (old.isNotEmpty()) {
++            val e = p.edit()
++            old.forEach { e.remove(it) }
++            e.apply()
++        }
++    }
++
++    fun clearAll(c: Context) {
++        val p = sp(c)
++        val e = p.edit()
++        p.all.keys.filter { it.startsWith("d_") }.forEach { e.remove(it) }
++        e.apply()
++        changed(c)
++    }
++}
++
++/**
++ * Turns scroll events into a count of short videos. A reels/shorts screen is a full-page pager: one
++ * item on screen at a time, and each swipe moves to the next item. So a video is counted when the
++ * first visible item changes in a pager-like list, or when a single event jumps about a screen.
++ */
++object ReelsEngine {
++    var logTick by mutableIntStateOf(0)
++        private set
++
++    /** Newest line first. Only kept in memory while calibration mode is on. */
++    val log = ArrayList<String>()
++
++    private val lastFrom = HashMap<String, Int>()
++    private var lastPkg = ""
++    private var lastCountAt = 0L
++
++    /** The app in front changed: forget the old list positions so the first scroll isn't counted. */
++    fun onForeground(pkg: String) {
++        if (pkg != lastPkg) {
++            lastFrom.clear()
++            lastPkg = pkg
++        }
++    }
++
++    fun judge(s: ReelsSample, now: Long): ReelsVerdict {
++        val prev = lastFrom[s.pkg] ?: -1
++        if (s.from >= 0) lastFrom[s.pkg] = s.from
++
++        val horizontal = abs(s.deltaX) > abs(s.deltaY) && abs(s.deltaX) > 0
++        if (horizontal) return ReelsVerdict(false, "horizontal")
++
++        val pagerLike = s.from >= 0 && s.to >= s.from && s.to - s.from <= 1
++        val indexMoved = pagerLike && prev >= 0 && s.from != prev
++        val bigJump = s.screenH > 0 && abs(s.deltaY) >= s.screenH / 2
++        if (!indexMoved && !bigJump) return ReelsVerdict(false, "not a page change")
++
++        if (now - lastCountAt < ReelsStore.MIN_GAP_MS) return ReelsVerdict(false, "too fast")
++        lastCountAt = now
++        return ReelsVerdict(true, if (indexMoved) "index" else "jump")
++    }
++
++    fun onScroll(c: Context, s: ReelsSample, now: Long) {
++        val app = ReelsStore.appOf(s.pkg) ?: return
++        val on = ReelsStore.enabled(c)
++        val appOn = ReelsStore.apps(c).contains(app.key)
++        val verdict = when {
++            !on -> ReelsVerdict(false, "counter off")
++            !appOn -> ReelsVerdict(false, "app off")
++            else -> judge(s, now)
++        }
++        if (ReelsStore.diagOn(c)) addLog(app, s, verdict, now)
++        if (verdict.counted) ReelsStore.record(c, app.key, now)
++    }
++
++    private fun addLog(app: ReelsApp, s: ReelsSample, v: ReelsVerdict, now: Long) {
++        val time = SimpleDateFormat("HH:mm:ss.SSS", Locale.US).format(Date(now))
++        val cls = s.className.substringAfterLast('.')
++        val mark = if (v.counted) "+1" else "--"
++        log.add(
++            0,
++            "$time ${app.key} $mark ${v.reason}\n   $cls from=${s.from} to=${s.to} n=${s.items} " +
++                "y=${s.scrollY} dy=${s.deltaY} dx=${s.deltaX}",
++        )
++        while (log.size > 80) log.removeAt(log.size - 1)
++        logTick++
++    }
++
++    fun clearLog() {
++        log.clear()
++        logTick++
++    }
++}
+--- a/src/main/java/com/rigen/volumeui/ReelsSync.kt
++++ b/src/main/java/com/rigen/volumeui/ReelsSync.kt
+@@ -0,0 +1,77 @@
++package com.rigen.volumeui
++
++import android.content.Context
++import kotlinx.coroutines.CoroutineScope
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.SupervisorJob
++import kotlinx.coroutines.launch
++import org.json.JSONObject
++
++/**
++ * Optional sync with the Kanade bot. Only the daily totals per app go out (never what was watched),
++ * so the bot can rank people and the Wrapped story can show "you vs everyone". Off until turned on.
++ */
++object ReelsSync {
++    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
++    private var lastAt = 0L
++    private var running = false
++
++    /** Called after every counted video; sends at most once a minute and only when sync is on. */
++    fun request(c: Context) {
++        if (!ReelsStore.syncOn(c)) return
++        val now = System.currentTimeMillis()
++        if (running || now - lastAt < 60_000L) return
++        val app = c.applicationContext
++        val session = AccountStore.load(app) ?: return
++        running = true
++        lastAt = now
++        scope.launch {
++            try {
++                push(app, session.token)
++            } finally {
++                running = false
++            }
++        }
++    }
++
++    private fun payload(c: Context): JSONObject {
++        val days = JSONObject()
++        for (d in ReelsStore.lastDays(c, 7)) {
++            if (d.total <= 0) continue
++            days.put(
++                d.key,
++                JSONObject()
++                    .put("a", JSONObject(d.counts.toMap()))
++                    .put("o", d.opens)
++                    .put("l", d.longest),
++            )
++        }
++        return JSONObject().put("days", days).put("limit", ReelsStore.limit(c))
++    }
++
++    private suspend fun push(c: Context, token: String): ApiResult =
++        KanadeApi.call("/me/reels/sync", payload(c), token)
++
++    /** Sends right now (when sync was just turned on). */
++    suspend fun pushNow(c: Context) {
++        val s = AccountStore.load(c) ?: return
++        lastAt = System.currentTimeMillis()
++        push(c, s.token)
++    }
++
++    /** Turns sync off for good: the bot forgets everything it was sent. */
++    suspend fun clearRemote(c: Context) {
++        val s = AccountStore.load(c) ?: return
++        KanadeApi.call("/me/reels/sync", JSONObject().put("clear", true), s.token)
++    }
++
++    /** Sends the latest numbers, then asks how this person ranks. Null when there is no answer yet. */
++    suspend fun pushAndRank(c: Context, period: String): Int? {
++        val s = AccountStore.load(c) ?: return null
++        push(c, s.token)
++        val r = KanadeApi.call("/me/reels/rank", JSONObject().put("period", period), s.token)
++        val b = r.body
++        if (!r.ok || b == null || b.isNull("pct")) return null
++        return b.optInt("pct", -1).takeIf { it in 0..100 }
++    }
++}
+--- a/src/main/java/com/rigen/volumeui/ReelsWidget.kt
++++ b/src/main/java/com/rigen/volumeui/ReelsWidget.kt
+@@ -0,0 +1,221 @@
++package com.rigen.volumeui
++
++import android.app.PendingIntent
++import android.appwidget.AppWidgetManager
++import android.appwidget.AppWidgetProvider
++import android.content.ComponentName
++import android.content.Context
++import android.content.Intent
++import android.graphics.Bitmap
++import android.graphics.Canvas
++import android.graphics.Paint
++import android.graphics.Path
++import android.graphics.RectF
++import android.os.Handler
++import android.os.Looper
++import android.os.SystemClock
++import android.widget.RemoteViews
++
++/** The home-screen widget: the brain, today's count and how the brain feels. */
++class ReelsWidget : AppWidgetProvider() {
++    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
++        ReelsWidgetUpdater.updateNow(context)
++    }
++}
++
++object ReelsWidgetUpdater {
++    private val main = Handler(Looper.getMainLooper())
++    private var lastAt = 0L
++    private var pending = false
++
++    /** Every counted video asks for an update; they are bunched so the launcher is not flooded. */
++    fun requestUpdate(c: Context) {
++        val app = c.applicationContext
++        val wait = 4000L - (SystemClock.elapsedRealtime() - lastAt)
++        if (wait <= 0L) {
++            updateNow(app)
++        } else if (!pending) {
++            pending = true
++            main.postDelayed({
++                pending = false
++                updateNow(app)
++            }, wait)
++        }
++    }
++
++    fun updateNow(c: Context) {
++        lastAt = SystemClock.elapsedRealtime()
++        try {
++            val m = AppWidgetManager.getInstance(c)
++            val ids = m.getAppWidgetIds(ComponentName(c, ReelsWidget::class.java))
++            if (ids.isEmpty()) return
++            val rv = views(c)
++            ids.forEach { m.updateAppWidget(it, rv) }
++        } catch (e: Throwable) {
++            Diag.error(c, "reels widget", e)
++        }
++    }
++
++    private fun views(c: Context): RemoteViews {
++        val today = ReelsStore.today(c)
++        val limit = ReelsStore.limit(c)
++        val level = reelsLevel(today.total, limit)
++        val color = when (level) {
++            0 -> 0xFF34A853
++            1 -> 0xFFF29900
++            2 -> 0xFFE5484D
++            else -> 0xFFB3261E
++        }.toInt()
++
++        val rv = RemoteViews(c.packageName, R.layout.widget_reels)
++        rv.setImageViewBitmap(R.id.w_reels_brain, ReelsBrainBitmap.render(level, 160))
++        rv.setTextViewText(R.id.w_reels_count, today.total.toString())
++        rv.setTextColor(R.id.w_reels_count, color)
++        rv.setTextViewText(R.id.w_reels_mood, c.getString(reelsMoodRes(level)))
++        rv.setTextViewText(
++            R.id.w_reels_sub,
++            if (ReelsStore.enabled(c)) c.getString(R.string.reels_of_limit, limit) else c.getString(R.string.widget_reels_off),
++        )
++        rv.setOnClickPendingIntent(
++            R.id.w_root,
++            PendingIntent.getActivity(
++                c, 960001,
++                Intent(c, MainActivity::class.java).putExtra(EXTRA_PAGE, PAGE_REELS)
++                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
++                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
++            ),
++        )
++        return rv
++    }
++}
++
++/** The same cartoon brain as [ReelsBrainFace], drawn into a bitmap because widgets can't show Compose. */
++object ReelsBrainBitmap {
++    fun render(level: Int, px: Int): Bitmap {
++        val bmp = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
++        val cv = Canvas(bmp)
++        val w = px.toFloat()
++        val h = px.toFloat()
++        val body = when (level) {
++            0 -> 0xFFF4B5C6
++            1 -> 0xFFDDB9C0
++            2 -> 0xFFBBA9AD
++            else -> 0xFF857173
++        }.toInt()
++        val ink = 0xFF2A1A1D.toInt()
++        val fold = 0x33000000
++        val crack = 0xFF8E1B1B.toInt()
++        val stroke = w * 0.03f
++
++        val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
++        val line = Paint(Paint.ANTI_ALIAS_FLAG).apply {
++            style = Paint.Style.STROKE
++            strokeCap = Paint.Cap.ROUND
++            strokeJoin = Paint.Join.ROUND
++        }
++        fun disc(color: Int, r: Float, x: Float, y: Float) {
++            fill.color = color
++            cv.drawCircle(x, y, r, fill)
++        }
++        fun pen(color: Int, width: Float) {
++            line.color = color
++            line.strokeWidth = width
++        }
++
++        val cx = w / 2f
++        val cy = h * 0.5f
++        val r = w * 0.17f
++        val bumps = listOf(
++            cx - w * 0.24f to cy - h * 0.22f,
++            cx to cy - h * 0.29f,
++            cx + w * 0.24f to cy - h * 0.22f,
++            cx - w * 0.31f to cy,
++            cx + w * 0.31f to cy,
++            cx - w * 0.22f to cy + h * 0.2f,
++            cx + w * 0.22f to cy + h * 0.2f,
++        )
++        bumps.forEach { disc(body, r, it.first, it.second) }
++        disc(body, w * 0.34f, cx, cy)
++
++        // Folds.
++        pen(fold, stroke)
++        cv.drawLine(cx, cy - h * 0.38f, cx, cy - h * 0.24f, line)
++        cv.drawArc(RectF(cx - w * 0.36f, cy - h * 0.32f, cx - w * 0.10f, cy - h * 0.12f), 200f, 110f, false, line)
++        cv.drawArc(RectF(cx + w * 0.10f, cy - h * 0.32f, cx + w * 0.36f, cy - h * 0.12f), 230f, 110f, false, line)
++
++        // Eyes.
++        val eyeR = w * 0.085f
++        val eyeY = cy - h * 0.04f
++        val eyeXs = listOf(cx - w * 0.14f, cx + w * 0.14f)
++        if (level >= 3) {
++            pen(ink, stroke)
++            for (ex in eyeXs) {
++                val d = eyeR * 0.8f
++                cv.drawLine(ex - d, eyeY - d, ex + d, eyeY + d, line)
++                cv.drawLine(ex - d, eyeY + d, ex + d, eyeY - d, line)
++            }
++        } else {
++            val lid = when (level) {
++                0 -> 0f
++                1 -> 0.35f
++                else -> 0.55f
++            }
++            for (ex in eyeXs) {
++                disc(0xFFFFFFFF.toInt(), eyeR, ex, eyeY)
++                disc(ink, eyeR * 0.5f, ex, eyeY + eyeR * 0.15f)
++                if (lid > 0f) {
++                    fill.color = body
++                    cv.drawRect(ex - eyeR, eyeY - eyeR, ex + eyeR, eyeY - eyeR + eyeR * 2f * lid, fill)
++                    pen(ink, stroke * 0.7f)
++                    cv.drawLine(
++                        ex - eyeR, eyeY - eyeR + eyeR * 2f * lid,
++                        ex + eyeR, eyeY - eyeR + eyeR * 2f * lid, line,
++                    )
++                }
++            }
++            if (level >= 1) {
++                pen(0x66000000, stroke * 0.8f)
++                for (ex in eyeXs) {
++                    cv.drawArc(RectF(ex - eyeR, eyeY - eyeR * 0.1f, ex + eyeR, eyeY + eyeR * 1.9f), 20f, 140f, false, line)
++                }
++            }
++        }
++
++        // Mouth.
++        val my = cy + h * 0.17f
++        pen(ink, stroke)
++        when (level) {
++            0 -> cv.drawArc(RectF(cx - w * 0.1f, my - h * 0.06f, cx + w * 0.1f, my + h * 0.06f), 20f, 140f, false, line)
++            1 -> cv.drawLine(cx - w * 0.07f, my, cx + w * 0.07f, my, line)
++            2 -> cv.drawArc(RectF(cx - w * 0.1f, my - h * 0.01f, cx + w * 0.1f, my + h * 0.11f), 200f, 140f, false, line)
++            else -> {
++                val wavy = Path()
++                wavy.moveTo(cx - w * 0.1f, my)
++                wavy.lineTo(cx - w * 0.05f, my + h * 0.025f)
++                wavy.lineTo(cx, my - h * 0.025f)
++                wavy.lineTo(cx + w * 0.05f, my + h * 0.025f)
++                wavy.lineTo(cx + w * 0.1f, my)
++                cv.drawPath(wavy, line)
++            }
++        }
++
++        // Cracks.
++        if (level >= 2) {
++            pen(crack, stroke)
++            val p = Path()
++            p.moveTo(cx - w * 0.05f, cy - h * 0.42f)
++            p.lineTo(cx + w * 0.03f, cy - h * 0.32f)
++            p.lineTo(cx - w * 0.04f, cy - h * 0.24f)
++            p.lineTo(cx + w * 0.04f, cy - h * 0.16f)
++            cv.drawPath(p, line)
++            if (level >= 3) {
++                val p2 = Path()
++                p2.moveTo(cx + w * 0.3f, cy - h * 0.14f)
++                p2.lineTo(cx + w * 0.22f, cy - h * 0.06f)
++                p2.lineTo(cx + w * 0.27f, cy + h * 0.02f)
++                cv.drawPath(p2, line)
++            }
++        }
++        return bmp
++    }
++}
+--- a/src/main/java/com/rigen/volumeui/Screens.kt
++++ b/src/main/java/com/rigen/volumeui/Screens.kt
+@@ -754,6 +754,12 @@
+ 
+                 SettingsGroup {
+                     SettingsItem(
++                        Glyph.BRAIN, ICON_PINK,
++                        stringResource(R.string.reels_title),
++                        stringResource(R.string.reels_summary),
++                    ) { onOpen(PAGE_REELS) }
++                    ItemDivider()
++                    SettingsItem(
+                         Glyph.GAMES, ICON_PURPLE,
+                         stringResource(R.string.games_title),
+                         stringResource(R.string.games_summary),
+@@ -1929,6 +1935,7 @@
+                 PAGE_CLOCK_TIME, PAGE_ALARMS, PAGE_TIMER, PAGE_STOPWATCH, PAGE_SLEEP -> PAGE_CLOCK
+                 PAGE_BLOCKS, PAGE_2048, PAGE_MEMORY, PAGE_STACK, PAGE_TYCOON -> PAGE_GAMES
+                 PAGE_HABITS, PAGE_SUBSCRIPTION, PAGE_LINKED -> PAGE_ACCOUNT
++                PAGE_REELS_DIAG -> PAGE_REELS
+                 else -> PAGE_HOME
+             }
+             BackHandler(enabled = page != PAGE_HOME) { page = parent }
+@@ -1964,6 +1971,9 @@
+                 PAGE_MEMORY -> MemoryGamePage(goBack)
+                 PAGE_STACK -> StackGamePage(goBack)
+                 PAGE_TYCOON -> TycoonPage(goBack)
++                // ── Reels counter ──
++                PAGE_REELS -> ReelsPage(serviceEnabled, { page = it }, goBack)
++                PAGE_REELS_DIAG -> ReelsDiagPage(goBack)
+                 // ── Keyboard ──
+                 PAGE_KEYBOARD -> KeyboardPage(goBack)
+                 "vault" -> VaultPage(goBack)
+--- a/src/main/java/com/rigen/volumeui/Service.kt
++++ b/src/main/java/com/rigen/volumeui/Service.kt
+@@ -182,11 +182,23 @@
+     // Which app is in front, for the per-app rules.
+     private var foregroundPackage: String? = null
+     private var floatingTimer: FloatingTimer? = null
++    private var reelsBadge: ReelsBadge? = null
++    private var reelsLock: ReelsLock? = null
+ 
+     /** Called by the Clock section whenever the timer starts, pauses, ends or its settings change. */
+     fun refreshFloatingTimer() {
+         handler.post { floatingTimer?.refresh() }
+     }
++
++    /** Called by the Reels page when the counter, the on-screen brain or the counted apps change. */
++    fun refreshReelsBadge() {
++        handler.post { reelsBadge?.refresh() }
++    }
++
++    /** Called when the lock starts, ends or is switched on or off. */
++    fun refreshReelsLock() {
++        handler.post { reelsLock?.refresh() }
++    }
+     private val launchableCache = mutableMapOf<String, Boolean>()
+ 
+     // Key handling: double-press mute and hold-to-repeat.
+@@ -251,6 +263,8 @@
+         super.onServiceConnected()
+         instance = this
+         floatingTimer = FloatingTimer(this)
++        reelsBadge = ReelsBadge(this)
++        reelsLock = ReelsLock(this)
+         Diag.mark(this, "svc_connected")
+     }
+ 
+@@ -268,13 +282,22 @@
+ 
+     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+         try {
+-            if (event == null || event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
++            if (event == null) return
++            if (event.eventType == AccessibilityEvent.TYPE_VIEW_SCROLLED) {
++                handleScroll(event)
++                return
++            }
++            if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+             val pkg = event.packageName?.toString() ?: return
+             if (pkg == packageName) {
+                 // Our own overlay windows (the floating timer, the volume panel) fire window events
+                 // too. If those counted as "our app is in front", the floating timer would remove
+                 // itself the moment it appeared. Only the real app screen counts.
+-                if (event.className?.toString() == MainActivity::class.java.name) floatingTimer?.onForeground(pkg)
++                if (event.className?.toString() == MainActivity::class.java.name) {
++                    floatingTimer?.onForeground(pkg)
++                    reelsBadge?.onForeground(pkg)
++                    reelsLock?.onForeground(pkg)
++                }
+                 return
+             }
+             // Ignore the system UI and anything that is not a normal app (keyboards...).
+@@ -282,11 +305,37 @@
+             if (!isLaunchable(pkg)) return
+             foregroundPackage = pkg
+             floatingTimer?.onForeground(pkg)
++            ReelsEngine.onForeground(pkg)
++            reelsBadge?.onForeground(pkg)
++            reelsLock?.onForeground(pkg)
+         } catch (e: Throwable) {
+             logError("onAccessibilityEvent", e)
+         }
+     }
+ 
++    /**
++     * Counts short videos from scroll events in the apps we track. Only the kind of scroll is looked at
++     * (never the screen content), and the events of every other app are dropped right away.
++     */
++    private fun handleScroll(event: AccessibilityEvent) {
++        val pkg = event.packageName?.toString() ?: return
++        if (ReelsStore.appOf(pkg) == null) return
++        if (!ReelsStore.enabled(this) && !ReelsStore.diagOn(this)) return
++        val api28 = Build.VERSION.SDK_INT >= 28
++        val sample = ReelsSample(
++            pkg = pkg,
++            className = event.className?.toString() ?: "",
++            from = event.fromIndex,
++            to = event.toIndex,
++            items = event.itemCount,
++            scrollY = event.scrollY,
++            deltaY = if (api28) event.scrollDeltaY else 0,
++            deltaX = if (api28) event.scrollDeltaX else 0,
++            screenH = resources.displayMetrics.heightPixels,
++        )
++        ReelsEngine.onScroll(applicationContext, sample, System.currentTimeMillis())
++    }
++
+     private fun isLaunchable(pkg: String): Boolean =
+         launchableCache.getOrPut(pkg) { packageManager.getLaunchIntentForPackage(pkg) != null }
+ 
+@@ -918,6 +967,10 @@
+         removePanel()
+         floatingTimer?.remove()
+         floatingTimer = null
++        reelsBadge?.remove()
++        reelsBadge = null
++        reelsLock?.remove()
++        reelsLock = null
+         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
+         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
+         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
+--- a/src/main/res/layout/widget_reels.xml
++++ b/src/main/res/layout/widget_reels.xml
+@@ -0,0 +1,49 @@
++<?xml version="1.0" encoding="utf-8"?>
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    android:id="@+id/w_root"
++    android:layout_width="match_parent"
++    android:layout_height="match_parent"
++    android:background="@drawable/widget_bg"
++    android:gravity="center_vertical"
++    android:orientation="horizontal"
++    android:padding="14dp">
++
++    <ImageView
++        android:id="@+id/w_reels_brain"
++        android:layout_width="64dp"
++        android:layout_height="64dp"
++        android:contentDescription="@null"
++        android:scaleType="fitCenter" />
++
++    <LinearLayout
++        android:layout_width="0dp"
++        android:layout_height="wrap_content"
++        android:layout_marginStart="12dp"
++        android:layout_weight="1"
++        android:orientation="vertical">
++
++        <TextView
++            android:id="@+id/w_reels_count"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:maxLines="1"
++            android:textSize="30sp"
++            android:textStyle="bold" />
++
++        <TextView
++            android:id="@+id/w_reels_mood"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:maxLines="1"
++            android:textColor="@color/widget_text"
++            android:textSize="14sp" />
++
++        <TextView
++            android:id="@+id/w_reels_sub"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:maxLines="1"
++            android:textColor="@color/widget_text_secondary"
++            android:textSize="12sp" />
++    </LinearLayout>
++</LinearLayout>
+--- a/src/main/res/values-ar/strings.xml
++++ b/src/main/res/values-ar/strings.xml
+@@ -369,6 +369,8 @@
+     <string name="acc_email_remove">حذف الإيميل</string>
+     <string name="acc_email_new">الإيميل الجديد</string>
+     <string name="acc_pass_confirm">الباسوورد بتاعك (للتأكيد)</string>
++    <string name="acc_answer">إجابة سؤال الأمان</string>
++    <string name="acc_question_label">سؤال الأمان: %1$s</string>
+     <string name="acc_email_change_hint">هيوصل كود على الإيميل الجديد. وتنبيه أمني هيوصل على واتساب بتاعك، وعلى الإيميل القديم لو فيه.</string>
+     <string name="acc_email_code_hint">بعتنا كود من 6 أرقام على الإيميل الجديد. صالح 10 دقايق.</string>
+     <string name="acc_email_send">ابعت الكود للإيميل ده</string>
+@@ -487,4 +489,72 @@
+     <string name="sub_auto_last_err">آخر تجديد فشل. هيحاول تاني.</string>
+     <string name="sub_auto_need_plan">اشترك في باقة الأول وبعدين تقدر تشغّل التجديد التلقائي.</string>
+     <string name="sub_upgrade_to">ترقية إلى %1$s \u2022 %2$s نيرو</string>
++    <string name="reels_title">عدّاد الريلز</string>
++    <string name="reels_summary">احسب الريلز والشورتس وشوف حالة مخك</string>
++    <string name="reels_service_needed">فعّل خدمة الـ Accessibility عشان التمرير يتعدّ</string>
++    <string name="reels_enable">عدّ الفيديوهات القصيرة</string>
++    <string name="reels_overlay">إظهار المخ فوق الشاشة</string>
++    <string name="reels_of_limit">من %1$d (الحد اليومي)</string>
++    <string name="reels_mood_0">مخك تمام</string>
++    <string name="reels_mood_1">مخك بدأ يتعب</string>
++    <string name="reels_mood_2">مخك بيتشقق</string>
++    <string name="reels_mood_3">مخك اتحرق</string>
++    <string name="reels_apps">التطبيقات</string>
++    <string name="reels_today_count">%1$d النهاردة</string>
++    <string name="reels_week">آخر 7 أيام</string>
++    <string name="reels_settings">الإعدادات</string>
++    <string name="reels_limit">الحد اليومي (فيديوهات)</string>
++    <string name="reels_sec">ثواني الفيديو الواحد</string>
++    <string name="reels_wrapped_day">Wrapped النهاردة</string>
++    <string name="reels_wrapped_week">Wrapped الأسبوع</string>
++    <string name="reels_diag_title">المعايرة</string>
++    <string name="reels_diag_record">تسجيل أحداث التمرير</string>
++    <string name="reels_diag_hint">فعّل ده، واتفرج على كام فيديو في إنستجرام أو يوتيوب، وارجع هنا. كل سطر بيوضح التمرير اتعدّ ولا لأ وليه. مفيش حاجة بتتحفظ ولا بتتبعت لأي مكان.</string>
++    <string name="reels_diag_log">سجل الأحداث</string>
++    <string name="reels_diag_empty">لسه مفيش أحداث</string>
++    <string name="reels_diag_clear">مسح السجل</string>
++    <string name="reels_reset">تصفير كل العدّادات</string>
++    <string name="rw_title">Reels Wrapped</string>
++    <string name="rw_label_total">اتفرجت على</string>
++    <string name="rw_videos">فيديو قصير</string>
++    <string name="rw_label_where">كنت بتتفرج فين</string>
++    <string name="rw_label_pulled">كام مرة رجعت</string>
++    <string name="rw_opened">مرة فتحت الريلز</string>
++    <string name="rw_label_time">الوقت اللي راح</string>
++    <string name="rw_min">%1$d دقيقة</string>
++    <string name="rw_hm">%1$d ساعة و%2$d دقيقة</string>
++    <string name="rw_time_eq">ده حوالي %1$d حلقة مسلسل</string>
++    <string name="rw_label_peak">ساعة الذروة</string>
++    <string name="rw_peak_hint">دي الساعة اللي اتفرجت فيها أكتر</string>
++    <string name="rw_label_longest">أطول جلسة</string>
++    <string name="rw_longest_unit">فيديو ورا بعض</string>
++    <string name="rw_label_vs">مقارنة بقبل كده</string>
++    <string name="rw_vs_more">أكتر من الفترة اللي فاتت</string>
++    <string name="rw_vs_less">أقل من الفترة اللي فاتت</string>
++    <string name="rw_vs_none">مفيش حاجة تتقارن بيها لسه</string>
++    <string name="rw_label_verdict">الحكم النهائي</string>
++    <string name="rw_limit_line">الحد اليومي: %1$d</string>
++    <string name="rw_empty">لسه مفيش حاجة اتعدّت. فعّل العدّاد واتفرج شوية.</string>
++    <string name="rw_share">مشاركة</string>
++    <string name="rw_share_text">مخي في الفترة دي: %1$d فيديو قصير، وضاع حوالي %2$d دقيقة. اتعدّت بـ Kanade.</string>
++    <string name="reels_lock_section">القفل</string>
++    <string name="reels_lock_enable">اقفل التطبيقات لما توصل للحد</string>
++    <string name="reels_lock_minutes">مدة القفل (دقيقة)</string>
++    <string name="reels_lock_title">وصلت حدك اليومي</string>
++    <string name="reels_lock_sub">اتفرجت على %1$d فيديو قصير النهاردة. خد استراحة.</string>
++    <string name="reels_lock_left_label">لحد ما يتفتح تاني</string>
++    <string name="reels_lock_home">ارجع للهوم</string>
++    <string name="reels_lock_status">مقفول لحد %1$s</string>
++    <string name="reels_left_n">فاضل %1$d</string>
++    <string name="reels_sync_title">البوت</string>
++    <string name="reels_sync_enable">شارك إجمالي يومي مع البوت</string>
++    <string name="reels_sync_hint">بيتبعت العدد اليومي بس، ومش اللي بتتفرج عليه. بيخليك تشوف ترتيبك في البوت وفي Wrapped. ولما تقفله البوت بيمسح اللي كان محتفظ بيه.</string>
++    <string name="reels_sync_signin">سجّل دخول بحساب كندا الأول (صفحة الحساب)</string>
++    <string name="reels_loading">بجيب ترتيبك...</string>
++    <string name="rw_label_everyone">أنت مقابل كل مستخدمي كندا</string>
++    <string name="rw_everyone_pre">اتفرجت أكتر من</string>
++    <string name="rw_everyone_post">من مستخدمي كندا</string>
++    <string name="widget_reels_label">مخ كندا</string>
++    <string name="widget_reels_desc">عدد الفيديوهات القصيرة النهاردة وحالة مخك.</string>
++    <string name="widget_reels_off">العدّاد مقفول</string>
+ </resources>
+--- a/src/main/res/values/strings.xml
++++ b/src/main/res/values/strings.xml
+@@ -412,6 +412,8 @@
+     <string name="acc_email_remove">Remove email</string>
+     <string name="acc_email_new">New email</string>
+     <string name="acc_pass_confirm">Your password (to confirm)</string>
++    <string name="acc_answer">Security answer</string>
++    <string name="acc_question_label">Security question: %1$s</string>
+     <string name="acc_email_change_hint">A code goes to the new email. A security alert goes to your WhatsApp, and to the old email if there is one.</string>
+     <string name="acc_email_code_hint">We sent a 6-digit code to the new email. It works for 10 minutes.</string>
+     <string name="acc_email_send">Send the code to this email</string>
+@@ -640,4 +642,72 @@
+     <string name="sub_auto_last_err">The last renewal failed. It will try again.</string>
+     <string name="sub_auto_need_plan">Get a plan first, then you can turn auto-renew on.</string>
+     <string name="sub_upgrade_to">Upgrade to %1$s \u2022 %2$s Nero</string>
++    <string name="reels_title">Reels counter</string>
++    <string name="reels_summary">Count Reels and Shorts and see how your brain is doing</string>
++    <string name="reels_service_needed">Turn on the accessibility service so scrolling can be counted</string>
++    <string name="reels_enable">Count short videos</string>
++    <string name="reels_overlay">Show the brain on screen</string>
++    <string name="reels_of_limit">of %1$d (daily limit)</string>
++    <string name="reels_mood_0">Your brain is fine</string>
++    <string name="reels_mood_1">Your brain is getting tired</string>
++    <string name="reels_mood_2">Your brain is cracking</string>
++    <string name="reels_mood_3">Your brain is fried</string>
++    <string name="reels_apps">Apps</string>
++    <string name="reels_today_count">%1$d today</string>
++    <string name="reels_week">Last 7 days</string>
++    <string name="reels_settings">Settings</string>
++    <string name="reels_limit">Daily limit (videos)</string>
++    <string name="reels_sec">Seconds per video</string>
++    <string name="reels_wrapped_day">Wrapped for today</string>
++    <string name="reels_wrapped_week">Wrapped for this week</string>
++    <string name="reels_diag_title">Calibration</string>
++    <string name="reels_diag_record">Record scroll events</string>
++    <string name="reels_diag_hint">Turn this on, scroll a few videos in Instagram or YouTube, then come back. Each line shows whether a scroll was counted and why. Nothing is saved or sent anywhere.</string>
++    <string name="reels_diag_log">Event log</string>
++    <string name="reels_diag_empty">No events yet</string>
++    <string name="reels_diag_clear">Clear log</string>
++    <string name="reels_reset">Reset all counts</string>
++    <string name="rw_title">Reels Wrapped</string>
++    <string name="rw_label_total">YOU WATCHED</string>
++    <string name="rw_videos">short videos</string>
++    <string name="rw_label_where">WHERE YOU SCROLLED</string>
++    <string name="rw_label_pulled">HOW YOU GOT PULLED BACK</string>
++    <string name="rw_opened">times you opened reels</string>
++    <string name="rw_label_time">TIME GONE</string>
++    <string name="rw_min">%1$d min</string>
++    <string name="rw_hm">%1$d h %2$d min</string>
++    <string name="rw_time_eq">About %1$d episodes of a series</string>
++    <string name="rw_label_peak">YOUR PEAK HOUR</string>
++    <string name="rw_peak_hint">This is when you scrolled the most</string>
++    <string name="rw_label_longest">LONGEST BINGE</string>
++    <string name="rw_longest_unit">videos in a row</string>
++    <string name="rw_label_vs">VS BEFORE</string>
++    <string name="rw_vs_more">more than the period before</string>
++    <string name="rw_vs_less">less than the period before</string>
++    <string name="rw_vs_none">Nothing to compare with yet</string>
++    <string name="rw_label_verdict">THE VERDICT</string>
++    <string name="rw_limit_line">Daily limit: %1$d</string>
++    <string name="rw_empty">Nothing counted yet. Turn the counter on and scroll a bit.</string>
++    <string name="rw_share">Share</string>
++    <string name="rw_share_text">My brain this period: %1$d short videos, about %2$d minutes gone. Counted with Kanade.</string>
++    <string name="reels_lock_section">Lock</string>
++    <string name="reels_lock_enable">Lock the apps when the limit is reached</string>
++    <string name="reels_lock_minutes">Lock for (minutes)</string>
++    <string name="reels_lock_title">Daily limit reached</string>
++    <string name="reels_lock_sub">You watched %1$d short videos today. Take a break.</string>
++    <string name="reels_lock_left_label">until it opens again</string>
++    <string name="reels_lock_home">Go home</string>
++    <string name="reels_lock_status">Locked until %1$s</string>
++    <string name="reels_left_n">%1$d left</string>
++    <string name="reels_sync_title">Bot</string>
++    <string name="reels_sync_enable">Share my daily totals with the bot</string>
++    <string name="reels_sync_hint">Only the daily counts are sent, never what you watch. It lets you see your rank in the bot and in Wrapped. Turning it off deletes what the bot kept.</string>
++    <string name="reels_sync_signin">Sign in to your Kanade account first (Account page)</string>
++    <string name="reels_loading">Getting your rank...</string>
++    <string name="rw_label_everyone">YOU VS EVERYONE ON KANADE</string>
++    <string name="rw_everyone_pre">You scrolled more than</string>
++    <string name="rw_everyone_post">of Kanade users</string>
++    <string name="widget_reels_label">Kanade brain</string>
++    <string name="widget_reels_desc">Your short-video count for today and how your brain feels.</string>
++    <string name="widget_reels_off">Counter is off</string>
+ </resources>
+--- a/src/main/res/xml/accessibility_service_config.xml
++++ b/src/main/res/xml/accessibility_service_config.xml
+@@ -1,6 +1,6 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+-    android:accessibilityEventTypes="typeWindowStateChanged"
++    android:accessibilityEventTypes="typeWindowStateChanged|typeViewScrolled"
+     android:accessibilityFeedbackType="feedbackGeneric"
+     android:accessibilityFlags="flagRequestFilterKeyEvents"
+     android:canRequestFilterKeyEvents="true"
+--- a/src/main/res/xml/widget_reels.xml
++++ b/src/main/res/xml/widget_reels.xml
+@@ -0,0 +1,11 @@
++<?xml version="1.0" encoding="utf-8"?>
++<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
++    android:description="@string/widget_reels_desc"
++    android:initialLayout="@layout/widget_reels"
++    android:minWidth="180dp"
++    android:minHeight="110dp"
++    android:resizeMode="horizontal|vertical"
++    android:targetCellWidth="3"
++    android:targetCellHeight="2"
++    android:updatePeriodMillis="1800000"
++    android:widgetCategory="home_screen" />
