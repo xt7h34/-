@@ -1,6 +1,18 @@
 package com.rigen.volumeui
 
 import androidx.compose.foundation.background
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Slider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -165,7 +177,19 @@ internal fun TycoonPage(onBack: () -> Unit) {
     var expired by remember { mutableStateOf(false) }
     var offline by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("") }
-    var tab by remember { mutableIntStateOf(0) }
+    var panel by remember { mutableIntStateOf(-1) }
+    var builder by remember { mutableStateOf<String?>(null) }
+    val popups = remember { mutableStateListOf<TyPopup>() }
+    val now = rememberTyClock()
+    val seen = remember { object { var sold = HashMap<Int, Int>(); var logKey = ""; var first = true; var id = 0L } }
+
+    // The game is drawn wide, like a console game: landscape while this page is open.
+    DisposableEffect(Unit) {
+        val activity = ctx as? android.app.Activity
+        val old = activity?.requestedOrientation
+        activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        onDispose { if (old != null) activity.requestedOrientation = old }
+    }
 
     LaunchedEffect(token) {
         if (token == null) return@LaunchedEffect
@@ -185,6 +209,33 @@ internal fun TycoonPage(onBack: () -> Unit) {
             message = ""
         }
     }
+    // Numbers that float up from the office when something happens: a sale, a finished research, an event.
+    LaunchedEffect(state) {
+        val view = state?.optJSONObject("company") ?: return@LaunchedEffect
+        val t = now.value
+        view.list("models").forEach { m ->
+            val id = m.optInt("id")
+            val sold = m.optInt("sold30")
+            val before = seen.sold[id]
+            seen.sold[id] = sold
+            if (!seen.first && before != null && sold > before) {
+                seen.id++
+                popups.add(TyPopup(seen.id, "+" + tyMoney((sold - before) * m.optDouble("price")), TyColors.green, t, 0.35f + (seen.id % 5) * 0.06f, 0.35f))
+            }
+        }
+        val last = view.list("log").lastOrNull()
+        val key = last?.toString().orEmpty()
+        if (!seen.first && key != seen.logKey && last != null) {
+            when (last.optString("type")) {
+                "research_done" -> { seen.id++; popups.add(TyPopup(seen.id, "+1 🎓", TyColors.cyan, t, 0.5f, 0.25f)) }
+                "order_done" -> { seen.id++; popups.add(TyPopup(seen.id, "📦 ✓", TyColors.orange, t, 0.55f, 0.45f)) }
+                "event_start" -> message = ctx.getString(R.string.ty_log_event_start, "") + last.optString("event").replace('_', ' ')
+            }
+        }
+        seen.logKey = key
+        seen.first = false
+        popups.removeAll { now.value - it.born > 2000 }
+    }
 
     fun act(body: JSONObject, onOk: (JSONObject) -> Unit) {
         val t = token ?: return
@@ -195,38 +246,47 @@ internal fun TycoonPage(onBack: () -> Unit) {
         }
     }
 
-    PageScaffold(stringResource(R.string.ty_title), onBack, pinTitle = true) { _ ->
-        Column(
-            Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding()
-                .padding(top = 64.dp),
-        ) {
-            val s = state
-            when {
-                token == null || expired -> Notice(stringResource(R.string.ty_need_signin))
-                s == null -> Notice(stringResource(if (offline) R.string.ty_offline else R.string.ty_loading))
-                s.isNull("company") -> CreateCompany(s, ::act)
-                s.optJSONObject("company")?.optJSONObject("company")?.optBoolean("bankrupt") == true -> Bankrupt(s, ::act)
-                else -> Main(s, tab, { tab = it }, ::act)
-            }
+    val s = state
+    val view = s?.optJSONObject("company")
+    val bankrupt = view?.optJSONObject("company")?.optBoolean("bankrupt") == true
+    val inGame = s != null && view != null && !bankrupt && token != null && !expired
+
+    Box(Modifier.fillMaxSize()) {
+        when {
+            token == null || expired -> TyBackdrop(TyColors.homeTop, TyColors.homeBottom) { Notice(stringResource(R.string.ty_need_signin)) }
+            s == null -> TyBackdrop(TyColors.homeTop, TyColors.homeBottom) { Notice(stringResource(if (offline) R.string.ty_offline else R.string.ty_loading)) }
+            s.isNull("company") -> TyBackdrop(TyColors.homeTop, TyColors.homeBottom) { CreateCompany(s, ::act) }
+            bankrupt -> TyBackdrop(TyColors.homeTop, TyColors.homeBottom) { Bankrupt(s, ::act) }
+            builder != null -> Builder(view!!, builder!!, now, ::act) { builder = null }
+            else -> Game(s, view!!, now, popups, panel, { panel = it }, { builder = it }, ::act)
+        }
+        if (builder == null) {
+            Text(
+                "←", color = Color.White, fontSize = 26.sp,
+                modifier = Modifier
+                    .statusBarsPadding()
+                    .padding(8.dp)
+                    .size(44.dp)
+                    .clickable { if (inGame && panel >= 0) panel = -1 else onBack() }
+                    .padding(top = 4.dp, start = 8.dp),
+            )
         }
         if (message.isNotEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
                 Text(
                     message,
                     color = Color.White,
                     modifier = Modifier
-                        .navigationBarsPadding()
-                        .padding(16.dp)
+                        .statusBarsPadding()
+                        .padding(top = 56.dp)
                         .background(Color(0xE61B2038), RoundedCornerShape(16.dp))
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
                 )
             }
         }
     }
 }
+
 
 @Composable
 private fun Notice(text: String) {
@@ -284,50 +344,236 @@ private fun Bankrupt(s: JSONObject, act: (JSONObject, (JSONObject) -> Unit) -> U
     }
 }
 
-/* ───────────── the running company ───────────── */
+/* ───────────── the running company: the office, with a bar of icons below ───────────── */
+
+private val NAV = listOf("🏠" to -1, "📱" to 1, "🔬" to 2, "🏭" to 3, "💰" to 4, "📊" to 0)
 
 @Composable
-private fun Main(s: JSONObject, tab: Int, setTab: (Int) -> Unit, act: (JSONObject, (JSONObject) -> Unit) -> Unit) {
-    val view = s.optJSONObject("company") ?: return
+private fun Game(
+    s: JSONObject, view: JSONObject, now: State<Long>, popups: List<TyPopup>,
+    panel: Int, setPanel: (Int) -> Unit, startBuilder: (String) -> Unit,
+    act: (JSONObject, (JSONObject) -> Unit) -> Unit,
+) {
     val co = view.optJSONObject("company") ?: return
-    Column(Modifier.fillMaxSize()) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Stat(stringResource(R.string.ty_cash), tyMoney(co.optDouble("cash")), Modifier.weight(1f))
-            Stat(stringResource(R.string.ty_date), tyDate(co.optInt("day")), Modifier.weight(1f))
-            Stat(stringResource(R.string.ty_brand), co.optDouble("brand").roundToInt().toString(), Modifier.weight(0.6f))
-        }
-        Text(
-            co.optString("name") + " · " + co.optString("player"),
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
-            fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+    val cash by animateFloatAsState(co.optDouble("cash").toFloat(), tween(600), label = "cash")
+    var pickCat by remember { mutableStateOf(false) }
+    val cats = co.optJSONArray("cats")?.let { a -> (0 until a.length()).map { a.optString(it) } } ?: listOf("phone")
+    val researching = co.optInt("lab") - co.optInt("labFree")
+    val producing = view.list("orders").isNotEmpty()
+    val stock = view.list("models").sumOf { it.optInt("stock") }
+    val sold30 = view.list("models").sumOf { it.optInt("sold30") }
+
+    TyBackdrop(TyColors.homeTop, TyColors.homeBottom) {
+        TyOffice(
+            lab = co.optInt("lab"), factory = co.optInt("factory"), researching = researching, producing = producing, nowState = now,
+            modifier = Modifier.fillMaxSize().padding(top = 56.dp, bottom = 70.dp),
         )
+        // top bar
         Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 8.dp, start = 56.dp, end = 12.dp).fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
         ) {
-            val names = listOf(R.string.ty_tab_home, R.string.ty_tab_products, R.string.ty_tab_rnd, R.string.ty_tab_company, R.string.ty_tab_finance)
-            names.forEachIndexed { i, n ->
-                FilterChip(selected = tab == i, onClick = { setTab(i) }, label = { Text(stringResource(n)) })
+            TyPill(tyMoney(cash.toDouble()), prefix = "💵")
+            TyPill("$researching/${co.optInt("lab")}", prefix = "🎓")
+            TyPill(tyDate(co.optInt("day")), prefix = "📅")
+            TyPill(co.optString("name"), prefix = "🏢")
+        }
+        // round gauges on the right, like the original's progress circles
+        Column(
+            Modifier.align(Alignment.CenterEnd).padding(end = 18.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Gauge(sold30.toString(), stringResource(R.string.ty_sold30), TyColors.green)
+            Gauge(stock.toString(), stringResource(R.string.ty_stock), TyColors.orange)
+            Gauge(co.optInt("buzz").toString(), stringResource(R.string.ty_buzz), TyColors.cyan)
+        }
+        // new device
+        Box(
+            Modifier.align(Alignment.CenterStart).padding(start = 18.dp).size(56.dp)
+                .background(Color(0xFFFF6A4D), CircleShape)
+                .clickable { if (cats.size == 1) startBuilder(cats[0]) else pickCat = true },
+            contentAlignment = Alignment.Center,
+        ) { Text("+", color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Bold) }
+        // bar of icons
+        Row(
+            Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            NAV.forEach { (icon, id) -> TyRoundButton(icon, { setPanel(id) }, selected = panel == id) }
+        }
+        TyPopups(popups, now)
+
+        if (panel >= 0) {
+            Box(
+                Modifier.fillMaxSize().background(Color(0x99060A1E)).clickable { setPanel(-1) },
+            )
+            Column(
+                Modifier
+                    .align(Alignment.Center)
+                    .fillMaxWidth(0.82f)
+                    .fillMaxHeight(0.78f)
+                    .background(MaterialTheme.colorScheme.background.copy(alpha = 0.97f), RoundedCornerShape(26.dp))
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Spacer(Modifier.height(4.dp))
+                when (panel) {
+                    0 -> HomeTab(s, view, co)
+                    1 -> ProductsTab(view, co, act, startBuilder)
+                    2 -> RndTab(view, co, act)
+                    3 -> CompanyTab(view, co, act)
+                    else -> FinanceTab(s, view, co, act)
+                }
+                Spacer(Modifier.height(12.dp))
             }
         }
-        Column(
-            Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            when (tab) {
-                0 -> HomeTab(s, view, co)
-                1 -> ProductsTab(view, co, act)
-                2 -> RndTab(view, co, act)
-                3 -> CompanyTab(view, co, act)
-                else -> FinanceTab(s, view, co, act)
-            }
-            Spacer(Modifier.height(16.dp))
+        if (pickCat) {
+            AlertDialog(
+                onDismissRequest = { pickCat = false },
+                title = { Text(stringResource(R.string.ty_tab_products)) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        cats.forEach { c -> Button(onClick = { pickCat = false; startBuilder(c) }, modifier = Modifier.fillMaxWidth()) { Text(catName(c)) } }
+                    }
+                },
+                confirmButton = {},
+                dismissButton = { TextButton(onClick = { pickCat = false }) { Text(stringResource(R.string.ty_cancel)) } },
+            )
         }
     }
 }
+
+@Composable
+private fun Gauge(value: String, label: String, color: Color) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(Modifier.size(58.dp).background(color, CircleShape), contentAlignment = Alignment.Center) {
+            Text(value, color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = if (value.length > 4) 12.sp else 16.sp, maxLines = 1)
+        }
+        Text(label, color = color, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+    }
+}
+
+/* ───────────── designing a device: choose the parts, then the price ───────────── */
+
+@Composable
+private fun Builder(
+    view: JSONObject, cat: String, now: State<Long>,
+    act: (JSONObject, (JSONObject) -> Unit) -> Unit,
+    onClose: () -> Unit,
+) {
+    val ctx = LocalContext.current
+    val token = remember { AccountStore.load(ctx)?.token }
+    val slots = view.optJSONObject("cats")?.optJSONObject(cat)?.list("slots") ?: emptyList()
+    var name by remember { mutableStateOf("") }
+    var step by remember { mutableIntStateOf(0) }
+    var hue by remember { mutableStateOf(210f) }
+    val picks = remember { mutableStateMapOf<String, Int>() }
+    slots.forEach { sl -> if (picks[sl.optString("slot")] == null) picks[sl.optString("slot")] = sl.optInt("have") }
+    var quote by remember { mutableStateOf<JSONObject?>(null) }
+    var price by remember { mutableStateOf(0f) }
+    var priceSet by remember { mutableStateOf(false) }
+
+    val key = picks.toMap().toString()
+    LaunchedEffect(key) {
+        delay(120)
+        val t = token ?: return@LaunchedEffect
+        val comps = JSONObject()
+        picks.forEach { (k, v) -> comps.put(k, v) }
+        val r = KanadeApi.call("/tycoon/act", JSONObject().put("type", "quote").put("cat", cat).put("comps", comps), t)
+        quote = r.body?.optJSONObject("quote")
+    }
+    val fair = quote?.optDouble("fair")?.toFloat() ?: 0f
+    val unit = quote?.optDouble("unitCost")?.toFloat() ?: 0f
+    if (!priceSet && fair > 0f) { price = fair; priceSet = true }
+
+    if (step == 0) {
+        TyBackdrop(TyColors.buildTop, TyColors.buildBottom) {
+            Row(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 24.dp, vertical = 12.dp)) {
+                TyDevicePreview(cat, picks.toMap(), hue, now, Modifier.weight(0.8f).fillMaxHeight().padding(bottom = 64.dp))
+                Column(Modifier.weight(1.2f).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(
+                            name, { name = it.take(24) }, singleLine = true,
+                            placeholder = { Text(stringResource(R.string.ty_device_name)) },
+                            modifier = Modifier.width(220.dp),
+                        )
+                        Text("  |  " + tyMoney(unit.toDouble()), color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Row(Modifier.padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        listOf(210f, 0f, 130f, 40f, 280f, 330f).forEach { h ->
+                            Box(
+                                Modifier.size(if (hue == h) 30.dp else 24.dp).background(Color.hsv(h, 0.55f, 0.95f), CircleShape).clickable { hue = h },
+                            )
+                        }
+                    }
+                    Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
+                        slots.forEach { sl ->
+                            val slot = sl.optString("slot")
+                            val have = sl.optInt("have")
+                            val cur = picks[slot] ?: have
+                            Text(slotName(slot).uppercase(), color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
+                            TyArrowRow(
+                                stringResource(R.string.ty_gen_n, cur.toString()),
+                                if (cur > 1) ({ picks[slot] = cur - 1 }) else null,
+                                if (cur < have) ({ picks[slot] = cur + 1 }) else null,
+                            )
+                            Text(stringResource(R.string.ty_market_tier, String.format(java.util.Locale.US, "%.1f", sl.optDouble("e"))), color = Color(0xAAFFFFFF), fontSize = 11.sp)
+                        }
+                    }
+                    quote?.let { q ->
+                        Text(
+                            stringResource(R.string.ty_quality, q.optDouble("q").roundToInt().toString()) + "   ·   " + stringResource(R.string.ty_design_fee, tyMoney(q.optDouble("fee"))),
+                            color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                    Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                        TyRoundButton("✕", onClose)
+                        TyRoundButton("✓", { if (name.isNotBlank() && quote != null) step = 1 }, selected = name.isNotBlank() && quote != null)
+                    }
+                }
+            }
+        }
+    } else {
+        TyBackdrop(TyColors.priceTop, TyColors.priceBottom) {
+            val profit = price - unit
+            Column(Modifier.align(Alignment.TopStart).statusBarsPadding().padding(start = 64.dp, top = 16.dp)) {
+                Text(stringResource(R.string.ty_unit_cost) + "  " + tyMoney(unit.toDouble()), color = Color(0xCCFFFFFF), fontSize = 15.sp)
+                Text(stringResource(R.string.ty_price) + "  " + tyMoney(price.toDouble()), color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                Text(tyMoney(profit.toDouble()), color = if (profit >= 0) TyColors.green else TyColors.red, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
+            }
+            Column(Modifier.align(Alignment.Center).fillMaxWidth(0.6f), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(name.uppercase(), color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
+                Text(stringResource(R.string.ty_price), color = Color(0xAAFFFFFF), fontSize = 14.sp)
+                Text(tyMoney(price.toDouble()), color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+                if (fair > 0f) {
+                    Slider(value = price.coerceIn(fair * 0.4f, fair * 2f), onValueChange = { price = it }, valueRange = (fair * 0.4f)..(fair * 2f))
+                    val ratio = price / fair
+                    val (label, color) = when {
+                        ratio < 0.9f -> stringResource(R.string.ty_price_low) to TyColors.green
+                        ratio <= 1.1f -> stringResource(R.string.ty_price_market) to TyColors.cyan
+                        else -> stringResource(R.string.ty_price_high) to TyColors.orange
+                    }
+                    Text(label, color = color, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.ty_fair, tyMoney(fair.toDouble())), color = Color(0xAAFFFFFF), fontSize = 12.sp)
+                }
+            }
+            Box(Modifier.align(Alignment.BottomStart).navigationBarsPadding().padding(24.dp)) { TyRoundButton("←", { step = 0 }) }
+            Button(
+                onClick = {
+                    val comps = JSONObject()
+                    picks.forEach { (k, v) -> comps.put(k, v) }
+                    act(JSONObject().put("type", "model").put("cat", cat).put("name", name).put("comps", comps)) { r ->
+                        act(JSONObject().put("type", "price").put("id", r.optInt("id")).put("price", price.toDouble().roundToInt())) { onClose() }
+                    }
+                },
+                modifier = Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(24.dp),
+            ) { Text(stringResource(R.string.ty_create).uppercase(), fontWeight = FontWeight.ExtraBold) }
+        }
+    }
+}
+
 
 @Composable
 private fun HomeTab(s: JSONObject, view: JSONObject, co: JSONObject) {
@@ -380,15 +626,14 @@ private fun HomeTab(s: JSONObject, view: JSONObject, co: JSONObject) {
 /* ───────────── products ───────────── */
 
 @Composable
-private fun ProductsTab(view: JSONObject, co: JSONObject, act: (JSONObject, (JSONObject) -> Unit) -> Unit) {
-    var creating by remember { mutableStateOf<String?>(null) }
+private fun ProductsTab(view: JSONObject, co: JSONObject, act: (JSONObject, (JSONObject) -> Unit) -> Unit, startBuilder: (String) -> Unit) {
     var pricing by remember { mutableStateOf<JSONObject?>(null) }
     var producing by remember { mutableStateOf<JSONObject?>(null) }
 
     val cats = co.optJSONArray("cats")?.let { a -> (0 until a.length()).map { a.optString(it) } } ?: listOf("phone")
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         cats.forEach { cat ->
-            Button(onClick = { creating = cat }) { Text(stringResource(R.string.ty_new_device, catName(cat))) }
+            Button(onClick = { startBuilder(cat) }) { Text(stringResource(R.string.ty_new_device, catName(cat))) }
         }
     }
     val models = view.list("models")
@@ -423,67 +668,8 @@ private fun ProductsTab(view: JSONObject, co: JSONObject, act: (JSONObject, (JSO
             }
         }
     }
-    creating?.let { cat -> NewDeviceDialog(view, cat, act) { creating = null } }
     pricing?.let { m -> PriceDialog(m, act) { pricing = null } }
     producing?.let { m -> ProduceDialog(m, act) { producing = null } }
-}
-
-@Composable
-private fun NewDeviceDialog(view: JSONObject, cat: String, act: (JSONObject, (JSONObject) -> Unit) -> Unit, onClose: () -> Unit) {
-    val ctx = LocalContext.current
-    val slots = view.optJSONObject("cats")?.optJSONObject(cat)?.list("slots") ?: emptyList()
-    var name by remember { mutableStateOf("") }
-    val picks = remember { androidx.compose.runtime.mutableStateMapOf<String, Int>() }
-    slots.forEach { sl -> if (picks[sl.optString("slot")] == null) picks[sl.optString("slot")] = sl.optInt("have") }
-    var quote by remember { mutableStateOf<JSONObject?>(null) }
-    val token = remember { AccountStore.load(ctx)?.token }
-
-    val key = picks.toMap().toString()
-    LaunchedEffect(key) {
-        delay(120)
-        val t = token ?: return@LaunchedEffect
-        val comps = JSONObject()
-        picks.forEach { (k, v) -> comps.put(k, v) }
-        val r = KanadeApi.call("/tycoon/act", JSONObject().put("type", "quote").put("cat", cat).put("comps", comps), t)
-        quote = r.body?.optJSONObject("quote")
-    }
-    AlertDialog(
-        onDismissRequest = onClose,
-        title = { Text(stringResource(R.string.ty_new_device, catName(cat))) },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(name, { name = it.take(24) }, label = { Text(stringResource(R.string.ty_device_name)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                slots.forEach { sl ->
-                    val slot = sl.optString("slot")
-                    Text(slotName(slot) + "  (" + stringResource(R.string.ty_market_tier, String.format(java.util.Locale.US, "%.1f", sl.optDouble("e"))) + ")", fontSize = 13.sp)
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        for (t in 1..sl.optInt("have")) {
-                            FilterChip(selected = picks[slot] == t, onClick = { picks[slot] = t }, label = { Text("$t") })
-                        }
-                    }
-                }
-                quote?.let { q ->
-                    TyCard {
-                        Text(stringResource(R.string.ty_quality, q.optDouble("q").roundToInt().toString()), fontWeight = FontWeight.Bold)
-                        Text(stringResource(R.string.ty_fair, tyMoney(q.optDouble("fair"))))
-                        Text(stringResource(R.string.ty_unit_cost) + ": " + tyMoney(q.optDouble("unitCost")))
-                        Text(stringResource(R.string.ty_design_fee, tyMoney(q.optDouble("fee"))))
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                enabled = name.isNotBlank(),
-                onClick = {
-                    val comps = JSONObject()
-                    picks.forEach { (k, v) -> comps.put(k, v) }
-                    act(JSONObject().put("type", "model").put("cat", cat).put("name", name).put("comps", comps)) { onClose() }
-                },
-            ) { Text(stringResource(R.string.ty_create)) }
-        },
-        dismissButton = { TextButton(onClick = onClose) { Text(stringResource(R.string.ty_cancel)) } },
-    )
 }
 
 @Composable
