@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="wp_alarm_time">7:30 AM</string>
+    <string name="wp_alarm_sub">Tomorrow • Work</string>
+    <string name="wp_prayer_title">Next prayer</string>
+    <string name="wp_prayer_name">Asr</string>
+    <string name="wp_prayer_time">3:12 PM</string>
+    <string name="wp_prayer_next">Then Maghrib 5:34 PM</string>
+    <string name="wp_rewards_title">Rewards</string>
+    <string name="wp_rewards_count">2 ready</string>
+    <string name="wp_rewards_r1">Daily: ready</string>
+    <string name="wp_rewards_r2">Treasure: in 2h</string>
+    <string name="wp_rewards_r3">Weekly: ready</string>
+    <string name="wp_rewards_r4">Monthly: in 12 days</string>
+    <string name="wp_sleep_title">Last night</string>
+    <string name="wp_sleep_hours">7h 40m</string>
+    <string name="wp_sleep_detail">Goal 8h • average 7h 12m</string>
+    <string name="wp_sleep_bed">Bed by 11:30 PM</string>
+    <string name="wp_habits_title">Habits 1/3</string>
+    <string name="wp_habits_h1">✓ Read 🔥5</string>
+    <string name="wp_habits_h2">Workout 🔥2</string>
+    <string name="wp_habits_h3">Drink water</string>
+    <string name="wp_reels_count">23</string>
+    <string name="wp_reels_mood">Doing fine</string>
+    <string name="wp_reels_sub">short videos today</string>
+</resources>

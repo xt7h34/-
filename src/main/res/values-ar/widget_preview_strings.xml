@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="wp_alarm_time">7:30 ص</string>
+    <string name="wp_alarm_sub">غدًا • الشغل</string>
+    <string name="wp_prayer_title">الصلاة القادمة</string>
+    <string name="wp_prayer_name">العصر</string>
+    <string name="wp_prayer_time">3:12 م</string>
+    <string name="wp_prayer_next">ثم المغرب 5:34 م</string>
+    <string name="wp_rewards_title">المكافآت</string>
+    <string name="wp_rewards_count">2 جاهزة</string>
+    <string name="wp_rewards_r1">اليومية: جاهزة</string>
+    <string name="wp_rewards_r2">الكنز: بعد ساعتين</string>
+    <string name="wp_rewards_r3">الأسبوعية: جاهزة</string>
+    <string name="wp_rewards_r4">الشهرية: بعد 12 يومًا</string>
+    <string name="wp_sleep_title">الليلة الماضية</string>
+    <string name="wp_sleep_hours">7س 40د</string>
+    <string name="wp_sleep_detail">الهدف 8س • المتوسط 7س 12د</string>
+    <string name="wp_sleep_bed">نم قبل 11:30 م</string>
+    <string name="wp_habits_title">العادات 1/3</string>
+    <string name="wp_habits_h1">✓ القراءة 🔥5</string>
+    <string name="wp_habits_h2">التمرين 🔥2</string>
+    <string name="wp_habits_h3">شرب الماء</string>
+    <string name="wp_reels_count">23</string>
+    <string name="wp_reels_mood">بخير</string>
+    <string name="wp_reels_sub">فيديو قصير اليوم</string>
+</resources>
