@@ -776,6 +776,12 @@ private fun HomePage(serviceEnabled: Boolean, onOpen: (String) -> Unit) {
 
                 SettingsGroup {
                     SettingsItem(
+                        Glyph.GOALS, ICON_ORANGE,
+                        stringResource(R.string.goals_title),
+                        stringResource(R.string.goals_summary),
+                    ) { onOpen(PAGE_GOALS) }
+                    ItemDivider()
+                    SettingsItem(
                         Glyph.LOCK, ICON_GREEN,
                         stringResource(R.string.vault_title),
                         stringResource(R.string.vault_summary),
@@ -845,6 +851,7 @@ private fun searchIndex(): List<SearchEntry> {
         // ── From the second file: games + keyboard ──
         SearchEntry(stringResource(R.string.games_title), stringResource(R.string.app_title), PAGE_GAMES),
         SearchEntry(stringResource(R.string.kb_title), stringResource(R.string.app_title), PAGE_KEYBOARD),
+        SearchEntry(stringResource(R.string.goals_title), stringResource(R.string.app_title), PAGE_GOALS),
         SearchEntry(stringResource(R.string.blocks_title), stringResource(R.string.games_title), PAGE_BLOCKS),
         SearchEntry(stringResource(R.string.g2048_title), stringResource(R.string.games_title), PAGE_2048),
         SearchEntry(stringResource(R.string.memory_title), stringResource(R.string.games_title), PAGE_MEMORY),
@@ -1977,6 +1984,7 @@ class MainActivity : ComponentActivity() {
                 // ── Keyboard ──
                 PAGE_KEYBOARD -> KeyboardPage(goBack)
                 "vault" -> VaultPage(goBack)
+                PAGE_GOALS -> GoalsPage(goBack)
                 // ── Home ──
                 else -> HomePage(serviceEnabled) { page = it }
             }
