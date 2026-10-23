@@ -109,4 +109,7 @@
     <string name="goals_import_nothing">لا جديد في هذه النسخة</string>
     <string name="goals_import_wrong">كلمة المرور خاطئة، أو هذا ليس ملف نسخة من كانا جولز</string>
     <string name="goals_io_failed">تعذّرت قراءة الملف أو كتابته</string>
+    <string name="widget_goals_sample_title">💻 لابتوب</string>
+    <string name="widget_goals_sample_detail">6,200 ج.م من 10,000 ج.م</string>
+    <string name="widget_goals_sample_status">على المسار الصحيح</string>
 </resources>

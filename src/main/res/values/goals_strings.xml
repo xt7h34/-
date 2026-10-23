@@ -109,4 +109,7 @@
     <string name="goals_import_nothing">Nothing new in this backup</string>
     <string name="goals_import_wrong">Wrong password, or this is not a KanaGoals backup</string>
     <string name="goals_io_failed">The file could not be read or written</string>
+    <string name="widget_goals_sample_title">💻 Laptop</string>
+    <string name="widget_goals_sample_detail">6,200 EGP of 10,000 EGP</string>
+    <string name="widget_goals_sample_status">On track</string>
 </resources>

@@ -206,7 +206,7 @@ object GoalsWidgets {
             // Locked: the widget must not give the amounts away.
             rv.setTextViewText(R.id.g_title, c.getString(R.string.goals_title))
             rv.setTextViewText(R.id.g_big, "\uD83D\uDD12")
-            rv.setProgressBar(R.id.g_progress, 100, 0, false)
+            rv.setProgressBar(R.id.g_ring, 100, 0, false)
             rv.setTextViewText(R.id.g_detail, c.getString(R.string.widget_goals_locked))
             rv.setTextViewText(R.id.g_status, "")
         } else {
@@ -215,7 +215,7 @@ object GoalsWidgets {
             if (g == null) {
                 rv.setTextViewText(R.id.g_title, c.getString(R.string.goals_title))
                 rv.setTextViewText(R.id.g_big, "\u2014")
-                rv.setProgressBar(R.id.g_progress, 100, 0, false)
+                rv.setProgressBar(R.id.g_ring, 100, 0, false)
                 rv.setTextViewText(R.id.g_detail, c.getString(R.string.widget_goals_none))
                 rv.setTextViewText(R.id.g_status, "")
             } else {
@@ -223,12 +223,18 @@ object GoalsWidgets {
                 val pct = (plan.progress * 100).toInt()
                 rv.setTextViewText(R.id.g_title, "${g.emoji} ${g.name}")
                 rv.setTextViewText(R.id.g_big, "$pct%")
-                rv.setProgressBar(R.id.g_progress, 100, pct, false)
+                rv.setProgressBar(R.id.g_ring, 100, pct, false)
                 rv.setTextViewText(
                     R.id.g_detail,
                     c.getString(R.string.goals_saved_of, formatMoney(plan.saved, g.currency), formatMoney(g.target, g.currency)),
                 )
-                rv.setTextViewText(R.id.g_status, statusLabel(c, plan))
+                // With no target date there is no plan to judge, so show what is left instead.
+                val line = if (plan.status == GoalStatus.NONE) {
+                    c.getString(R.string.goals_remaining, formatMoney(plan.remaining, g.currency))
+                } else {
+                    statusLabel(c, plan)
+                }
+                rv.setTextViewText(R.id.g_status, line)
             }
         }
         val open = PendingIntent.getActivity(
