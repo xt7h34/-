@@ -1,0 +1,1993 @@
+package com.rigen.volumeui
+
+import android.app.Activity
+import android.app.NotificationManager
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.media.AudioManager
+import android.net.Uri
+import android.os.Build
+import android.os.PowerManager
+import android.os.Bundle
+import android.provider.Settings
+import android.widget.Toast
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LargeTopAppBar
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
+import java.text.DateFormat
+import java.util.Date
+import kotlin.math.roundToInt
+
+// ───────────────────────────── Theme ─────────────────────────────
+
+private val KanadeLight = lightColorScheme(
+    primary = Color(0xFF4F5BD5),
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFFE0E2FF),
+    onPrimaryContainer = Color(0xFF14196B),
+    secondary = Color(0xFF8A5CC4),
+    tertiary = Color(0xFFC2638F),
+    background = Color(0xFFF3F3F8),
+    surface = Color(0xFFF3F3F8),
+    surfaceVariant = Color(0xFFE4E3EB),
+    surfaceContainer = Color.White,
+    outlineVariant = Color(0xFFE3E3EA),
+)
+
+private val KanadeDark = darkColorScheme(
+    primary = Color(0xFFB4BBFF),
+    onPrimary = Color(0xFF1C2178),
+    primaryContainer = Color(0xFF343B9E),
+    onPrimaryContainer = Color(0xFFE0E2FF),
+    secondary = Color(0xFFD6BAFF),
+    tertiary = Color(0xFFFFB0D2),
+    background = Color(0xFF000000),
+    surface = Color(0xFF000000),
+    surfaceVariant = Color(0xFF2A2C33),
+    surfaceContainer = Color(0xFF1A1C22),
+    outlineVariant = Color(0xFF34363D),
+)
+
+@Composable
+fun KanadeTheme(themeMode: Int, dynamicColor: Boolean, content: @Composable () -> Unit) {
+    val dark = when (themeMode) {
+        THEME_LIGHT -> false
+        THEME_DARK -> true
+        else -> isSystemInDarkTheme()
+    }
+    val context = LocalContext.current
+    val scheme = when {
+        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
+            if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        dark -> KanadeDark
+        else -> KanadeLight
+    }
+    // Make the status bar icons readable on top of the chosen theme.
+    val view = LocalView.current
+    SideEffect {
+        val window = (view.context as? Activity)?.window
+        if (window != null) {
+            val bars = WindowCompat.getInsetsController(window, view)
+            bars.isAppearanceLightStatusBars = !dark
+            bars.isAppearanceLightNavigationBars = !dark
+        }
+    }
+    MaterialTheme(colorScheme = scheme) {
+        // Text outside a Material Surface falls back to BLACK, which vanishes on the dark theme.
+        CompositionLocalProvider(LocalContentColor provides scheme.onBackground, content = content)
+    }
+}
+
+// ───────────────────────────── Building blocks ─────────────────────────────
+
+private val SWATCHES = listOf(
+    0xFF1E1E1E, 0xFF000000, 0xFFFFFFFF, 0xFF1565C0,
+    0xFF2E7D32, 0xFFC62828, 0xFF6A1B9A, 0xFFEF6C00,
+    0xFF4F5BA5, 0xFF3A9DB5, 0xFF43B85A, 0xFFE0558A,
+).map { it.toInt() }
+
+internal val ICON_BLUE = Color(0xFF3D7BF5)
+internal val ICON_PURPLE = Color(0xFF7B61FF)
+internal val ICON_GREEN = Color(0xFF34A853)
+internal val ICON_ORANGE = Color(0xFFF29900)
+internal val ICON_PINK = Color(0xFFE0558A)
+internal val ICON_RED = Color(0xFFE5484D)
+
+private val LocalPageScroll = compositionLocalOf<ScrollState> { error("No page scroll state") }
+private val LocalPageList = compositionLocalOf<LazyListState> { error("No page list state") }
+
+private val HEADER_EXPANDED = 250.dp
+private val HEADER_COLLAPSED = 96.dp
+
+/** The empty room at the top of a page where the big title lives. */
+@Composable
+private fun HeaderSpacer() {
+    Spacer(
+        Modifier
+            .statusBarsPadding()
+            .height(HEADER_EXPANDED),
+    )
+}
+
+/**
+ * The page title. It starts big and centered. Scrolling moves it to the top corner and makes it
+ * smaller, and scrolling further makes it fade away, like in the system Settings app.
+ * When [pinned] is true it stays collapsed (for pages that do not scroll).
+ */
+@Composable
+private fun CollapsingTitle(title: String, startPad: Dp, pinned: Boolean = false, scrollPx: () -> Int) {
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    val screenW = LocalConfiguration.current.screenWidthDp.dp
+    val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    Text(
+        text = title,
+        color = MaterialTheme.colorScheme.primary,
+        fontSize = 36.sp,
+        fontWeight = FontWeight.SemiBold,
+        maxLines = 1,
+        softWrap = false,
+        modifier = Modifier
+            .padding(start = startPad, top = statusTop)
+            .graphicsLayer {
+                val expandedPx = HEADER_EXPANDED.toPx()
+                val collapsedPx = HEADER_COLLAPSED.toPx()
+                val status = statusTop.toPx()
+                val range = (expandedPx - collapsedPx).coerceAtLeast(1f)
+                // A pinned title stays in its small, collapsed place (for pages that do not scroll).
+                val s = if (pinned) range else scrollPx().toFloat()
+                val p = (s / range).coerceIn(0f, 1f)
+
+                val scale = 1f + (0.62f - 1f) * p
+                transformOrigin = TransformOrigin(if (rtl) 1f else 0f, 0.5f)
+                scaleX = scale
+                scaleY = scale
+
+                // From the middle of the screen to the corner.
+                val centerShift = ((screenW.toPx() - size.width) / 2f - startPad.toPx()) * (1f - p)
+                translationX = if (rtl) -centerShift else centerShift
+
+                // From the big header's middle to the small header's middle.
+                val center0 = status + expandedPx * 0.42f
+                val center1 = status + collapsedPx * 0.45f
+                val center = center0 + (center1 - center0) * p
+                translationY = center - (status + size.height / 2f)
+
+                // Once the page has scrolled further, the title fades out.
+                val fade = ((s - range) / 60.dp.toPx()).coerceIn(0f, 1f)
+                alpha = 1f - fade
+            },
+    )
+}
+
+@Composable
+private fun BackButton(onBack: () -> Unit) {
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    IconButton(
+        onClick = onBack,
+        modifier = Modifier
+            .statusBarsPadding()
+            .padding(start = 8.dp, top = 6.dp)
+            .background(MaterialTheme.colorScheme.background.copy(alpha = 0.6f), CircleShape),
+    ) {
+        PathIcon(
+            Glyph.BACK.pathData,
+            MaterialTheme.colorScheme.onBackground,
+            24.dp,
+            if (rtl) Modifier.scale(-1f, 1f) else Modifier,
+        )
+    }
+}
+
+/** A page with the Settings-style title. Set [lazy] when the page scrolls with a LazyColumn. */
+@Composable
+internal fun PageScaffold(
+    title: String,
+    onBack: (() -> Unit)?,
+    lazy: Boolean = false,
+    pinTitle: Boolean = false,
+    content: @Composable (PaddingValues) -> Unit,
+) {
+    val scroll = rememberScrollState()
+    val list = rememberLazyListState()
+    CompositionLocalProvider(LocalPageScroll provides scroll, LocalPageList provides list) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
+        ) {
+            content(PaddingValues(0.dp))
+            // Content scrolls under the status bar: a soft cover keeps the clock and icons readable.
+            val bg = MaterialTheme.colorScheme.background
+            Column(Modifier.fillMaxWidth().align(Alignment.TopCenter)) {
+                Spacer(Modifier.fillMaxWidth().statusBarsPadding().background(bg))
+                Spacer(Modifier.fillMaxWidth().height(14.dp).background(Brush.verticalGradient(listOf(bg, bg.copy(alpha = 0f)))))
+            }
+            CollapsingTitle(title, if (onBack != null) 64.dp else 24.dp, pinTitle) {
+                if (lazy) {
+                    if (list.firstVisibleItemIndex == 0) list.firstVisibleItemScrollOffset else Int.MAX_VALUE / 4
+                } else {
+                    scroll.value
+                }
+            }
+            if (onBack != null) BackButton(onBack)
+        }
+    }
+}
+
+@Composable
+internal fun PageColumn(padding: PaddingValues, content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(LocalPageScroll.current)
+            .padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        HeaderSpacer()
+        content()
+        Spacer(
+            Modifier
+                .navigationBarsPadding()
+                .height(24.dp),
+        )
+    }
+}
+
+/** A rounded group of rows, like the groups in the system Settings. */
+@Composable
+internal fun SettingsGroup(content: @Composable ColumnScope.() -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        Column(content = content)
+    }
+}
+
+@Composable
+internal fun ItemDivider() {
+    HorizontalDivider(
+        modifier = Modifier.padding(start = 76.dp, end = 20.dp),
+        color = MaterialTheme.colorScheme.outlineVariant,
+    )
+}
+
+/** One row: a colored round icon, a title and a short summary. */
+@Composable
+internal fun SettingsItem(
+    glyph: Glyph,
+    iconColor: Color,
+    title: String,
+    summary: String? = null,
+    enabled: Boolean = true,
+    onClick: (() -> Unit)? = null,
+) {
+    var rowModifier = Modifier.fillMaxWidth()
+    if (enabled && onClick != null) rowModifier = rowModifier.clickable(onClick = onClick)
+    Row(
+        modifier = rowModifier
+            .padding(horizontal = 20.dp, vertical = 14.dp)
+            .alpha(if (enabled) 1f else 0.45f),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(iconColor),
+            contentAlignment = Alignment.Center,
+        ) {
+            PathIcon(glyph.pathData, Color.White, 22.dp)
+        }
+        Spacer(Modifier.width(16.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            if (summary != null) {
+                Text(
+                    summary,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+/** A card with a small colored title and free content (sliders, switches...). */
+@Composable
+internal fun Section(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+            content()
+        }
+    }
+}
+
+@Composable
+private fun LabeledSlider(
+    label: String,
+    value: Int,
+    range: ClosedFloatingPointRange<Float>,
+    onChange: (Int) -> Unit,
+) {
+    Column {
+        Text(label)
+        Slider(
+            value = value.toFloat(),
+            onValueChange = { onChange(it.roundToInt()) },
+            valueRange = range,
+        )
+    }
+}
+
+@Composable
+internal fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, Modifier.weight(1f))
+        KanadeSwitch(checked, onChange)
+    }
+}
+
+/**
+ * A day and night switch. Off is a pastel day sky with a cloud and the knob on the left. On is
+ * a deep purple night with stars and clouds and the knob on the right.
+ */
+@Composable
+internal fun KanadeSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    val trackW = 76.dp
+    val trackH = 40.dp
+    val knob = 32.dp
+    val margin = 4.dp
+    val progress by animateFloatAsState(if (checked) 1f else 0f, label = "night")
+    val interaction = remember { MutableInteractionSource() }
+    val knobX = margin + (trackW - knob - margin * 2) * progress
+
+    Box(
+        modifier = Modifier
+            .size(trackW, trackH)
+            .clickable(interactionSource = interaction, indication = null, role = Role.Switch) {
+                onCheckedChange(!checked)
+            },
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Canvas(
+            Modifier
+                .fillMaxSize()
+                .shadow(
+                    5.dp,
+                    RoundedCornerShape(trackH / 2),
+                    ambientColor = Color(0x44000000),
+                    spotColor = Color(0x44000000),
+                ),
+        ) {
+            val w = size.width
+            val h = size.height
+            val p = progress
+            val dayA = 1f - p
+
+            // The sky: day on the way out, night on the way in.
+            drawRect(
+                Brush.horizontalGradient(
+                    listOf(Color(0xFFFFE6C2), Color(0xFFD6BFFF), Color(0xFF93D2F5)),
+                ),
+                alpha = dayA,
+            )
+            drawRect(
+                Brush.horizontalGradient(
+                    listOf(Color(0xFF1B0FC4), Color(0xFF4A22D8), Color(0xFF6B19C2)),
+                ),
+                alpha = p,
+            )
+
+            // A pale cloud on the right in the day.
+            drawCircle(Color.White.copy(alpha = 0.50f * dayA), h * 0.20f, Offset(w * 0.60f, h * 0.38f))
+            drawCircle(Color(0xFFEDE6FF).copy(alpha = 0.60f * dayA), h * 0.26f, Offset(w * 0.74f, h * 0.60f))
+            drawCircle(Color(0xFFE4EEFF).copy(alpha = 0.60f * dayA), h * 0.30f, Offset(w * 0.86f, h * 0.66f))
+
+            // Purple clouds on the left at night.
+            drawCircle(Color(0xFF8A4DF5).copy(alpha = 0.55f * p), h * 0.24f, Offset(w * 0.34f, h * 0.42f))
+            drawCircle(Color(0xFF5B2BE0).copy(alpha = 0.55f * p), h * 0.30f, Offset(w * 0.22f, h * 0.66f))
+            drawCircle(Color(0xFF3A1FD0).copy(alpha = 0.55f * p), h * 0.30f, Offset(w * 0.42f, h * 0.70f))
+
+            // Little sparkles at night.
+            fun star(cx: Float, cy: Float, r: Float) {
+                val sparkle = Path().apply {
+                    moveTo(cx, cy - r)
+                    lineTo(cx + r * 0.2f, cy - r * 0.2f)
+                    lineTo(cx + r, cy)
+                    lineTo(cx + r * 0.2f, cy + r * 0.2f)
+                    lineTo(cx, cy + r)
+                    lineTo(cx - r * 0.2f, cy + r * 0.2f)
+                    lineTo(cx - r, cy)
+                    lineTo(cx - r * 0.2f, cy - r * 0.2f)
+                    close()
+                }
+                drawPath(sparkle, Color.White.copy(alpha = 0.9f * p))
+            }
+            star(w * 0.50f, h * 0.30f, h * 0.13f)
+            star(w * 0.34f, h * 0.20f, h * 0.07f)
+            star(w * 0.14f, h * 0.30f, h * 0.06f)
+            star(w * 0.58f, h * 0.76f, h * 0.06f)
+            star(w * 0.26f, h * 0.80f, h * 0.05f)
+
+            // The rim: white by day, purple at night.
+            val rim = lerp(Color.White, Color(0xFF7A20C8), p)
+            val edge = 1.dp.toPx()
+            drawRoundRect(
+                color = rim.copy(alpha = 0.95f),
+                topLeft = Offset(edge, edge),
+                size = Size(w - 2 * edge, h - 2 * edge),
+                cornerRadius = CornerRadius(h / 2f),
+                style = Stroke(width = 2.dp.toPx()),
+            )
+        }
+        // The round white knob.
+        Box(
+            modifier = Modifier
+                .offset(x = knobX)
+                .size(knob)
+                .shadow(
+                    6.dp,
+                    CircleShape,
+                    ambientColor = Color(0x55000000),
+                    spotColor = Color(0x55000000),
+                )
+                .clip(CircleShape)
+                .background(Brush.verticalGradient(listOf(Color(0xFFFBFBFD), Color(0xFFECECF1))))
+                .border(1.5.dp, Color.White.copy(alpha = 0.9f), CircleShape),
+        )
+    }
+}
+
+@Composable
+private fun ColorRow(title: String, selected: Int, showAuto: Boolean, onPick: (Int) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(title)
+        Row(
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (showAuto) {
+                FilterChip(
+                    selected = selected == 0,
+                    onClick = { onPick(0) },
+                    label = { Text(stringResource(R.string.color_auto)) },
+                )
+            }
+            SWATCHES.forEach { argb ->
+                val isSelected = selected == argb
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(Color(argb))
+                        .border(
+                            BorderStroke(3.dp, if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray),
+                            CircleShape,
+                        )
+                        .clickable { onPick(argb) },
+                )
+            }
+        }
+    }
+}
+
+/**
+ * A mini phone screen: tap or drag on it to place something. [posX]/[posY] are the center of
+ * the marker as fractions of the screen; the marker is drawn at its real relative size.
+ */
+@Composable
+private fun PositionPicker(
+    posX: Float,
+    posY: Float,
+    markerWdp: Int,
+    markerHdp: Int,
+    cornerDp: Int,
+    markerColor: Color,
+    onChange: (Float, Float) -> Unit,
+) {
+    val currentOnChange by rememberUpdatedState(onChange)
+    val config = LocalConfiguration.current
+    val screenWdp = config.screenWidthDp.coerceAtLeast(1)
+    val screenHdp = config.screenHeightDp.coerceAtLeast(1)
+    val pickerW = 180.dp
+    val pickerH = pickerW * (screenHdp.toFloat() / screenWdp)
+    val scale = 180f / screenWdp
+    val markerW = (markerWdp * scale).dp
+    val markerH = (markerHdp * scale).dp
+    val shape = RoundedCornerShape(16.dp)
+
+    Box(
+        modifier = Modifier
+            .size(pickerW, pickerH)
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .border(BorderStroke(2.dp, MaterialTheme.colorScheme.outline), shape)
+            .pointerInput(Unit) {
+                detectTapGestures(onTap = { o ->
+                    currentOnChange(o.x / size.width, o.y / size.height)
+                })
+            }
+            .pointerInput(Unit) {
+                detectDragGestures(
+                    onDragStart = { o -> currentOnChange(o.x / size.width, o.y / size.height) },
+                    onDrag = { c, _ ->
+                        c.consume()
+                        currentOnChange(c.position.x / size.width, c.position.y / size.height)
+                    },
+                )
+            },
+    ) {
+        val maxLeft = (pickerW - markerW).coerceAtLeast(0.dp)
+        val maxTop = (pickerH - markerH).coerceAtLeast(0.dp)
+        val left = (pickerW * posX - markerW / 2).coerceIn(0.dp, maxLeft)
+        val top = (pickerH * posY - markerH / 2).coerceIn(0.dp, maxTop)
+        Box(
+            modifier = Modifier
+                .offset(left, top)
+                .size(markerW, markerH)
+                .clip(RoundedCornerShape((cornerDp * scale).dp))
+                .background(markerColor),
+        )
+    }
+}
+
+// ───────────────────────────── Pages ─────────────────────────────
+
+@Composable
+private fun AccountCard(onClick: () -> Unit) {
+    val ctx = LocalContext.current
+    val profile = remember { AccountStore.load(ctx)?.profile }
+    val signedName = profile?.optString("name").orEmpty().ifBlank { profile?.optString("hash").orEmpty() }
+    SettingsGroup {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onClick() }
+                .padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFF4F1FF)),
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.ic_launcher_foreground),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .scale(1.4f),
+                )
+            }
+            Spacer(Modifier.width(16.dp))
+            Column {
+                Text(
+                    if (profile != null && signedName.isNotBlank()) signedName else stringResource(R.string.account_title),
+                    style = MaterialTheme.typography.titleLarge,
+                )
+                Text(
+                    if (profile != null) profile.optString("hash") else stringResource(R.string.account_summary),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomePage(serviceEnabled: Boolean, onOpen: (String) -> Unit) {
+    val context = LocalContext.current
+    val power = context.getSystemService(PowerManager::class.java)
+    val unrestricted = power?.isIgnoringBatteryOptimizations(context.packageName) ?: false
+
+    PageScaffold(stringResource(R.string.app_title), null) { padding ->
+        Box(Modifier.fillMaxSize()) {
+            PageColumn(padding) {
+                AccountCard { onOpen(PAGE_ACCOUNT) }
+
+                SettingsGroup {
+                    SettingsItem(
+                        glyph = Glyph.ACCESS,
+                        iconColor = if (serviceEnabled) ICON_GREEN else ICON_ORANGE,
+                        title = stringResource(if (serviceEnabled) R.string.service_on else R.string.service_off),
+                        summary = stringResource(
+                            if (serviceEnabled) R.string.service_on_summary else R.string.service_off_summary,
+                        ),
+                    ) {
+                        context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                    }
+                    ItemDivider()
+                    SettingsItem(
+                        glyph = Glyph.BATTERY,
+                        iconColor = if (unrestricted) ICON_GREEN else ICON_ORANGE,
+                        title = stringResource(R.string.keepalive_title),
+                        summary = stringResource(
+                            if (unrestricted) R.string.keepalive_summary_on else R.string.keepalive_summary_off,
+                        ),
+                    ) { onOpen(PAGE_KEEPALIVE) }
+                }
+
+                SettingsGroup {
+                    SettingsItem(
+                        Glyph.VOLUME, ICON_BLUE,
+                        stringResource(R.string.item_volume_title),
+                        stringResource(R.string.item_volume_summary),
+                    ) { onOpen(PAGE_VOLUME) }
+                    ItemDivider()
+                    SettingsItem(
+                        Glyph.CLOCK, ICON_PURPLE,
+                        stringResource(R.string.clock_title),
+                        stringResource(R.string.clock_summary),
+                    ) { onOpen(PAGE_CLOCK) }
+                }
+
+                SettingsGroup {
+                    SettingsItem(
+                        Glyph.BRAIN, ICON_PINK,
+                        stringResource(R.string.reels_title),
+                        stringResource(R.string.reels_summary),
+                    ) { onOpen(PAGE_REELS) }
+                    ItemDivider()
+                    SettingsItem(
+                        Glyph.GAMES, ICON_PURPLE,
+                        stringResource(R.string.games_title),
+                        stringResource(R.string.games_summary),
+                    ) { onOpen(PAGE_GAMES) }
+                }
+
+                SettingsGroup {
+                    SettingsItem(
+                        Glyph.KEYBOARD, ICON_BLUE,
+                        stringResource(R.string.kb_title),
+                        stringResource(R.string.kb_summary),
+                    ) { onOpen(PAGE_KEYBOARD) }
+                }
+
+                SettingsGroup {
+                    SettingsItem(
+                        Glyph.GOALS, ICON_ORANGE,
+                        stringResource(R.string.goals_title),
+                        stringResource(R.string.goals_summary),
+                    ) { onOpen(PAGE_GOALS) }
+                    ItemDivider()
+                    SettingsItem(
+                        Glyph.LOCK, ICON_GREEN,
+                        stringResource(R.string.vault_title),
+                        stringResource(R.string.vault_summary),
+                    ) { onOpen("vault") }
+                }
+
+                SettingsGroup {
+                    SettingsItem(
+                        Glyph.PALETTE, ICON_PINK,
+                        stringResource(R.string.item_app_title),
+                        stringResource(R.string.item_app_summary),
+                    ) { onOpen(PAGE_APP) }
+                }
+
+                // Room for the floating search bar.
+                Spacer(Modifier.height(72.dp))
+            }
+            SettingsSearch(onOpen, Modifier.align(Alignment.BottomCenter))
+        }
+    }
+}
+
+private class SearchEntry(val title: String, val where: String, val page: String)
+
+/** Every setting people may look for, and the page it lives on. */
+@Composable
+private fun searchIndex(): List<SearchEntry> {
+    val panelPage = stringResource(R.string.item_panel_title)
+    val behaviorPage = stringResource(R.string.item_behavior_title)
+    val stationPage = stringResource(R.string.section_station)
+    val appsPage = stringResource(R.string.apps_title)
+    val appPage = stringResource(R.string.item_app_title)
+    val keepPage = stringResource(R.string.keepalive_title)
+    return listOf(
+        SearchEntry(stringResource(R.string.item_volume_title), stringResource(R.string.app_title), PAGE_VOLUME),
+        SearchEntry(stringResource(R.string.panel_style), panelPage, PAGE_PANEL),
+        SearchEntry(stringResource(R.string.vertical_panel), panelPage, PAGE_PANEL),
+        SearchEntry(stringResource(R.string.show_frame), panelPage, PAGE_PANEL),
+        SearchEntry(stringResource(R.string.show_dnd_icon), panelPage, PAGE_PANEL),
+        SearchEntry(stringResource(R.string.label_corner_radius), panelPage, PAGE_PANEL),
+        SearchEntry(stringResource(R.string.label_panel_width), panelPage, PAGE_PANEL),
+        SearchEntry(stringResource(R.string.label_panel_height), panelPage, PAGE_PANEL),
+        SearchEntry(stringResource(R.string.label_red_threshold), panelPage, PAGE_PANEL),
+        SearchEntry(stringResource(R.string.panel_color), panelPage, PAGE_PANEL),
+        SearchEntry(stringResource(R.string.bar_color), panelPage, PAGE_PANEL),
+        SearchEntry(stringResource(R.string.section_position), panelPage, PAGE_PANEL),
+        SearchEntry(stringResource(R.string.touch_control), behaviorPage, PAGE_BEHAVIOR),
+        SearchEntry(stringResource(R.string.haptics), behaviorPage, PAGE_BEHAVIOR),
+        SearchEntry(stringResource(R.string.label_hide_delay), behaviorPage, PAGE_BEHAVIOR),
+        SearchEntry(stringResource(R.string.double_press_title), behaviorPage, PAGE_BEHAVIOR),
+        SearchEntry(stringResource(R.string.section_limits), behaviorPage, PAGE_BEHAVIOR),
+        SearchEntry(stringResource(R.string.section_station), stationPage, PAGE_STATION),
+        SearchEntry(stringResource(R.string.station_toggle), stationPage, PAGE_STATION),
+        SearchEntry(stringResource(R.string.station_mute_all), stationPage, PAGE_STATION),
+        SearchEntry(stringResource(R.string.station_dnd_button), stationPage, PAGE_STATION),
+        SearchEntry(stringResource(R.string.station_ringer), stationPage, PAGE_STATION),
+        SearchEntry(stringResource(R.string.station_output), stationPage, PAGE_STATION),
+        SearchEntry(stringResource(R.string.station_now_playing), stationPage, PAGE_STATION),
+        SearchEntry(stringResource(R.string.relative_drag), behaviorPage, PAGE_BEHAVIOR),
+        SearchEntry(stringResource(R.string.apps_title), appsPage, PAGE_APPS),
+        SearchEntry(stringResource(R.string.alt_position_title), appsPage, PAGE_APPS),
+        SearchEntry(stringResource(R.string.section_theme), appPage, PAGE_APP),
+        SearchEntry(stringResource(R.string.dynamic_color), appPage, PAGE_APP),
+        SearchEntry(stringResource(R.string.section_language), appPage, PAGE_APP),
+        SearchEntry(stringResource(R.string.section_diag), appPage, PAGE_APP),
+        SearchEntry(stringResource(R.string.keepalive_title), keepPage, PAGE_KEEPALIVE),
+        // ── From the second file: games + keyboard ──
+        SearchEntry(stringResource(R.string.games_title), stringResource(R.string.app_title), PAGE_GAMES),
+        SearchEntry(stringResource(R.string.kb_title), stringResource(R.string.app_title), PAGE_KEYBOARD),
+        SearchEntry(stringResource(R.string.goals_title), stringResource(R.string.app_title), PAGE_GOALS),
+        SearchEntry(stringResource(R.string.blocks_title), stringResource(R.string.games_title), PAGE_BLOCKS),
+        SearchEntry(stringResource(R.string.g2048_title), stringResource(R.string.games_title), PAGE_2048),
+        SearchEntry(stringResource(R.string.memory_title), stringResource(R.string.games_title), PAGE_MEMORY),
+        SearchEntry(stringResource(R.string.stack_title), stringResource(R.string.games_title), PAGE_STACK),
+        SearchEntry(stringResource(R.string.ty_title), stringResource(R.string.games_title), PAGE_TYCOON),
+        // ── From the first file: account pages ──
+        SearchEntry(stringResource(R.string.habits_title), stringResource(R.string.account_title), PAGE_HABITS),
+        SearchEntry(stringResource(R.string.sub_title), stringResource(R.string.account_title), PAGE_SUBSCRIPTION),
+        SearchEntry(stringResource(R.string.linked_title), stringResource(R.string.account_title), PAGE_LINKED),
+    )
+}
+
+/**
+ * The floating search bar: a compact, translucent purple pill with a glass magnifier circle.
+ * It is see-through, so it takes on the colors behind it, and it grows a little while typing.
+ */
+@Composable
+private fun SettingsSearch(onOpen: (String) -> Unit, modifier: Modifier = Modifier) {
+    var query by remember { mutableStateOf("") }
+    var focused by remember { mutableStateOf(false) }
+    val focus = LocalFocusManager.current
+    val index = searchIndex()
+    val q = query.trim()
+    val results = if (q.isEmpty()) {
+        emptyList()
+    } else {
+        index.filter { it.title.contains(q, ignoreCase = true) || it.where.contains(q, ignoreCase = true) }.take(6)
+    }
+    val active = focused || query.isNotEmpty()
+    val pillWidth by animateDpAsState(if (active) 320.dp else 236.dp, label = "searchWidth")
+    val pillShape = RoundedCornerShape(27.dp)
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .imePadding()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        if (q.isNotEmpty()) {
+            Card(
+                modifier = Modifier.width(320.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+            ) {
+                if (results.isEmpty()) {
+                    Text(
+                        stringResource(R.string.search_empty),
+                        modifier = Modifier.padding(16.dp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    results.forEachIndexed { i, r ->
+                        if (i > 0) ItemDivider()
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    query = ""
+                                    focus.clearFocus()
+                                    onOpen(r.page)
+                                }
+                                .padding(horizontal = 20.dp, vertical = 12.dp),
+                        ) {
+                            Text(r.title, style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                r.where,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Box(
+            Modifier
+                .width(pillWidth)
+                .height(54.dp),
+        ) {
+            // The translucent purple pill. It starts under the glass circle.
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(start = 27.dp)
+                    .clip(pillShape)
+                    .background(Brush.horizontalGradient(listOf(Color(0xCC5A1FD6), Color(0xCC8A2BFA))))
+                    .drawBehind {
+                        drawRect(
+                            Brush.verticalGradient(
+                                listOf(Color.White.copy(alpha = 0.22f), Color.Transparent),
+                                endY = size.height * 0.55f,
+                            ),
+                        )
+                    }
+                    .border(
+                        width = 1.dp,
+                        brush = Brush.verticalGradient(
+                            listOf(Color.White.copy(alpha = 0.50f), Color.White.copy(alpha = 0.06f)),
+                        ),
+                        shape = pillShape,
+                    )
+                    .padding(start = 36.dp, end = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                BasicTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    singleLine = true,
+                    textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
+                    cursorBrush = SolidColor(Color.White),
+                    modifier = Modifier
+                        .weight(1f)
+                        .onFocusChanged { focused = it.isFocused },
+                    decorationBox = { inner ->
+                        Box(contentAlignment = Alignment.CenterStart) {
+                            if (query.isEmpty()) {
+                                Text(
+                                    stringResource(R.string.search_hint),
+                                    color = Color.White.copy(alpha = 0.9f),
+                                    fontSize = 16.sp,
+                                )
+                            }
+                            inner()
+                        }
+                    },
+                )
+                if (query.isNotEmpty()) {
+                    IconButton(onClick = {
+                        query = ""
+                        focus.clearFocus()
+                    }) {
+                        PathIcon(Glyph.CLOSE.pathData, Color.White, 20.dp)
+                    }
+                }
+            }
+            // The glass circle: frosted, with a bright rim and a soft glow.
+            Box(
+                modifier = Modifier
+                    .size(54.dp)
+                    .align(Alignment.CenterStart)
+                    .shadow(
+                        10.dp,
+                        CircleShape,
+                        ambientColor = Color(0xFF5A1FD6),
+                        spotColor = Color(0xFF5A1FD6),
+                    )
+                    .clip(CircleShape)
+                    .background(Brush.radialGradient(listOf(Color(0xB3C9AAFF), Color(0x80A875F5))))
+                    .drawBehind {
+                        drawRect(
+                            Brush.verticalGradient(
+                                listOf(Color.White.copy(alpha = 0.35f), Color.Transparent),
+                                endY = size.height * 0.6f,
+                            ),
+                        )
+                    }
+                    .border(
+                        width = 1.5.dp,
+                        brush = Brush.linearGradient(
+                            listOf(
+                                Color.White.copy(alpha = 0.95f),
+                                Color.White.copy(alpha = 0.15f),
+                                Color.White.copy(alpha = 0.60f),
+                            ),
+                        ),
+                        shape = CircleShape,
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                PathIcon(Glyph.SEARCH.pathData, Color.White, 26.dp)
+            }
+        }
+    }
+}
+
+/** How to stop the system from putting the service to sleep. */
+@Composable
+private fun KeepAlivePage(onBack: () -> Unit) {
+    val context = LocalContext.current
+    val power = context.getSystemService(PowerManager::class.java)
+    val unrestricted = power?.isIgnoringBatteryOptimizations(context.packageName) ?: false
+
+    fun open(intent: Intent) {
+        try {
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            Toast.makeText(context, R.string.keepalive_open_failed, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    PageScaffold(stringResource(R.string.keepalive_title), onBack) { padding ->
+        PageColumn(padding) {
+            Section(stringResource(R.string.keepalive_title)) {
+                Text(stringResource(R.string.keepalive_why), style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    stringResource(if (unrestricted) R.string.keepalive_status_on else R.string.keepalive_status_off),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            Section(stringResource(R.string.keepalive_steps_title)) {
+                Text(stringResource(R.string.keepalive_steps), style = MaterialTheme.typography.bodyMedium)
+                Button(onClick = {
+                    open(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                }) { Text(stringResource(R.string.keepalive_open_battery)) }
+                OutlinedButton(onClick = {
+                    open(
+                        Intent(
+                            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.parse("package:" + context.packageName),
+                        ),
+                    )
+                }) { Text(stringResource(R.string.keepalive_open_app)) }
+            }
+        }
+    }
+}
+
+/**
+ * The state behind every live preview of the panel (Volume Panel, Panel look, Volume Station):
+ * the levels, the three dots, mute buttons, ringer mode... all work on fake values here.
+ */
+private class PreviewModel(
+    private val hapticsOn: () -> Boolean,
+    context: Context,
+    private val sampleApp: String,
+    private val sampleTitle: String,
+) {
+    val levels = mutableStateMapOf(
+        AudioManager.STREAM_MUSIC to 17,
+        AudioManager.STREAM_VOICE_CALL to 5,
+        AudioManager.STREAM_RING to 13,
+        AudioManager.STREAM_NOTIFICATION to 11,
+        AudioManager.STREAM_ALARM to 15,
+    )
+    val maxes = STREAMS.associate { it.stream to PANEL_STEPS }
+    var expanded by mutableStateOf(false)
+    var dnd by mutableStateOf(false)
+    var ringer by mutableIntStateOf(AudioManager.RINGER_MODE_NORMAL)
+    private val beforeMute = mutableMapOf<Int, Int>()
+
+    private fun toggleMute(stream: Int) {
+        val now = levels[stream] ?: 0
+        if (now > 0) {
+            beforeMute[stream] = now
+            levels[stream] = 0
+        } else {
+            levels[stream] = (beforeMute[stream] ?: 10).coerceAtLeast(1)
+        }
+    }
+
+    val actions = PanelActions(
+        onSeek = { stream, f -> levels[stream] = (f * PANEL_STEPS).roundToInt().coerceIn(0, PANEL_STEPS) },
+        onTouch = { },
+        onToggleStation = { expanded = !expanded },
+        onMedia = { },
+        onMuteAll = {
+            val anyOn = STREAMS.any { (levels[it.stream] ?: 0) > 0 }
+            STREAMS.forEach { levels[it.stream] = if (anyOn) 0 else 10 }
+        },
+        onToggleDnd = { dnd = !dnd },
+        // In the preview the gear just closes the card.
+        onOpenSettings = { expanded = false },
+        onToggleMute = { toggleMute(AudioManager.STREAM_MUSIC) },
+        onTick = { if (hapticsOn()) Haptics.tick(context) },
+        onToggleMuteStream = { stream -> toggleMute(stream) },
+        onToggleRinger = {
+            ringer = when (ringer) {
+                AudioManager.RINGER_MODE_NORMAL -> AudioManager.RINGER_MODE_VIBRATE
+                AudioManager.RINGER_MODE_VIBRATE -> AudioManager.RINGER_MODE_SILENT
+                else -> AudioManager.RINGER_MODE_NORMAL
+            }
+        },
+        onOpenOutput = { },
+    )
+
+    fun state(settings: PanelSettings, expanded: Boolean = this.expanded) = PanelState(
+        stream = AudioManager.STREAM_MUSIC,
+        level = levels[AudioManager.STREAM_MUSIC] ?: 0,
+        max = PANEL_STEPS,
+        dnd = dnd,
+        expanded = expanded,
+        levels = levels,
+        maxes = maxes,
+        ringerMode = ringer,
+        outputKind = OUTPUT_BLUETOOTH,
+        mediaApp = if (settings.stationNowPlaying) sampleApp else null,
+        mediaTitle = if (settings.stationNowPlaying) sampleTitle else null,
+    )
+}
+
+@Composable
+private fun rememberPreviewModel(settings: PanelSettings): PreviewModel {
+    val context = LocalContext.current
+    val hapticsOn by rememberUpdatedState(settings.haptics)
+    val app = stringResource(R.string.sample_app)
+    val title = stringResource(R.string.sample_title)
+    return remember { PreviewModel({ hapticsOn }, context, app, title) }
+}
+
+/** The "Volume Panel" option: a live preview and the pages that belong to it. */
+@Composable
+private fun VolumeHubPage(settings: PanelSettings, onOpen: (String) -> Unit, onBack: () -> Unit) {
+    val context = LocalContext.current
+    val pm = rememberPreviewModel(settings)
+
+    PageScaffold(stringResource(R.string.item_volume_title), onBack) { padding ->
+        PageColumn(padding) {
+            Section(stringResource(R.string.preview_title)) {
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    PanelOrStation(
+                        settings = settings,
+                        state = pm.state(settings),
+                        actions = pm.actions,
+                    )
+                }
+                if (settings.stationEnabled) {
+                    Text(stringResource(R.string.preview_hint), style = MaterialTheme.typography.bodySmall)
+                }
+            }
+
+            SettingsGroup {
+                SettingsItem(
+                    Glyph.VOLUME, ICON_BLUE,
+                    stringResource(R.string.item_panel_title),
+                    stringResource(R.string.item_panel_summary),
+                ) { onOpen(PAGE_PANEL) }
+                ItemDivider()
+                SettingsItem(
+                    Glyph.TUNE, ICON_PURPLE,
+                    stringResource(R.string.item_behavior_title),
+                    stringResource(R.string.item_behavior_summary),
+                ) { onOpen(PAGE_BEHAVIOR) }
+                ItemDivider()
+                SettingsItem(
+                    Glyph.MORE, ICON_GREEN,
+                    stringResource(R.string.section_station),
+                    stringResource(if (settings.stationEnabled) R.string.station_on else R.string.station_off),
+                ) { onOpen(PAGE_STATION) }
+                ItemDivider()
+                SettingsItem(
+                    Glyph.APPS, ICON_ORANGE,
+                    stringResource(R.string.apps_title),
+                    stringResource(R.string.apps_summary),
+                ) { onOpen(PAGE_APPS) }
+            }
+
+            SettingsGroup {
+                SettingsItem(
+                    glyph = Glyph.PLAY,
+                    iconColor = ICON_BLUE,
+                    title = stringResource(R.string.test_panel),
+                ) {
+                    val s = VolumeAccessibilityService.instance
+                    if (s != null) {
+                        s.showPanel(ignoreRules = true)
+                    } else {
+                        Toast.makeText(context, R.string.enable_service_first, Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** The panel styles, each drawn live so they are easy to compare. All four are always visible. */
+@Composable
+private fun StylePicker(settings: PanelSettings, onPick: (Int) -> Unit) {
+    val styles = listOf(
+        STYLE_CLASSIC to R.string.style_classic,
+        STYLE_CAPSULE to R.string.style_capsule,
+        STYLE_CAPSULE2 to R.string.style_capsule2,
+        STYLE_BAR to R.string.style_bar,
+    )
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        styles.chunked(2).forEach { pair ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                pair.forEach { (style, labelRes) ->
+                    StyleThumb(settings, style, labelRes, onPick)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StyleThumb(settings: PanelSettings, style: Int, labelRes: Int, onPick: (Int) -> Unit) {
+    val selected = settings.panelStyle == style
+    val shape = RoundedCornerShape(18.dp)
+    val thumb = settings.copy(
+        panelStyle = style,
+        vertical = true,
+        widthDp = 52,
+        heightDp = 140,
+        stationEnabled = false,
+    )
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .clickable { onPick(style) }
+            .padding(6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .width(110.dp)
+                .height(170.dp)
+                .clip(shape)
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .border(
+                    BorderStroke(
+                        if (selected) 2.5.dp else 1.dp,
+                        if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                    ),
+                    shape,
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            VolumePanel(
+                // Capsule II always shows with the look it was made for.
+                settings = if (style == STYLE_CAPSULE2) {
+                    thumb.copy(colorArgb = CAPSULE2_FRAME, barColorArgb = CAPSULE2_ACCENT)
+                } else {
+                    thumb
+                },
+                state = PanelState(
+                    stream = AudioManager.STREAM_MUSIC,
+                    level = 12,
+                    max = PANEL_STEPS,
+                    dnd = true,
+                ),
+            )
+        }
+        Text(
+            stringResource(labelRes),
+            style = MaterialTheme.typography.labelLarge,
+            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+        )
+    }
+}
+
+/**
+ * A size preset for the current style: the style's usual size times [scale], kept inside the
+ * range of the width and height sliders. With [resetLook] the corner radius, frame and colours go
+ * back to the app's defaults as well (Capsule II brings its own look): the "Reset to default" button.
+ */
+private fun sizePreset(s: PanelSettings, scale: Float, resetLook: Boolean): PanelSettings {
+    val d = PanelSettings()
+    // Capsule II only exists as a vertical panel.
+    val vertical = if (s.panelStyle == STYLE_CAPSULE2) true else s.vertical
+    val (baseW, baseH) = when {
+        s.panelStyle == STYLE_CLASSIC ->
+            if (vertical) d.heightDp to d.widthDp else d.widthDp to d.heightDp
+        else -> if (vertical) 64 to 260 else 260 to 64
+    }
+    val wRange = if (vertical) 32..120 else 160..360
+    val hRange = if (vertical) 160..360 else 32..120
+    var next = s.copy(
+        vertical = vertical,
+        widthDp = (baseW * scale).roundToInt().coerceIn(wRange),
+        heightDp = (baseH * scale).roundToInt().coerceIn(hRange),
+    )
+    if (resetLook) {
+        next = next.copy(cornerRadiusDp = d.cornerRadiusDp, showFrame = d.showFrame)
+        next = if (s.panelStyle == STYLE_CAPSULE2) {
+            next.copy(colorArgb = CAPSULE2_FRAME, barColorArgb = CAPSULE2_ACCENT)
+        } else {
+            next.copy(colorArgb = d.colorArgb, barColorArgb = d.barColorArgb)
+        }
+    }
+    return next
+}
+
+@Composable
+private fun PanelPage(settings: PanelSettings, onChange: (PanelSettings) -> Unit, onBack: () -> Unit) {
+    val pm = rememberPreviewModel(settings)
+    val previewLevel = pm.levels[AudioManager.STREAM_MUSIC] ?: 0
+
+    // The capsule and the bar are tall shapes, so choosing one turns the panel vertical.
+    fun setStyle(style: Int) {
+        var next = settings.copy(panelStyle = style)
+        if (style != STYLE_CLASSIC && !settings.vertical) {
+            next = next.copy(vertical = true, widthDp = 64, heightDp = 260)
+        } else if (style != STYLE_CLASSIC && next.widthDp < 52) {
+            // Too narrow for the capsule shapes: use the size the style pictures are drawn at.
+            next = next.copy(widthDp = 52)
+        }
+        if (style == STYLE_CAPSULE2) {
+            next = next.copy(colorArgb = CAPSULE2_FRAME, barColorArgb = CAPSULE2_ACCENT)
+        }
+        onChange(next)
+    }
+
+    PageScaffold(stringResource(R.string.item_panel_title), onBack) { padding ->
+        PageColumn(padding) {
+            Section(stringResource(R.string.item_panel_title)) {
+                SwitchRow(stringResource(R.string.panel_enabled), settings.panelEnabled) {
+                    onChange(settings.copy(panelEnabled = it))
+                }
+                Text(stringResource(R.string.panel_enabled_hint), style = MaterialTheme.typography.bodySmall)
+            }
+
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                PanelOrStation(
+                    settings = settings,
+                    state = pm.state(settings),
+                    actions = pm.actions,
+                )
+            }
+
+            Section(stringResource(R.string.preview_title)) {
+                LabeledSlider(stringResource(R.string.preview_level, previewLevel, PANEL_STEPS), previewLevel, 0f..PANEL_STEPS.toFloat()) {
+                    pm.levels[AudioManager.STREAM_MUSIC] = it
+                }
+                SwitchRow(stringResource(R.string.preview_dnd), pm.dnd) { pm.dnd = it }
+                if (settings.stationEnabled) {
+                    SwitchRow(stringResource(R.string.preview_station), pm.expanded) { pm.expanded = it }
+                }
+            }
+
+            Section(stringResource(R.string.section_look)) {
+                Text(stringResource(R.string.panel_style))
+                StylePicker(settings) { setStyle(it) }
+                Text(stringResource(R.string.style_hint), style = MaterialTheme.typography.bodySmall)
+                val capsuleStyle = settings.panelStyle == STYLE_CAPSULE || settings.panelStyle == STYLE_CAPSULE2
+                Text(stringResource(R.string.number_title), style = MaterialTheme.typography.labelLarge)
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    FilterChip(
+                        selected = settings.numberMode == NUMBER_NONE,
+                        onClick = { onChange(settings.copy(numberMode = NUMBER_NONE)) },
+                        label = { Text(stringResource(R.string.number_off)) },
+                    )
+                    FilterChip(
+                        selected = settings.numberMode == NUMBER_ICON ||
+                            (settings.numberMode == NUMBER_MUTE && !capsuleStyle),
+                        onClick = { onChange(settings.copy(numberMode = NUMBER_ICON)) },
+                        label = { Text(stringResource(R.string.number_icon)) },
+                    )
+                    if (capsuleStyle) {
+                        FilterChip(
+                            selected = settings.numberMode == NUMBER_MUTE,
+                            onClick = { onChange(settings.copy(numberMode = NUMBER_MUTE)) },
+                            label = { Text(stringResource(R.string.number_mute)) },
+                        )
+                    }
+                }
+                Text(stringResource(R.string.number_hint), style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(R.string.presets_title), style = MaterialTheme.typography.labelLarge)
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    AssistChip(
+                        onClick = { onChange(sizePreset(settings, 0.8f, resetLook = false)) },
+                        label = { Text(stringResource(R.string.preset_compact)) },
+                    )
+                    AssistChip(
+                        onClick = { onChange(sizePreset(settings, 1.25f, resetLook = false)) },
+                        label = { Text(stringResource(R.string.preset_large)) },
+                    )
+                    OutlinedButton(onClick = { onChange(sizePreset(settings, 1f, resetLook = true)) }) {
+                        Text(stringResource(R.string.reset_style))
+                    }
+                }
+                SwitchRow(stringResource(R.string.vertical_panel), settings.vertical) {
+                    // Rotate the panel: swap its width and height.
+                    onChange(settings.copy(vertical = it, widthDp = settings.heightDp, heightDp = settings.widthDp))
+                }
+                SwitchRow(stringResource(R.string.show_frame), settings.showFrame) {
+                    onChange(settings.copy(showFrame = it))
+                }
+                SwitchRow(stringResource(R.string.show_dnd_icon), settings.showDndIcon) {
+                    onChange(settings.copy(showDndIcon = it))
+                }
+                LabeledSlider(
+                    stringResource(R.string.corner_radius, settings.cornerRadiusDp),
+                    settings.cornerRadiusDp,
+                    0f..40f,
+                ) { onChange(settings.copy(cornerRadiusDp = it)) }
+                LabeledSlider(
+                    stringResource(R.string.panel_width, settings.widthDp),
+                    settings.widthDp,
+                    if (settings.vertical) 32f..120f else 160f..360f,
+                ) { onChange(settings.copy(widthDp = it)) }
+                LabeledSlider(
+                    stringResource(R.string.panel_height, settings.heightDp),
+                    settings.heightDp,
+                    if (settings.vertical) 160f..360f else 32f..120f,
+                ) { onChange(settings.copy(heightDp = it)) }
+                LabeledSlider(
+                    stringResource(R.string.red_threshold, settings.redThresholdPct),
+                    settings.redThresholdPct,
+                    50f..100f,
+                ) { onChange(settings.copy(redThresholdPct = it)) }
+                ColorRow(stringResource(R.string.panel_color), settings.colorArgb, false) {
+                    onChange(settings.copy(colorArgb = it))
+                }
+                ColorRow(stringResource(R.string.bar_color), settings.barColorArgb, true) {
+                    onChange(settings.copy(barColorArgb = it))
+                }
+            }
+
+            Section(stringResource(R.string.section_position)) {
+                Text(stringResource(R.string.position_hint), style = MaterialTheme.typography.bodySmall)
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    PositionPicker(
+                        posX = settings.posX,
+                        posY = settings.posY,
+                        markerWdp = settings.widthDp + 24,
+                        markerHdp = settings.heightDp + 24,
+                        cornerDp = settings.cornerRadiusDp,
+                        markerColor = if (settings.showFrame) {
+                            Color(settings.colorArgb)
+                        } else {
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+                        },
+                    ) { fx, fy ->
+                        onChange(settings.copy(posX = fx.coerceIn(0f, 1f), posY = fy.coerceIn(0f, 1f)))
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AssistChip(
+                        onClick = { onChange(settings.copy(posX = 0.5f, posY = 0.08f)) },
+                        label = { Text(stringResource(R.string.pos_top)) },
+                    )
+                    AssistChip(
+                        onClick = { onChange(settings.copy(posX = 0.5f, posY = 0.5f)) },
+                        label = { Text(stringResource(R.string.pos_center)) },
+                    )
+                    AssistChip(
+                        onClick = { onChange(settings.copy(posX = 0.5f, posY = 0.92f)) },
+                        label = { Text(stringResource(R.string.pos_bottom)) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BehaviorPage(settings: PanelSettings, onChange: (PanelSettings) -> Unit, onBack: () -> Unit) {
+    val context = LocalContext.current
+    PageScaffold(stringResource(R.string.item_behavior_title), onBack) { padding ->
+        PageColumn(padding) {
+            Section(stringResource(R.string.section_controls)) {
+                SwitchRow(stringResource(R.string.touch_control), settings.touchEnabled) {
+                    onChange(settings.copy(touchEnabled = it))
+                }
+                SwitchRow(stringResource(R.string.relative_drag), settings.relativeDrag) {
+                    onChange(settings.copy(relativeDrag = it))
+                }
+                Text(stringResource(R.string.relative_drag_hint), style = MaterialTheme.typography.bodySmall)
+                SwitchRow(stringResource(R.string.haptics), settings.haptics) {
+                    onChange(settings.copy(haptics = it))
+                }
+                OutlinedButton(onClick = { Haptics.tick(context) }) {
+                    Text(stringResource(R.string.haptic_test))
+                }
+                LabeledSlider(
+                    stringResource(R.string.hide_delay, (settings.hideDelayMs / 1000f).toString()),
+                    settings.hideDelayMs,
+                    500f..5000f,
+                ) { onChange(settings.copy(hideDelayMs = it / 100 * 100)) }
+                Text(stringResource(R.string.double_press_title))
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    FilterChip(
+                        selected = settings.doublePressKey == 0,
+                        onClick = { onChange(settings.copy(doublePressKey = 0)) },
+                        label = { Text(stringResource(R.string.dp_none)) },
+                    )
+                    FilterChip(
+                        selected = settings.doublePressKey == 1,
+                        onClick = { onChange(settings.copy(doublePressKey = 1)) },
+                        label = { Text(stringResource(R.string.dp_up)) },
+                    )
+                    FilterChip(
+                        selected = settings.doublePressKey == 2,
+                        onClick = { onChange(settings.copy(doublePressKey = 2)) },
+                        label = { Text(stringResource(R.string.dp_down)) },
+                    )
+                }
+            }
+
+            Section(stringResource(R.string.section_limits)) {
+                Text(stringResource(R.string.limits_hint), style = MaterialTheme.typography.bodySmall)
+                STREAMS.forEachIndexed { i, info ->
+                    val limit = settings.volumeLimits.getOrElse(i) { 100 }
+                    LabeledSlider(
+                        stringResource(R.string.limit_label, stringResource(info.labelRes), limit),
+                        limit,
+                        10f..100f,
+                    ) { v ->
+                        val next = settings.volumeLimits.toMutableList()
+                        next[i] = v
+                        onChange(settings.copy(volumeLimits = next))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StationPage(
+    settings: PanelSettings,
+    dndAccess: Boolean,
+    mediaAccess: Boolean,
+    onChange: (PanelSettings) -> Unit,
+    onBack: () -> Unit,
+) {
+    val context = LocalContext.current
+    val pm = rememberPreviewModel(settings)
+
+    PageScaffold(stringResource(R.string.section_station), onBack) { padding ->
+        PageColumn(padding) {
+            Section(stringResource(R.string.section_station)) {
+                Text(stringResource(R.string.station_desc), style = MaterialTheme.typography.bodySmall)
+                SwitchRow(stringResource(R.string.station_toggle), settings.stationEnabled) {
+                    onChange(settings.copy(stationEnabled = it))
+                }
+                SwitchRow(stringResource(R.string.station_mute_all), settings.stationMuteAll) {
+                    onChange(settings.copy(stationMuteAll = it))
+                }
+                SwitchRow(stringResource(R.string.station_dnd_button), settings.stationDnd) {
+                    onChange(settings.copy(stationDnd = it))
+                }
+                SwitchRow(stringResource(R.string.station_ringer), settings.stationRinger) {
+                    onChange(settings.copy(stationRinger = it))
+                }
+                SwitchRow(stringResource(R.string.station_output), settings.stationOutput) {
+                    onChange(settings.copy(stationOutput = it))
+                }
+                Text(stringResource(R.string.station_output_hint), style = MaterialTheme.typography.bodySmall)
+                SwitchRow(stringResource(R.string.station_now_playing), settings.stationNowPlaying) {
+                    onChange(settings.copy(stationNowPlaying = it))
+                }
+            }
+
+            if (settings.stationNowPlaying && !mediaAccess) {
+                Section(stringResource(R.string.media_perm_title)) {
+                    Text(stringResource(R.string.media_perm_text), style = MaterialTheme.typography.bodySmall)
+                    Button(onClick = {
+                        context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                    }) { Text(stringResource(R.string.media_perm_button)) }
+                }
+            }
+
+            Section(stringResource(R.string.preview_title)) {
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    PanelOrStation(
+                        settings = settings.copy(stationEnabled = true),
+                        state = pm.state(settings, expanded = true),
+                        actions = pm.actions,
+                    )
+                }
+            }
+
+            if (!dndAccess) {
+                Section(stringResource(R.string.dnd_perm_title)) {
+                    Text(stringResource(R.string.dnd_perm_text), style = MaterialTheme.typography.bodySmall)
+                    Button(onClick = {
+                        context.startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS))
+                    }) { Text(stringResource(R.string.dnd_perm_button)) }
+                }
+            }
+        }
+    }
+}
+
+private class AppEntry(val pkg: String, val label: String)
+
+private fun loadLaunchableApps(context: Context): List<AppEntry> {
+    val pm = context.packageManager
+    val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+    return pm.queryIntentActivities(intent, 0)
+        .map { AppEntry(it.activityInfo.packageName, it.loadLabel(pm).toString()) }
+        .distinctBy { it.pkg }
+        .filter { it.pkg != context.packageName }
+        .sortedBy { it.label.lowercase() }
+}
+
+@Composable
+private fun AppsPage(settings: PanelSettings, onChange: (PanelSettings) -> Unit, onBack: () -> Unit) {
+    val context = LocalContext.current
+    var apps by remember { mutableStateOf<List<AppEntry>?>(null) }
+    DisposableEffect(Unit) {
+        // Loading the app list can take a moment, so do it off the main thread.
+        val thread = Thread { apps = loadLaunchableApps(context) }
+        thread.start()
+        onDispose { }
+    }
+    var query by remember { mutableStateOf("") }
+    val loaded = apps
+    val shown = loaded?.filter { query.isBlank() || it.label.contains(query, ignoreCase = true) }
+        ?: emptyList()
+
+    PageScaffold(stringResource(R.string.apps_title), onBack, lazy = true) { padding ->
+        LazyColumn(
+            state = LocalPageList.current,
+            modifier = Modifier
+                .fillMaxSize()
+                .navigationBarsPadding(),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            item { HeaderSpacer() }
+            item {
+                Text(stringResource(R.string.apps_desc), style = MaterialTheme.typography.bodySmall)
+            }
+            item {
+                Section(stringResource(R.string.alt_position_title)) {
+                    Text(stringResource(R.string.alt_position_hint), style = MaterialTheme.typography.bodySmall)
+                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        PositionPicker(
+                            posX = settings.altPosX,
+                            posY = settings.altPosY,
+                            markerWdp = settings.widthDp + 24,
+                            markerHdp = settings.heightDp + 24,
+                            cornerDp = settings.cornerRadiusDp,
+                            markerColor = if (settings.showFrame) {
+                                Color(settings.colorArgb)
+                            } else {
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+                            },
+                        ) { fx, fy ->
+                            onChange(settings.copy(altPosX = fx.coerceIn(0f, 1f), altPosY = fy.coerceIn(0f, 1f)))
+                        }
+                    }
+                }
+            }
+            item {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text(stringResource(R.string.search_apps)) },
+                )
+            }
+            if (loaded == null) {
+                item { Text(stringResource(R.string.loading_apps)) }
+            } else if (shown.isEmpty()) {
+                item { Text(stringResource(R.string.no_apps)) }
+            } else {
+                items(shown, key = { it.pkg }) { app ->
+                    val mode = settings.appRules[app.pkg] ?: RULE_NORMAL
+                    fun setRule(newMode: Int) {
+                        val rules = settings.appRules.toMutableMap()
+                        if (newMode == RULE_NORMAL) {
+                            rules.remove(app.pkg)
+                        } else {
+                            rules[app.pkg] = newMode
+                        }
+                        onChange(settings.copy(appRules = rules))
+                    }
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                        ),
+                    ) {
+                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(app.label, style = MaterialTheme.typography.titleSmall)
+                            Text(app.pkg, style = MaterialTheme.typography.bodySmall)
+                            Row(
+                                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                FilterChip(
+                                    selected = mode == RULE_NORMAL,
+                                    onClick = { setRule(RULE_NORMAL) },
+                                    label = { Text(stringResource(R.string.rule_normal)) },
+                                )
+                                FilterChip(
+                                    selected = mode == RULE_HIDE,
+                                    onClick = { setRule(RULE_HIDE) },
+                                    label = { Text(stringResource(R.string.rule_hide)) },
+                                )
+                                FilterChip(
+                                    selected = mode == RULE_ALT_POSITION,
+                                    onClick = { setRule(RULE_ALT_POSITION) },
+                                    label = { Text(stringResource(R.string.rule_alt)) },
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private class DiagSnapshot(
+    val created: Long,
+    val connected: Long,
+    val destroyed: Long,
+    val errors: String,
+)
+
+private fun readDiag(context: Context) = DiagSnapshot(
+    Diag.time(context, "svc_created"),
+    Diag.time(context, "svc_connected"),
+    Diag.time(context, "svc_destroyed"),
+    Diag.errors(context),
+)
+
+@Composable
+private fun AppPage(settings: PanelSettings, onChange: (PanelSettings) -> Unit, onBack: () -> Unit) {
+    val context = LocalContext.current
+    val version = remember {
+        runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }
+            .getOrNull() ?: ""
+    }
+    var diag by remember { mutableStateOf(readDiag(context)) }
+    val never = stringResource(R.string.diag_never)
+    fun whenText(ms: Long): String =
+        if (ms == 0L) never else DateFormat.getDateTimeInstance().format(Date(ms))
+
+    fun setLanguage(code: String) {
+        if (settings.language != code) {
+            onChange(settings.copy(language = code))
+            (context as? Activity)?.recreate()
+        }
+    }
+
+    PageScaffold(stringResource(R.string.item_app_title), onBack) { padding ->
+        PageColumn(padding) {
+            Section(stringResource(R.string.section_theme)) {
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    FilterChip(
+                        selected = settings.themeMode == THEME_SYSTEM,
+                        onClick = { onChange(settings.copy(themeMode = THEME_SYSTEM)) },
+                        label = { Text(stringResource(R.string.theme_system)) },
+                    )
+                    FilterChip(
+                        selected = settings.themeMode == THEME_LIGHT,
+                        onClick = { onChange(settings.copy(themeMode = THEME_LIGHT)) },
+                        label = { Text(stringResource(R.string.theme_light)) },
+                    )
+                    FilterChip(
+                        selected = settings.themeMode == THEME_DARK,
+                        onClick = { onChange(settings.copy(themeMode = THEME_DARK)) },
+                        label = { Text(stringResource(R.string.theme_dark)) },
+                    )
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    SwitchRow(stringResource(R.string.dynamic_color), settings.dynamicColor) {
+                        onChange(settings.copy(dynamicColor = it))
+                    }
+                }
+            }
+
+            Section(stringResource(R.string.section_language)) {
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    FilterChip(
+                        selected = settings.language.isEmpty(),
+                        onClick = { setLanguage("") },
+                        label = { Text(stringResource(R.string.lang_system)) },
+                    )
+                    FilterChip(
+                        selected = settings.language == "ar",
+                        onClick = { setLanguage("ar") },
+                        label = { Text(stringResource(R.string.lang_ar)) },
+                    )
+                    FilterChip(
+                        selected = settings.language == "en",
+                        onClick = { setLanguage("en") },
+                        label = { Text(stringResource(R.string.lang_en)) },
+                    )
+                }
+            }
+
+            Section(stringResource(R.string.section_diag)) {
+                Text(stringResource(R.string.diag_hint), style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(R.string.diag_created, whenText(diag.created)))
+                Text(stringResource(R.string.diag_connected, whenText(diag.connected)))
+                Text(stringResource(R.string.diag_destroyed, whenText(diag.destroyed)))
+                Text(
+                    stringResource(R.string.diag_errors),
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(
+                    if (diag.errors.isEmpty()) stringResource(R.string.diag_no_errors) else diag.errors,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { diag = readDiag(context) }) {
+                        Text(stringResource(R.string.diag_refresh))
+                    }
+                    OutlinedButton(onClick = {
+                        val report = "Kanade System $version | Android ${Build.VERSION.RELEASE} " +
+                            "(API ${Build.VERSION.SDK_INT}) | ${Build.MANUFACTURER} ${Build.MODEL}\n" +
+                            "created: ${whenText(diag.created)}\n" +
+                            "connected: ${whenText(diag.connected)}\n" +
+                            "stopped: ${whenText(diag.destroyed)}\n\n" +
+                            diag.errors
+                        val cm = context.getSystemService(ClipboardManager::class.java)
+                        cm?.setPrimaryClip(ClipData.newPlainText("Kanade diagnostics", report))
+                        Toast.makeText(context, R.string.diag_copied, Toast.LENGTH_SHORT).show()
+                    }) { Text(stringResource(R.string.diag_copy)) }
+                    OutlinedButton(onClick = {
+                        Diag.clearErrors(context)
+                        diag = readDiag(context)
+                    }) { Text(stringResource(R.string.diag_clear)) }
+                }
+            }
+
+            UpdateSection()
+
+            Text(stringResource(R.string.about_text, version), style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+// ───────────────────────────── The activity ─────────────────────────────
+
+class MainActivity : ComponentActivity() {
+
+    private var serviceEnabled by mutableStateOf(false)
+    private var dndAccess by mutableStateOf(true)
+    private var mediaAccess by mutableStateOf(false)
+
+    /** Uses the language chosen inside the app, if there is one. */
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(Prefs.localized(newBase))
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        setContent { AppRoot() }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        serviceEnabled = isServiceEnabled()
+        dndAccess = getSystemService(NotificationManager::class.java)
+            ?.isNotificationPolicyAccessGranted ?: true
+        mediaAccess = isMediaAccessGranted(this)
+    }
+
+    private fun isServiceEnabled(): Boolean {
+        val enabled = Settings.Secure.getString(
+            contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
+        ) ?: return false
+        val cn = ComponentName(this, VolumeAccessibilityService::class.java)
+        return enabled.split(':').any {
+            it.equals(cn.flattenToString(), ignoreCase = true) ||
+                it.equals(cn.flattenToShortString(), ignoreCase = true)
+        }
+    }
+
+    @Composable
+    private fun AppRoot() {
+        var settings by remember { mutableStateOf(Prefs.load(this@MainActivity)) }
+        // Every change is saved immediately.
+        val onChange: (PanelSettings) -> Unit = { new ->
+            settings = new
+            Prefs.save(this@MainActivity, new)
+        }
+
+        KanadeTheme(settings.themeMode, settings.dynamicColor) {
+            // The service can ask for a page, for example from the Volume Station's gear.
+            val startPage = this@MainActivity.intent?.getStringExtra(EXTRA_PAGE) ?: PAGE_HOME
+            var page by rememberSaveable { mutableStateOf(startPage) }
+            val parent = when (page) {
+                PAGE_PANEL, PAGE_BEHAVIOR, PAGE_STATION, PAGE_APPS -> PAGE_VOLUME
+                PAGE_CLOCK_TIME, PAGE_ALARMS, PAGE_TIMER, PAGE_STOPWATCH, PAGE_SLEEP -> PAGE_CLOCK
+                PAGE_BLOCKS, PAGE_2048, PAGE_MEMORY, PAGE_STACK, PAGE_TYCOON -> PAGE_GAMES
+                PAGE_HABITS, PAGE_SUBSCRIPTION, PAGE_LINKED -> PAGE_ACCOUNT
+                PAGE_REELS_DIAG -> PAGE_REELS
+                else -> PAGE_HOME
+            }
+            BackHandler(enabled = page != PAGE_HOME) { page = parent }
+            val goBack = { page = parent }
+            // Asks when a newer version of the app is out.
+            UpdatePrompt()
+            when (page) {
+                // ── Volume ──
+                PAGE_VOLUME -> VolumeHubPage(settings, { page = it }, goBack)
+                PAGE_PANEL -> PanelPage(settings, onChange, goBack)
+                PAGE_BEHAVIOR -> BehaviorPage(settings, onChange, goBack)
+                PAGE_STATION -> StationPage(settings, dndAccess, mediaAccess, onChange, goBack)
+                PAGE_APPS -> AppsPage(settings, onChange, goBack)
+                // ── App ──
+                PAGE_APP -> AppPage(settings, onChange, goBack)
+                PAGE_KEEPALIVE -> KeepAlivePage(goBack)
+                // ── Clock ──
+                PAGE_CLOCK -> ClockHubPage({ page = it }, goBack)
+                PAGE_CLOCK_TIME -> WorldClockPage(goBack)
+                PAGE_ALARMS -> AlarmsPage(goBack)
+                PAGE_TIMER -> TimerPage(goBack)
+                PAGE_STOPWATCH -> StopwatchPage(goBack)
+                PAGE_SLEEP -> SleepPage(goBack)
+                // ── Account ──
+                PAGE_ACCOUNT -> AccountPage({ page = it }, goBack)
+                PAGE_HABITS -> HabitsPage(goBack)
+                PAGE_SUBSCRIPTION -> SubscriptionPage(goBack)
+                PAGE_LINKED -> LinkedAccountsPage(goBack)
+                // ── Games ──
+                PAGE_GAMES -> GameHubPage({ page = it }, goBack)
+                PAGE_BLOCKS -> BlocksGamePage(goBack)
+                PAGE_2048 -> Game2048Page(goBack)
+                PAGE_MEMORY -> MemoryGamePage(goBack)
+                PAGE_STACK -> StackGamePage(goBack)
+                PAGE_TYCOON -> TycoonPage(goBack)
+                // ── Reels counter ──
+                PAGE_REELS -> ReelsPage(serviceEnabled, { page = it }, goBack)
+                PAGE_REELS_DIAG -> ReelsDiagPage(goBack)
+                // ── Keyboard ──
+                PAGE_KEYBOARD -> KeyboardPage(goBack)
+                "vault" -> VaultPage(goBack)
+                PAGE_GOALS -> GoalsPage(goBack)
+                // ── Home ──
+                else -> HomePage(serviceEnabled) { page = it }
+            }
+        }
+    }
+}

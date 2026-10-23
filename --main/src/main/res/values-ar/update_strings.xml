@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="upd_title">التحديثات</string>
+    <string name="upd_current">الإصدار المثبّت: %1$s (بناء %2$d)</string>
+    <string name="upd_check">البحث عن تحديث</string>
+    <string name="upd_checking">جارٍ البحث…</string>
+    <string name="upd_uptodate">لديك أحدث إصدار.</string>
+    <string name="upd_new">الإصدار %1$s متاح.</string>
+    <string name="upd_size">الحجم: %1$s ميغابايت</string>
+    <string name="upd_notes">ما الجديد</string>
+    <string name="upd_download">تنزيل وتثبيت</string>
+    <string name="upd_downloading">جارٍ التنزيل… %1$d%%</string>
+    <string name="upd_install">تثبيت الآن</string>
+    <string name="upd_later">لاحقاً</string>
+    <string name="upd_skip">تخطي هذا الإصدار</string>
+    <string name="upd_failed">تعذّر البحث عن التحديث أو تنزيله. تأكد من الإنترنت وحاول مرة أخرى.</string>
+    <string name="upd_bad_file">الملف الذي نزل لم يجتز فحص الأمان فتم حذفه. لم يُثبَّت شيء.</string>
+    <string name="upd_noconfig">هذا الإصدار لا يعرف أين يبحث عن التحديثات. اكتب مستودع GitHub في الأسفل بالشكل owner/name.</string>
+    <string name="upd_auto">البحث عن تحديثات عند فتح التطبيق</string>
+    <string name="upd_repo">مصدر التحديث (owner/repository)</string>
+    <string name="upd_allow">للتثبيت، اسمح لكندا بتثبيت التطبيقات في الشاشة التالية، ثم ارجع إلى هنا واضغط تثبيت الآن.</string>
+    <string name="upd_dialog_title">صدر إصدار جديد</string>
+    <string name="upd_dialog_text">الإصدار %1$s جاهز. هل تريد تنزيله وتثبيته الآن؟</string>
+</resources>
