@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/w_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+<ImageView android:id="@+id/w_bg" android:layout_width="match_parent" android:layout_height="match_parent" android:contentDescription="@null" android:scaleType="fitXY" android:src="@drawable/wbg_sig_alarm" />
+<LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="horizontal" android:gravity="center_vertical" android:padding="16dp">
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:orientation="vertical" android:layout_weight="1">
+<LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end" android:textColor="#FFFFE8B0" android:textSize="14sp" android:text="⏰" />
+<TextView android:id="@+id/w_title" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="6dp" android:maxLines="1" android:ellipsize="end" android:textColor="#FFFFE8B0" android:textSize="11sp" android:textStyle="bold" android:text="@string/widget_next_alarm_label" android:textAllCaps="true" />
+</LinearLayout>
+<TextView android:id="@+id/w_time" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:maxLines="1" android:ellipsize="end" android:textColor="#FFFFFFFF" android:textSize="44sp" android:fontFamily="sans-serif-light" />
+<TextView android:id="@+id/w_sub" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:maxLines="1" android:ellipsize="end" android:textColor="#CCFFFFFF" android:textSize="14sp" />
+</LinearLayout>
+<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:orientation="vertical" android:layout_weight="1" android:layout_marginStart="14dp">
+<TextView android:id="@+id/w_more_title" android:layout_width="wrap_content" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end" android:textColor="#CCFFFFFF" android:textSize="11sp" android:textStyle="bold" android:text="@string/widget_alarm_then" android:textAllCaps="true" />
+<TextView android:id="@+id/w_a2" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:maxLines="1" android:ellipsize="end" android:textColor="#FFFFFFFF" android:textSize="14sp" />
+<TextView android:id="@+id/w_a3" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:maxLines="1" android:ellipsize="end" android:textColor="#FFFFFFFF" android:textSize="14sp" />
+</LinearLayout>
+</LinearLayout>
+</LinearLayout>
+</FrameLayout>

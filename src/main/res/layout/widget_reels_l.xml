@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/w_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+<ImageView android:id="@+id/w_bg" android:layout_width="match_parent" android:layout_height="match_parent" android:contentDescription="@null" android:scaleType="fitXY" android:src="@drawable/wbg_sig_reels" />
+<LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="horizontal" android:gravity="center_vertical" android:padding="16dp">
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+<ImageView android:id="@+id/w_reels_brain" android:layout_width="104dp" android:layout_height="104dp" android:contentDescription="@null" android:scaleType="fitCenter" />
+<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:orientation="vertical" android:layout_weight="1" android:layout_marginStart="16dp">
+<TextView android:id="@+id/w_reels_count" android:layout_width="wrap_content" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end" android:textColor="#FFFFFFFF" android:textSize="46sp" android:textStyle="bold" />
+<TextView android:id="@+id/w_reels_mood" android:layout_width="wrap_content" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end" android:textColor="#FFFFFFFF" android:textSize="15sp" />
+<TextView android:id="@+id/w_reels_sub" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:maxLines="1" android:ellipsize="end" android:textColor="#CCFFFFFF" android:textSize="12sp" />
+<TextView android:id="@+id/w_reels_week" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:maxLines="1" android:ellipsize="end" android:textColor="#FFFFE3A3" android:textSize="12sp" />
+</LinearLayout>
+</LinearLayout>
+</LinearLayout>
+</FrameLayout>

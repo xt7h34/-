@@ -9,6 +9,8 @@
     android:maxResizeWidth="1000dp"
     android:maxResizeHeight="1000dp"
     android:previewLayout="@layout/widget_next_alarm_preview"
+    android:configure="com.rigen.volumeui.WidgetConfigActivity"
+    android:widgetFeatures="reconfigurable"
     android:resizeMode="horizontal|vertical"
     android:targetCellWidth="2"
     android:targetCellHeight="1"

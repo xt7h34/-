@@ -49,43 +49,10 @@ object ReelsWidgetUpdater {
             val m = AppWidgetManager.getInstance(c)
             val ids = m.getAppWidgetIds(ComponentName(c, ReelsWidget::class.java))
             if (ids.isEmpty()) return
-            val rv = views(c)
-            ids.forEach { m.updateAppWidget(it, rv) }
+            ids.forEach { m.updateAppWidget(it, WidgetDesigns.reels(c, it)) }
         } catch (e: Throwable) {
             Diag.error(c, "reels widget", e)
         }
-    }
-
-    private fun views(c: Context): RemoteViews {
-        val today = ReelsStore.today(c)
-        val limit = ReelsStore.limit(c)
-        val level = reelsLevel(today.total, limit)
-        val color = when (level) {
-            0 -> 0xFF34A853
-            1 -> 0xFFF29900
-            2 -> 0xFFE5484D
-            else -> 0xFFB3261E
-        }.toInt()
-
-        val rv = RemoteViews(c.packageName, R.layout.widget_reels)
-        rv.setImageViewBitmap(R.id.w_reels_brain, ReelsBrainBitmap.render(level, 160))
-        rv.setTextViewText(R.id.w_reels_count, today.total.toString())
-        rv.setTextColor(R.id.w_reels_count, color)
-        rv.setTextViewText(R.id.w_reels_mood, c.getString(reelsMoodRes(level)))
-        rv.setTextViewText(
-            R.id.w_reels_sub,
-            if (ReelsStore.enabled(c)) c.getString(R.string.reels_of_limit, limit) else c.getString(R.string.widget_reels_off),
-        )
-        rv.setOnClickPendingIntent(
-            R.id.w_root,
-            PendingIntent.getActivity(
-                c, 960001,
-                Intent(c, MainActivity::class.java).putExtra(EXTRA_PAGE, PAGE_REELS)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-            ),
-        )
-        return rv
     }
 }
 

@@ -1,5 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="widget_style_0">الافتراضي</string>
+    <string name="widget_style_1">الشفق القطبي</string>
+    <string name="widget_style_2">الغروب</string>
+    <string name="widget_style_3">المحيط</string>
+    <string name="widget_style_4">الغابة</string>
+    <string name="widget_style_5">التوت</string>
+    <string name="widget_style_6">منتصف الليل</string>
+    <string name="widget_style_7">ورقي</string>
+    <string name="widget_style_8">لون واحد</string>
+    <string name="widget_cfg_title">شكل الويدجت</string>
+    <string name="widget_cfg_style">الخلفية</string>
+    <string name="widget_cfg_color">اللون</string>
+    <string name="widget_cfg_opacity">الشفافية</string>
+    <string name="widget_cfg_save">حفظ</string>
+    <string name="widget_cfg_cancel">إلغاء</string>
+    <string name="widget_cfg_sample">Aa  7:30</string>
     <string name="wp_alarm_time">7:30 ص</string>
     <string name="wp_alarm_sub">غدًا • الشغل</string>
     <string name="wp_prayer_title">الصلاة القادمة</string>
@@ -23,4 +39,10 @@
     <string name="wp_reels_count">23</string>
     <string name="wp_reels_mood">بخير</string>
     <string name="wp_reels_sub">فيديو قصير اليوم</string>
+    <string name="wp_goals_title">💻 لابتوب</string>
+    <string name="wp_goals_detail">6,200 ج.م من 10,000 ج.م</string>
+    <string name="wp_goals_status">على المسار الصحيح</string>
+    <string name="widget_alarm_then">بعدها</string>
+    <string name="widget_sleep_week">آخر 7 أيام</string>
+    <string name="widget_reels_week_avg">متوسط 7 أيام: %1$d</string>
 </resources>

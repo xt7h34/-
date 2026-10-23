@@ -188,7 +188,7 @@ class GoalsReceiver : BroadcastReceiver() {
 /** Home screen widget: the goal you put first. */
 class GoalsWidget : AppWidgetProvider() {
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
-        appWidgetIds.forEach { appWidgetManager.updateAppWidget(it, GoalsWidgets.views(context)) }
+        appWidgetIds.forEach { appWidgetManager.updateAppWidget(it, WidgetDesigns.goals(context, it)) }
     }
 }
 
@@ -196,67 +196,8 @@ object GoalsWidgets {
     fun updateAll(c: Context) {
         val m = AppWidgetManager.getInstance(c)
         m.getAppWidgetIds(ComponentName(c, GoalsWidget::class.java))
-            .forEach { m.updateAppWidget(it, views(c)) }
+            .forEach { m.updateAppWidget(it, WidgetDesigns.goals(c, it)) }
     }
-
-    fun views(c: Context): RemoteViews {
-        val rv = RemoteViews(c.packageName, R.layout.widget_goals)
-        val now = System.currentTimeMillis()
-        if (GoalsLock.enabled(c)) {
-            // Locked: the widget must not give the amounts away.
-            rv.setTextViewText(R.id.g_title, c.getString(R.string.goals_title))
-            rv.setTextViewText(R.id.g_big, "\uD83D\uDD12")
-            rv.setProgressBar(R.id.g_ring, 100, 0, false)
-            rv.setTextViewText(R.id.g_detail, c.getString(R.string.widget_goals_locked))
-            rv.setTextViewText(R.id.g_status, "")
-        } else {
-            val active = GoalsStore.load(c).filter { !it.archived }
-            val g = active.firstOrNull { it.completedAt == 0L } ?: active.firstOrNull()
-            if (g == null) {
-                rv.setTextViewText(R.id.g_title, c.getString(R.string.goals_title))
-                rv.setTextViewText(R.id.g_big, "\u2014")
-                rv.setProgressBar(R.id.g_ring, 100, 0, false)
-                rv.setTextViewText(R.id.g_detail, c.getString(R.string.widget_goals_none))
-                rv.setTextViewText(R.id.g_status, "")
-            } else {
-                val plan = GoalsEngine.plan(g, now)
-                val pct = (plan.progress * 100).toInt()
-                rv.setTextViewText(R.id.g_title, "${g.emoji} ${g.name}")
-                rv.setTextViewText(R.id.g_big, "$pct%")
-                rv.setProgressBar(R.id.g_ring, 100, pct, false)
-                rv.setTextViewText(
-                    R.id.g_detail,
-                    c.getString(R.string.goals_saved_of, formatMoney(plan.saved, g.currency), formatMoney(g.target, g.currency)),
-                )
-                // With no target date there is no plan to judge, so show what is left instead.
-                val line = if (plan.status == GoalStatus.NONE) {
-                    c.getString(R.string.goals_remaining, formatMoney(plan.remaining, g.currency))
-                } else {
-                    statusLabel(c, plan)
-                }
-                rv.setTextViewText(R.id.g_status, line)
-            }
-        }
-        val open = PendingIntent.getActivity(
-            c, 3400,
-            Intent(c, MainActivity::class.java).putExtra(EXTRA_PAGE, PAGE_GOALS)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-        rv.setOnClickPendingIntent(R.id.g_root, open)
-        return rv
-    }
-
-    private fun statusLabel(c: Context, p: GoalPlan): String = c.getString(
-        when (p.status) {
-            GoalStatus.NEW -> R.string.goals_st_new
-            GoalStatus.DONE -> R.string.goals_st_done
-            GoalStatus.AHEAD -> R.string.goals_st_ahead
-            GoalStatus.ON_TRACK -> R.string.goals_st_on
-            GoalStatus.BEHIND -> if ((p.daysLeft ?: 0) < 0) R.string.goals_st_overdue else R.string.goals_st_behind
-            GoalStatus.NONE -> R.string.goals_st_none
-        },
-    )
 }
 
 // ───────────────────────── Lock ─────────────────────────

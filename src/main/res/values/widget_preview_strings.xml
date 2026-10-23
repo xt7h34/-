@@ -1,5 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="widget_style_0">Signature</string>
+    <string name="widget_style_1">Aurora</string>
+    <string name="widget_style_2">Sunset</string>
+    <string name="widget_style_3">Ocean</string>
+    <string name="widget_style_4">Forest</string>
+    <string name="widget_style_5">Berry</string>
+    <string name="widget_style_6">Midnight</string>
+    <string name="widget_style_7">Paper</string>
+    <string name="widget_style_8">One color</string>
+    <string name="widget_cfg_title">Widget look</string>
+    <string name="widget_cfg_style">Background</string>
+    <string name="widget_cfg_color">Color</string>
+    <string name="widget_cfg_opacity">Transparency</string>
+    <string name="widget_cfg_save">Save</string>
+    <string name="widget_cfg_cancel">Cancel</string>
+    <string name="widget_cfg_sample">Aa  7:30</string>
     <string name="wp_alarm_time">7:30 AM</string>
     <string name="wp_alarm_sub">Tomorrow • Work</string>
     <string name="wp_prayer_title">Next prayer</string>
@@ -23,4 +39,10 @@
     <string name="wp_reels_count">23</string>
     <string name="wp_reels_mood">Doing fine</string>
     <string name="wp_reels_sub">short videos today</string>
+    <string name="wp_goals_title">💻 Laptop</string>
+    <string name="wp_goals_detail">6,200 EGP of 10,000 EGP</string>
+    <string name="wp_goals_status">On track</string>
+    <string name="widget_alarm_then">Then</string>
+    <string name="widget_sleep_week">Last 7 days</string>
+    <string name="widget_reels_week_avg">7-day average: %1$d</string>
 </resources>

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/w_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+<ImageView android:id="@+id/w_bg" android:layout_width="match_parent" android:layout_height="match_parent" android:contentDescription="@null" android:scaleType="fitXY" android:src="@drawable/wbg_sig_goals" />
+<LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:gravity="center_vertical" android:padding="16dp">
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+<FrameLayout android:layout_width="64dp" android:layout_height="64dp">
+<ImageView android:id="@+id/w_ring" android:layout_width="64dp" android:layout_height="64dp" android:contentDescription="@null" android:scaleType="fitCenter" android:src="@drawable/wp_ring" />
+<TextView android:id="@+id/w_big" android:layout_width="match_parent" android:layout_height="match_parent" android:maxLines="1" android:ellipsize="end" android:textColor="#FFFFFFFF" android:textSize="15sp" android:textStyle="bold" android:gravity="center" />
+</FrameLayout>
+<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:orientation="vertical" android:layout_weight="1" android:layout_marginStart="14dp">
+<TextView android:id="@+id/w_title" android:layout_width="wrap_content" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end" android:textColor="#FFFFFFFF" android:textSize="16sp" android:textStyle="bold" />
+<TextView android:id="@+id/w_detail" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:maxLines="1" android:ellipsize="end" android:textColor="#CCFFFFFF" android:textSize="13sp" />
+<TextView android:id="@+id/w_status" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:maxLines="1" android:ellipsize="end" android:textColor="#FFFFF4CC" android:textSize="12sp" android:textStyle="bold" />
+</LinearLayout>
+</LinearLayout>
+<LinearLayout android:id="@+id/w_g2" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginTop="8dp">
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+<TextView android:id="@+id/w_g2_title" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:maxLines="1" android:ellipsize="end" android:textColor="#FFFFFFFF" android:textSize="13sp" />
+<TextView android:id="@+id/w_g2_pct" android:layout_width="wrap_content" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end" android:textColor="#FFFFF4CC" android:textSize="12sp" android:textStyle="bold" />
+</LinearLayout>
+<ImageView android:id="@+id/w_g2_bar" android:layout_width="match_parent" android:layout_height="6dp" android:contentDescription="@null" android:scaleType="fitXY" android:layout_marginTop="3dp" />
+</LinearLayout>
+<LinearLayout android:id="@+id/w_g3" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginTop="8dp">
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+<TextView android:id="@+id/w_g3_title" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:maxLines="1" android:ellipsize="end" android:textColor="#FFFFFFFF" android:textSize="13sp" />
+<TextView android:id="@+id/w_g3_pct" android:layout_width="wrap_content" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end" android:textColor="#FFFFF4CC" android:textSize="12sp" android:textStyle="bold" />
+</LinearLayout>
+<ImageView android:id="@+id/w_g3_bar" android:layout_width="match_parent" android:layout_height="6dp" android:contentDescription="@null" android:scaleType="fitXY" android:layout_marginTop="3dp" />
+</LinearLayout>
+</LinearLayout>
+</FrameLayout>
