@@ -98,6 +98,19 @@ private val WEEK_DAYS = listOf(
     Calendar.SATURDAY to R.string.day_sat,
 )
 
+/** "50 100 200" (spaces, slashes or semicolons between) into amounts; empty is fine; null when something is not an amount. */
+private fun parseQuick(text: String): List<Long>? {
+    val parts = text.split(Regex("[\\s/;\u061B]+")).filter { it.isNotBlank() }
+    if (parts.size > 3) return null
+    val out = ArrayList<Long>()
+    for (p in parts) {
+        val v = parseMoney(p) ?: return null
+        if (v <= 0L) return null
+        out.add(v)
+    }
+    return out
+}
+
 private tailrec fun Context.activityOrNull(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.activityOrNull()
@@ -238,6 +251,15 @@ private fun GoalThumb(g: Goal, size: Dp) {
 
 @Composable
 fun GoalsPage(onBack: () -> Unit) {
+    MoneyPage(onBack) { lockOn, setLock -> GoalsMain(onBack, lockOn, setLock) }
+}
+
+/**
+ * The lock (if the person turned it on) in front of a page that shows money. The goals page and the
+ * budget page both stand behind it, and one unlock opens both.
+ */
+@Composable
+internal fun MoneyPage(onBack: () -> Unit, content: @Composable (lockOn: Boolean, setLock: (Boolean) -> Unit) -> Unit) {
     val ctx = LocalContext.current
     var locked by remember { mutableStateOf(GoalsLock.enabled(ctx) && !GoalsLock.unlocked) }
     var lockOn by remember { mutableStateOf(GoalsLock.enabled(ctx)) }
@@ -277,7 +299,7 @@ fun GoalsPage(onBack: () -> Unit) {
     if (locked) {
         GoalsGate(onBack) { locked = false }
     } else {
-        GoalsMain(onBack, lockOn) { lockOn = it }
+        content(lockOn) { lockOn = it }
     }
 }
 
@@ -333,6 +355,9 @@ private fun GoalsMain(onBack: () -> Unit, lockOn: Boolean, onLockChange: (Boolea
     val open = goals.firstOrNull { it.id == openId }
 
     BackHandler(enabled = open != null) { openId = null }
+
+    // Saving plans that add money by themselves catch up with whatever came due while the app was closed.
+    LaunchedEffect(Unit) { GoalsAuto.catchUp(ctx) }
 
     PageScaffold(
         title = open?.name ?: stringResource(R.string.goals_title),
@@ -726,6 +751,12 @@ private fun GoalDetail(
             )
             val rem = reminderLine(ctx, g)
             if (rem != null) Text(rem, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (g.plan > 0L) {
+                Text(
+                    stringResource(if (g.autoAdd) R.string.goals_plan_line_auto else R.string.goals_plan_line, formatMoney(g.plan, g.currency)),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 
@@ -970,6 +1001,13 @@ private fun GoalEditDialog(initial: Goal?, onDismiss: () -> Unit, onSave: (Goal)
     var domText by remember {
         mutableStateOf(if (initial != null && initial.remind == 3 && initial.remindDay in 1..28) initial.remindDay.toString() else "1")
     }
+    var planText by remember {
+        mutableStateOf(if (initial != null && initial.plan > 0L) editableMoney(initial.plan) else "")
+    }
+    var autoAdd by remember { mutableStateOf(initial?.autoAdd ?: false) }
+    var quickText by remember {
+        mutableStateOf(initial?.quick?.joinToString(" ") { editableMoney(it) } ?: "")
+    }
     var pendingPhoto by remember { mutableStateOf(false) }
     var removedPhoto by remember { mutableStateOf(false) }
     var photoTick by remember { mutableIntStateOf(0) }
@@ -1013,6 +1051,9 @@ private fun GoalEditDialog(initial: Goal?, onDismiss: () -> Unit, onSave: (Goal)
     val cleanedLink = cleanLink(link)
     val dom = domText.toIntOrNull()
     val domOk = remind != 3 || (dom != null && dom in 1..28)
+    val planMinor = if (planText.isBlank()) 0L else parseMoney(planText)
+    val planOk = remind == 0 || planMinor != null
+    val quickParsed = parseQuick(quickText)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1134,6 +1175,21 @@ private fun GoalEditDialog(initial: Goal?, onDismiss: () -> Unit, onSave: (Goal)
                         }
                     }
                 }
+                if (remind != 0) {
+                    OutlinedTextField(
+                        value = planText,
+                        onValueChange = { if (it.length <= 20) planText = it },
+                        label = { Text(stringResource(R.string.goals_plan_amount)) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        isError = tried && !planOk,
+                        supportingText = { if (tried && !planOk) Text(stringResource(R.string.goals_err_amount)) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    if (planText.isNotBlank()) {
+                        SwitchRow(stringResource(R.string.goals_plan_auto), autoAdd) { autoAdd = it }
+                    }
+                }
                 if (remind == 3) {
                     OutlinedTextField(
                         value = domText,
@@ -1146,12 +1202,21 @@ private fun GoalEditDialog(initial: Goal?, onDismiss: () -> Unit, onSave: (Goal)
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
+                OutlinedTextField(
+                    value = quickText,
+                    onValueChange = { if (it.length <= 40) quickText = it },
+                    label = { Text(stringResource(R.string.goals_quick_label)) },
+                    singleLine = true,
+                    isError = quickParsed == null,
+                    supportingText = { if (quickParsed == null) Text(stringResource(R.string.goals_err_amount)) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         },
         confirmButton = {
             TextButton(onClick = {
                 tried = true
-                if (nameOk && targetOk && targetMinor != null && cleanedLink != null && domOk) {
+                if (nameOk && targetOk && targetMinor != null && cleanedLink != null && domOk && planOk && quickParsed != null) {
                     var photoAt = initial?.photoAt ?: 0L
                     if (pendingPhoto) {
                         GoalsPhotos.commit(ctx, goalId)
@@ -1159,6 +1224,21 @@ private fun GoalEditDialog(initial: Goal?, onDismiss: () -> Unit, onSave: (Goal)
                     } else if (removedPhoto) {
                         GoalsPhotos.deleteFinal(ctx, goalId)
                         photoAt = 0L
+                    }
+                    val plan = if (remind != 0 && (planMinor ?: 0L) > 0L) (planMinor ?: 0L) else 0L
+                    val day = when (remind) {
+                        2 -> weekDay
+                        3 -> dom ?: 1
+                        else -> 0
+                    }
+                    val auto = autoAdd && plan > 0L
+                    // A changed plan or schedule starts from now, so it never back-fills the past.
+                    val sameSchedule = initial != null && initial.plan == plan && initial.autoAdd == auto &&
+                        initial.remind == remind && initial.remindMinutes == remindMinutes && initial.remindDay == day
+                    val planSince = when {
+                        plan <= 0L -> 0L
+                        sameSchedule -> initial?.planSince ?: 0L
+                        else -> System.currentTimeMillis()
                     }
                     onSave(
                         Goal(
@@ -1176,11 +1256,11 @@ private fun GoalEditDialog(initial: Goal?, onDismiss: () -> Unit, onSave: (Goal)
                             photoAt = photoAt,
                             remind = remind,
                             remindMinutes = remindMinutes,
-                            remindDay = when (remind) {
-                                2 -> weekDay
-                                3 -> dom ?: 1
-                                else -> 0
-                            },
+                            remindDay = day,
+                            plan = plan,
+                            autoAdd = auto,
+                            planSince = planSince,
+                            quick = quickParsed,
                         ),
                     )
                 }

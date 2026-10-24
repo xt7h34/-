@@ -424,13 +424,20 @@ object WidgetDesigns {
             else -> goalsStatus(c, plan)
         }
         val progress = plan?.progress ?: 0f
+        // The quick buttons: hidden when locked (they would give the amounts away) or when there is nothing left to save.
+        val quick = if (locked || g == null || plan == null || g.completedAt != 0L) {
+            emptyList()
+        } else {
+            GoalsEngine.quickFor(g, plan.remaining).take(3)
+        }
+        val quickIds = listOf(R.id.w_q1, R.id.w_q2, R.id.w_q3)
         val others = if (g == null) emptyList() else active.filter { it.id != g.id }.take(2)
         val rowIds = listOf(
             listOf(R.id.w_g2, R.id.w_g2_title, R.id.w_g2_pct, R.id.w_g2_bar),
             listOf(R.id.w_g3, R.id.w_g3_title, R.id.w_g3_pct, R.id.w_g3_bar),
         )
 
-        return WidgetFrame.build(SizeF(180f, 108f), SizeF(200f, 170f)) { size ->
+        return WidgetFrame.build(SizeF(180f, 132f), SizeF(200f, 205f)) { size ->
             val layout = when (size) {
                 WSize.COMPACT -> R.layout.widget_goals_s
                 WSize.NORMAL -> R.layout.widget_goals
@@ -447,6 +454,20 @@ object WidgetDesigns {
             if (size != WSize.COMPACT) {
                 rv.txt(R.id.w_status, status)
                 rv.paint(pal.accent, R.id.w_status)
+            }
+            if (size != WSize.COMPACT) {
+                rv.setViewVisibility(R.id.w_q, if (quick.isEmpty()) View.GONE else View.VISIBLE)
+                for (i in 0 until 3) {
+                    val amount = quick.getOrNull(i)
+                    if (amount == null || g == null) {
+                        rv.setViewVisibility(quickIds[i], View.GONE)
+                    } else {
+                        rv.setViewVisibility(quickIds[i], View.VISIBLE)
+                        rv.txt(quickIds[i], "+" + formatMoney(amount, ""))
+                        rv.paint(pal.primary, quickIds[i])
+                        rv.setOnClickPendingIntent(quickIds[i], GoalsQuick.pending(c, g.id, amount))
+                    }
+                }
             }
             if (size == WSize.EXPANDED) {
                 for (i in 0 until 2) {

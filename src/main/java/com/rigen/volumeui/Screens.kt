@@ -782,6 +782,12 @@ private fun HomePage(serviceEnabled: Boolean, onOpen: (String) -> Unit) {
                     ) { onOpen(PAGE_GOALS) }
                     ItemDivider()
                     SettingsItem(
+                        Glyph.BUDGET, ICON_GREEN,
+                        stringResource(R.string.bud_title),
+                        stringResource(R.string.bud_summary),
+                    ) { onOpen(PAGE_BUDGET) }
+                    ItemDivider()
+                    SettingsItem(
                         Glyph.LOCK, ICON_GREEN,
                         stringResource(R.string.vault_title),
                         stringResource(R.string.vault_summary),
@@ -852,6 +858,7 @@ private fun searchIndex(): List<SearchEntry> {
         SearchEntry(stringResource(R.string.games_title), stringResource(R.string.app_title), PAGE_GAMES),
         SearchEntry(stringResource(R.string.kb_title), stringResource(R.string.app_title), PAGE_KEYBOARD),
         SearchEntry(stringResource(R.string.goals_title), stringResource(R.string.app_title), PAGE_GOALS),
+        SearchEntry(stringResource(R.string.bud_title), stringResource(R.string.app_title), PAGE_BUDGET),
         SearchEntry(stringResource(R.string.blocks_title), stringResource(R.string.games_title), PAGE_BLOCKS),
         SearchEntry(stringResource(R.string.g2048_title), stringResource(R.string.games_title), PAGE_2048),
         SearchEntry(stringResource(R.string.memory_title), stringResource(R.string.games_title), PAGE_MEMORY),
@@ -1985,6 +1992,7 @@ class MainActivity : ComponentActivity() {
                 PAGE_KEYBOARD -> KeyboardPage(goBack)
                 "vault" -> VaultPage(goBack)
                 PAGE_GOALS -> GoalsPage(goBack)
+                PAGE_BUDGET -> BudgetPage(goBack)
                 // ── Home ──
                 else -> HomePage(serviceEnabled) { page = it }
             }

@@ -17,7 +17,11 @@ import java.util.Locale
 import java.util.UUID
 import kotlin.math.abs
 import kotlin.math.ceil
+import kotlin.math.floor
+import kotlin.math.log10
 import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.pow
 
 /*
  * KanaGoals: savings goals kept on this phone only. Nothing here talks to the bot or the network.
@@ -52,6 +56,14 @@ class Goal(
     val remindMinutes: Int = 20 * 60,
     /** Weekly: Calendar.DAY_OF_WEEK (1 = Sunday). Monthly: day of month, 1 to 28. */
     val remindDay: Int = 0,
+    /** What to put aside each time the reminder comes round, in minor units. 0 means no plan. */
+    val plan: Long = 0L,
+    /** With a plan: add the amount to the goal by itself instead of asking. */
+    val autoAdd: Boolean = false,
+    /** The last scheduled time the plan was dealt with. Plans never reach back before it. */
+    val planSince: Long = 0L,
+    /** The amounts on the quick buttons, in minor units. Empty means round ones worked out from the price. */
+    val quick: List<Long> = emptyList(),
 ) {
     val saved: Long get() = entries.sumOf { it.amount }
 
@@ -60,9 +72,11 @@ class Goal(
         archived: Boolean = this.archived,
         completedAt: Long = this.completedAt,
         photoAt: Long = this.photoAt,
+        planSince: Long = this.planSince,
     ) = Goal(
         id, name, emoji, target, currency, deadline, link, createdAt, entries,
         archived, completedAt, photoAt, remind, remindMinutes, remindDay,
+        plan, autoAdd, planSince, quick,
     )
 }
 
@@ -86,6 +100,25 @@ class GoalPlan(
 
 object GoalsEngine {
     const val DAY_MS = 86_400_000L
+
+    /** The amounts for the quick buttons: the person's own, or round ones worked out from the price. */
+    fun quickAmounts(g: Goal): List<Long> {
+        val own = g.quick.filter { it > 0L }
+        if (own.isNotEmpty()) return own.take(3)
+        // 1-2-5 steps, never below one whole unit.
+        fun nice(minor: Double): Long {
+            val units = max(1.0, minor / 100.0)
+            val base = 10.0.pow(floor(log10(units)))
+            val f = units / base
+            val n = if (f < 1.5) 1.0 else if (f < 3.5) 2.0 else if (f < 7.5) 5.0 else 10.0
+            return (n * base * 100.0).toLong()
+        }
+        return listOf(g.target / 50.0, g.target / 20.0, g.target / 10.0).map { nice(it) }.distinct()
+    }
+
+    /** The quick amounts that still make sense: none above what is left to save. */
+    fun quickFor(g: Goal, remaining: Long): List<Long> =
+        quickAmounts(g).map { min(it, remaining) }.filter { it > 0L }.distinct()
 
     fun startOfDay(ms: Long): Long {
         val c = Calendar.getInstance()
@@ -343,6 +376,32 @@ object GoalsStore {
         return reached
     }
 
+    /**
+     * Adds the goal's saving plan once for each time in [times] (the scheduled moments that have
+     * passed), stopping once the price is reached. Returns true when that is what reached it.
+     */
+    fun applyPlan(c: Context, goalId: String, times: List<Long>): Boolean {
+        if (times.isEmpty()) return false
+        val now = System.currentTimeMillis()
+        var reached = false
+        val out = load(c).map {
+            if (it.id != goalId || it.plan <= 0L) {
+                it
+            } else {
+                var g = it
+                for (t in times) {
+                    if (g.target > 0 && g.saved >= g.target) break
+                    g = g.copyOf(entries = g.entries + GoalEntry(newId(), it.plan, t, "\u21BB"))
+                }
+                val updated = settle(g.copyOf(planSince = times.last()), now)
+                reached = it.completedAt == 0L && updated.completedAt != 0L
+                updated
+            }
+        }
+        save(c, out)
+        return reached
+    }
+
     fun sameCurrency(a: Goal, b: Goal): Boolean = a.currency.trim().equals(b.currency.trim(), ignoreCase = true)
 
     fun setArchived(c: Context, goalId: String, archived: Boolean) {
@@ -376,6 +435,8 @@ object GoalsStore {
             .put("createdAt", g.createdAt).put("entries", es)
             .put("archived", g.archived).put("completedAt", g.completedAt).put("photoAt", g.photoAt)
             .put("remind", g.remind).put("remindMinutes", g.remindMinutes).put("remindDay", g.remindDay)
+            .put("plan", g.plan).put("autoAdd", g.autoAdd).put("planSince", g.planSince)
+            .put("quick", JSONArray().also { a -> g.quick.forEach { a.put(it) } })
     }
 
     private fun toJson(goals: List<Goal>): String {
@@ -425,6 +486,12 @@ object GoalsStore {
             remind = o.optInt("remind", 0).coerceIn(0, 3),
             remindMinutes = o.optInt("remindMinutes", 20 * 60).coerceIn(0, 1439),
             remindDay = o.optInt("remindDay", 0).coerceIn(0, 31),
+            plan = o.optLong("plan", 0L).coerceIn(0L, MAX_MINOR),
+            autoAdd = o.optBoolean("autoAdd", false),
+            planSince = o.optLong("planSince", 0L).coerceAtLeast(0L),
+            quick = o.optJSONArray("quick")?.let { a ->
+                (0 until a.length()).map { a.optLong(it, 0L) }.filter { it in 1..MAX_MINOR }.take(3)
+            } ?: emptyList(),
         )
     }
 

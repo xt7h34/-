@@ -112,4 +112,15 @@
     <string name="widget_goals_sample_title">💻 لابتوب</string>
     <string name="widget_goals_sample_detail">6,200 ج.م من 10,000 ج.م</string>
     <string name="widget_goals_sample_status">على المسار الصحيح</string>
+    <string name="goals_notif_auto">تمت إضافة %1$s إلى %2$s تلقائيًا.</string>
+    <string name="goals_notif_plan">حان وقت ادخار %1$s لـ %2$s.</string>
+    <string name="goals_notif_other">مبلغ آخر</string>
+    <string name="goals_notif_other_hint">المبلغ</string>
+    <string name="goals_quick_done">تمت إضافة %1$s إلى %2$s</string>
+    <string name="goals_quick_done_locked">تمت الإضافة إلى هدفك</string>
+    <string name="goals_plan_amount">المبلغ المدّخر كل مرة (اختياري)</string>
+    <string name="goals_plan_auto">أضفه تلقائيًا</string>
+    <string name="goals_quick_label">مبالغ سريعة تفصل بينها مسافة (اختياري)</string>
+    <string name="goals_plan_line">خطة الادخار: %1$s كل مرة، وتؤكدها من التذكير</string>
+    <string name="goals_plan_line_auto">خطة الادخار: %1$s كل مرة، وتُضاف تلقائيًا</string>
 </resources>

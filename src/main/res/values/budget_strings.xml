@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="bud_title">KanaBudget</string>
+    <string name="bud_summary">Track what you spend, month by month</string>
+    <string name="bud_prev">Previous</string>
+    <string name="bud_next">Next</string>
+    <string name="bud_add_expense">Add expense</string>
+    <string name="bud_add_income">Add income</string>
+    <string name="bud_overview">Overview</string>
+    <string name="bud_left">%1$s left</string>
+    <string name="bud_over">%1$s over budget</string>
+    <string name="bud_spent_of">Spent %1$s of %2$s</string>
+    <string name="bud_spent">Spent %1$s</string>
+    <string name="bud_income_line">Income %1$s</string>
+    <string name="bud_daily">About %1$s a day for the rest of the month</string>
+    <string name="bud_set_hint">Set a monthly budget in the settings to see what is left.</string>
+    <string name="bud_categories">By category</string>
+    <string name="bud_transactions">Transactions</string>
+    <string name="bud_empty">Nothing recorded this month</string>
+    <string name="bud_settings">Budget settings</string>
+    <string name="bud_monthly">Monthly budget</string>
+    <string name="bud_limits">Category limits (optional)</string>
+    <string name="bud_new_cat">New category</string>
+    <string name="bud_cat_name">Category name</string>
+    <string name="bud_add_cat">Add category</string>
+    <string name="bud_save_rest">Put what is left into a goal</string>
+    <string name="bud_save_rest_title">Move %1$s to a goal</string>
+    <string name="bud_export_csv">Export as CSV</string>
+    <string name="bud_csv_saved">CSV saved</string>
+    <string name="bud_category">Category</string>
+    <string name="bud_date">Date</string>
+    <string name="bud_income_label">Income</string>
+    <string name="bud_cat_food">Food</string>
+    <string name="bud_cat_transport">Transport</string>
+    <string name="bud_cat_bills">Bills</string>
+    <string name="bud_cat_shopping">Shopping</string>
+    <string name="bud_cat_health">Health</string>
+    <string name="bud_cat_fun">Fun</string>
+    <string name="bud_cat_savings">Savings</string>
+    <string name="bud_cat_other">Other</string>
+</resources>

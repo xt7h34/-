@@ -112,4 +112,15 @@
     <string name="widget_goals_sample_title">💻 Laptop</string>
     <string name="widget_goals_sample_detail">6,200 EGP of 10,000 EGP</string>
     <string name="widget_goals_sample_status">On track</string>
+    <string name="goals_notif_auto">Added %1$s to %2$s automatically.</string>
+    <string name="goals_notif_plan">Time to put aside %1$s for %2$s.</string>
+    <string name="goals_notif_other">Other amount</string>
+    <string name="goals_notif_other_hint">Amount</string>
+    <string name="goals_quick_done">Added %1$s to %2$s</string>
+    <string name="goals_quick_done_locked">Added to your goal</string>
+    <string name="goals_plan_amount">Amount to save each time (optional)</string>
+    <string name="goals_plan_auto">Add it automatically</string>
+    <string name="goals_quick_label">Quick amounts, separated by spaces (optional)</string>
+    <string name="goals_plan_line">Saving plan: %1$s each time, confirmed from the reminder</string>
+    <string name="goals_plan_line_auto">Saving plan: %1$s each time, added automatically</string>
 </resources>

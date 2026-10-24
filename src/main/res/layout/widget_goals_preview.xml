@@ -4,17 +4,22 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 <ImageView android:id="@+id/w_bg" android:layout_width="match_parent" android:layout_height="match_parent" android:contentDescription="@null" android:scaleType="fitXY" android:src="@drawable/wbg_sig_goals" />
-<LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="horizontal" android:gravity="center_vertical" android:padding="14dp">
+<LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:gravity="center_vertical" android:padding="14dp">
 <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
-<FrameLayout android:layout_width="76dp" android:layout_height="76dp">
-<ImageView android:id="@+id/w_ring" android:layout_width="76dp" android:layout_height="76dp" android:contentDescription="@null" android:scaleType="fitCenter" android:src="@drawable/wp_ring" />
-<TextView android:id="@+id/w_big" android:layout_width="match_parent" android:layout_height="match_parent" android:maxLines="1" android:ellipsize="end" android:textColor="#FFFFFFFF" android:textSize="17sp" android:textStyle="bold" android:gravity="center" android:text="62%" />
+<FrameLayout android:layout_width="60dp" android:layout_height="60dp">
+<ImageView android:id="@+id/w_ring" android:layout_width="60dp" android:layout_height="60dp" android:contentDescription="@null" android:scaleType="fitCenter" android:src="@drawable/wp_ring" />
+<TextView android:id="@+id/w_big" android:layout_width="match_parent" android:layout_height="match_parent" android:maxLines="1" android:ellipsize="end" android:textColor="#FFFFFFFF" android:textSize="15sp" android:textStyle="bold" android:gravity="center" android:text="62%" />
 </FrameLayout>
 <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:orientation="vertical" android:layout_weight="1" android:layout_marginStart="14dp">
 <TextView android:id="@+id/w_title" android:layout_width="wrap_content" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end" android:textColor="#FFFFFFFF" android:textSize="16sp" android:textStyle="bold" android:text="@string/wp_goals_title" />
 <TextView android:id="@+id/w_detail" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:maxLines="1" android:ellipsize="end" android:textColor="#CCFFFFFF" android:textSize="13sp" android:text="@string/wp_goals_detail" />
-<TextView android:id="@+id/w_status" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:maxLines="1" android:ellipsize="end" android:textColor="#FFFFF4CC" android:textSize="12sp" android:textStyle="bold" android:text="@string/wp_goals_status" />
+<TextView android:id="@+id/w_status" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:maxLines="1" android:ellipsize="end" android:textColor="#FFFFF4CC" android:textSize="12sp" android:textStyle="bold" android:text="@string/wp_goals_status" />
 </LinearLayout>
+</LinearLayout>
+<LinearLayout android:id="@+id/w_q" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="8dp">
+<TextView android:id="@+id/w_q1" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:maxLines="1" android:ellipsize="end" android:textColor="#FFFFFFFF" android:textSize="13sp" android:textStyle="bold" android:gravity="center" android:text="+200" android:background="@drawable/wbtn" android:paddingTop="6dp" android:paddingBottom="6dp" />
+<TextView android:id="@+id/w_q2" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="6dp" android:maxLines="1" android:ellipsize="end" android:textColor="#FFFFFFFF" android:textSize="13sp" android:textStyle="bold" android:gravity="center" android:text="+500" android:background="@drawable/wbtn" android:paddingTop="6dp" android:paddingBottom="6dp" />
+<TextView android:id="@+id/w_q3" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="6dp" android:maxLines="1" android:ellipsize="end" android:textColor="#FFFFFFFF" android:textSize="13sp" android:textStyle="bold" android:gravity="center" android:text="+1000" android:background="@drawable/wbtn" android:paddingTop="6dp" android:paddingBottom="6dp" />
 </LinearLayout>
 </LinearLayout>
 </FrameLayout>

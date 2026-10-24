@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="bud_title">كانا بدجت</string>
+    <string name="bud_summary">تابع مصروفك شهرًا بشهر</string>
+    <string name="bud_prev">السابق</string>
+    <string name="bud_next">التالي</string>
+    <string name="bud_add_expense">إضافة مصروف</string>
+    <string name="bud_add_income">إضافة دخل</string>
+    <string name="bud_overview">نظرة عامة</string>
+    <string name="bud_left">متبقٍ %1$s</string>
+    <string name="bud_over">تجاوزت الميزانية بـ %1$s</string>
+    <string name="bud_spent_of">صرفت %1$s من %2$s</string>
+    <string name="bud_spent">المصروف %1$s</string>
+    <string name="bud_income_line">الدخل %1$s</string>
+    <string name="bud_daily">حوالي %1$s في اليوم لباقي الشهر</string>
+    <string name="bud_set_hint">حدد ميزانية شهرية من الإعدادات لتعرف المتبقي.</string>
+    <string name="bud_categories">حسب الفئة</string>
+    <string name="bud_transactions">العمليات</string>
+    <string name="bud_empty">لا عمليات هذا الشهر</string>
+    <string name="bud_settings">إعدادات الميزانية</string>
+    <string name="bud_monthly">الميزانية الشهرية</string>
+    <string name="bud_limits">حدود الفئات (اختياري)</string>
+    <string name="bud_new_cat">فئة جديدة</string>
+    <string name="bud_cat_name">اسم الفئة</string>
+    <string name="bud_add_cat">إضافة فئة</string>
+    <string name="bud_save_rest">ضع المتبقي في هدف</string>
+    <string name="bud_save_rest_title">انقل %1$s إلى هدف</string>
+    <string name="bud_export_csv">تصدير بصيغة CSV</string>
+    <string name="bud_csv_saved">تم حفظ ملف CSV</string>
+    <string name="bud_category">الفئة</string>
+    <string name="bud_date">التاريخ</string>
+    <string name="bud_income_label">دخل</string>
+    <string name="bud_cat_food">الأكل</string>
+    <string name="bud_cat_transport">المواصلات</string>
+    <string name="bud_cat_bills">الفواتير</string>
+    <string name="bud_cat_shopping">التسوق</string>
+    <string name="bud_cat_health">الصحة</string>
+    <string name="bud_cat_fun">الترفيه</string>
+    <string name="bud_cat_savings">الادخار</string>
+    <string name="bud_cat_other">أخرى</string>
+</resources>

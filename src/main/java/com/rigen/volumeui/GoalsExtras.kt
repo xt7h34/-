@@ -5,6 +5,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.app.RemoteInput
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.BroadcastReceiver
@@ -13,6 +14,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.drawable.Icon
 import android.graphics.Matrix
 import android.hardware.biometrics.BiometricManager
 import android.hardware.biometrics.BiometricPrompt
@@ -22,6 +24,7 @@ import android.os.Build
 import android.os.CancellationSignal
 import android.util.Base64
 import android.widget.RemoteViews
+import android.widget.Toast
 import org.json.JSONObject
 import java.io.File
 import java.util.Calendar
@@ -127,43 +130,165 @@ object GoalsReminders {
         sp.edit().putStringSet(KEY_IDS, active).apply()
     }
 
-    /** An alarm rang: tell the person, then set the next one. */
+    /** The scheduled moments of the goal's reminder after [from], up to and including [to]. */
+    fun occurrences(g: Goal, from: Long, to: Long): List<Long> {
+        val out = ArrayList<Long>()
+        var t = from
+        while (out.size < 120) {
+            val n = nextTrigger(g, t) ?: break
+            if (n > to) break
+            out.add(n)
+            t = n
+        }
+        return out
+    }
+
+    /** An alarm rang: do what the plans owe, tell the person, then set the next alarm. */
     fun fire(c: Context, id: String) {
+        GoalsAuto.catchUp(c)
         val goals = GoalsStore.load(c)
         val g = goals.firstOrNull { it.id == id }
-        if (g != null && !g.archived && g.completedAt == 0L && g.remind in 1..3) notify(c, g)
+        if (g != null && !g.archived && g.completedAt == 0L && g.remind in 1..3) notify(c, g, g.plan > 0L && g.autoAdd)
         sync(c, goals)
     }
 
-    private fun notify(c: Context, g: Goal) {
-        val nm = c.getSystemService(NotificationManager::class.java) ?: return
-        if (!nm.areNotificationsEnabled()) return
+    private fun channel(c: Context, nm: NotificationManager) {
         nm.createNotificationChannel(
             NotificationChannel(CHANNEL, c.getString(R.string.goals_notif_channel), NotificationManager.IMPORTANCE_DEFAULT),
         )
-        // With the lock on, nothing about the goal shows on the lock screen.
-        val text = if (GoalsLock.enabled(c)) {
-            c.getString(R.string.goals_notif_locked)
-        } else {
-            val remaining = max(0L, g.target - g.saved)
-            c.getString(R.string.goals_notif_text, "${g.emoji} ${g.name}", formatMoney(remaining, g.currency))
+    }
+
+    private fun openGoals(c: Context): PendingIntent = PendingIntent.getActivity(
+        c, 950900,
+        Intent(c, MainActivity::class.java).putExtra(EXTRA_PAGE, PAGE_GOALS)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+    )
+
+    /**
+     * The reminder. Unless the plan adds money by itself, it carries buttons: the plan's amount (or the
+     * goal's quick amounts) and a box to type any other amount, so saving never needs the app opened.
+     */
+    private fun notify(c: Context, g: Goal, auto: Boolean) {
+        val nm = c.getSystemService(NotificationManager::class.java) ?: return
+        if (!nm.areNotificationsEnabled()) return
+        channel(c, nm)
+        // With the lock on, nothing about the goal shows on the lock screen, and no amount is offered.
+        val locked = GoalsLock.enabled(c)
+        val remaining = max(0L, g.target - g.saved)
+        val name = "${g.emoji} ${g.name}"
+        val text = when {
+            locked -> c.getString(R.string.goals_notif_locked)
+            auto && g.plan > 0L -> c.getString(R.string.goals_notif_auto, formatMoney(g.plan, g.currency), name)
+            g.plan > 0L -> c.getString(R.string.goals_notif_plan, formatMoney(g.plan, g.currency), name)
+            else -> c.getString(R.string.goals_notif_text, name, formatMoney(remaining, g.currency))
         }
-        val open = PendingIntent.getActivity(
-            c, 950900,
-            Intent(c, MainActivity::class.java).putExtra(EXTRA_PAGE, PAGE_GOALS)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-        val n = Notification.Builder(c, CHANNEL)
+        val nid = 5000 + (g.id.hashCode() and 0xFFFF)
+        val b = Notification.Builder(c, CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_alarm)
             .setContentTitle(c.getString(R.string.goals_notif_title))
             .setContentText(text)
             .setCategory(Notification.CATEGORY_REMINDER)
+            .setVisibility(if (locked) Notification.VISIBILITY_SECRET else Notification.VISIBILITY_PRIVATE)
+            .setAutoCancel(true)
+            .setContentIntent(openGoals(c))
+        if (!auto) {
+            val icon = Icon.createWithResource(c, R.drawable.ic_stat_alarm)
+            if (!locked) {
+                val amounts = if (g.plan > 0L) listOf(g.plan) else GoalsEngine.quickFor(g, remaining).take(2)
+                for (a in amounts) {
+                    b.addAction(
+                        Notification.Action.Builder(icon, "+" + formatMoney(a, g.currency), GoalsQuick.pending(c, g.id, a, nid)).build(),
+                    )
+                }
+            }
+            val box = RemoteInput.Builder(GoalsQuick.KEY_AMOUNT).setLabel(c.getString(R.string.goals_notif_other_hint)).build()
+            b.addAction(
+                Notification.Action.Builder(icon, c.getString(R.string.goals_notif_other), GoalsQuick.pending(c, g.id, 0L, nid, mutable = true))
+                    .addRemoteInput(box)
+                    .build(),
+            )
+        }
+        nm.notify(nid, b.build())
+    }
+
+    /** The goal reached its price by itself or from a button: say so even if the app is closed. */
+    fun notifyDone(c: Context, goalId: String) {
+        val g = GoalsStore.load(c).firstOrNull { it.id == goalId } ?: return
+        val nm = c.getSystemService(NotificationManager::class.java) ?: return
+        if (!nm.areNotificationsEnabled()) return
+        channel(c, nm)
+        val text = if (GoalsLock.enabled(c)) c.getString(R.string.goals_st_done) else c.getString(R.string.goals_celebrate_msg, "${g.emoji} ${g.name}")
+        val n = Notification.Builder(c, CHANNEL)
+            .setSmallIcon(R.drawable.ic_stat_alarm)
+            .setContentTitle(c.getString(R.string.goals_celebrate_title))
+            .setContentText(text)
             .setVisibility(if (GoalsLock.enabled(c)) Notification.VISIBILITY_SECRET else Notification.VISIBILITY_PRIVATE)
             .setAutoCancel(true)
-            .setContentIntent(open)
+            .setContentIntent(openGoals(c))
             .build()
-        nm.notify(5000 + (g.id.hashCode() and 0xFFFF), n)
+        nm.notify(6000 + (g.id.hashCode() and 0xFFFF), n)
+    }
+}
+
+/** Saving plans that add money by themselves: whatever came due while the app was closed is added when it next runs. */
+object GoalsAuto {
+    fun catchUp(c: Context, now: Long = System.currentTimeMillis()) {
+        for (g in GoalsStore.load(c)) {
+            if (g.plan <= 0L || !g.autoAdd || g.remind !in 1..3 || g.archived || g.completedAt != 0L || g.planSince <= 0L) continue
+            val times = GoalsReminders.occurrences(g, g.planSince, now)
+            if (times.isEmpty()) continue
+            if (GoalsStore.applyPlan(c, g.id, times)) GoalsReminders.notifyDone(c, g.id)
+        }
+    }
+}
+
+/** Adding money to a goal from a widget button or a notification button, without opening the app. */
+object GoalsQuick {
+    const val ACTION = "com.kanade.goals.QUICK"
+    const val KEY_AMOUNT = "amount"
+
+    /**
+     * A button's action. With [mutable] it is the "other amount" box of a notification, which needs the
+     * system to be able to put the typed text into it.
+     */
+    fun pending(c: Context, goalId: String, amount: Long, nid: Int = 0, mutable: Boolean = false): PendingIntent {
+        val i = Intent(c, GoalsReceiver::class.java)
+            .setAction(ACTION)
+            .setData(Uri.parse("kanagoal://quick/$goalId/$amount/$nid/${if (mutable) "box" else "fixed"}"))
+            .putExtra("id", goalId)
+            .putExtra("amount", amount)
+            .putExtra("nid", nid)
+        val kind = if (!mutable) {
+            PendingIntent.FLAG_IMMUTABLE
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            PendingIntent.FLAG_MUTABLE
+        } else {
+            0
+        }
+        return PendingIntent.getBroadcast(c, 0, i, PendingIntent.FLAG_UPDATE_CURRENT or kind)
+    }
+
+    fun handle(c: Context, intent: Intent) {
+        val id = intent.getStringExtra("id").orEmpty()
+        val nid = intent.getIntExtra("nid", 0)
+        var amount = intent.getLongExtra("amount", 0L)
+        val typed = RemoteInput.getResultsFromIntent(intent)?.getCharSequence(KEY_AMOUNT)?.toString()
+        if (typed != null) amount = parseMoney(typed) ?: 0L
+        if (nid != 0) c.getSystemService(NotificationManager::class.java)?.cancel(nid)
+        val g = GoalsStore.load(c).firstOrNull { it.id == id }
+        if (g == null || g.archived || amount <= 0L) {
+            if (typed != null) Toast.makeText(c, R.string.goals_err_amount, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val reached = GoalsStore.addEntry(c, id, amount, "")
+        val msg = if (GoalsLock.enabled(c)) {
+            c.getString(R.string.goals_quick_done_locked)
+        } else {
+            c.getString(R.string.goals_quick_done, formatMoney(amount, g.currency), "${g.emoji} ${g.name}")
+        }
+        Toast.makeText(c, msg, Toast.LENGTH_SHORT).show()
+        if (reached) GoalsReminders.notifyDone(c, id)
     }
 }
 
@@ -172,7 +297,9 @@ class GoalsReceiver : BroadcastReceiver() {
         try {
             when (intent.action) {
                 GoalsReminders.ACTION -> GoalsReminders.fire(context, intent.getStringExtra("id").orEmpty())
+                GoalsQuick.ACTION -> GoalsQuick.handle(context, intent)
                 Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED -> {
+                    GoalsAuto.catchUp(context)
                     GoalsReminders.sync(context, GoalsStore.load(context))
                     GoalsWidgets.updateAll(context)
                 }
