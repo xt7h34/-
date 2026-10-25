@@ -123,4 +123,5 @@
     <string name="goals_quick_label">Quick amounts, separated by spaces (optional)</string>
     <string name="goals_plan_line">Saving plan: %1$s each time, confirmed from the reminder</string>
     <string name="goals_plan_line_auto">Saving plan: %1$s each time, added automatically</string>
+    <string name="game_nero_low">Not enough for a Nero this round. Play on!</string>
 </resources>

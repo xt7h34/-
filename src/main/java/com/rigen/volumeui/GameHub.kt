@@ -57,8 +57,6 @@ internal fun GameHubPage(onOpen: (String) -> Unit, onBack: () -> Unit) {
                 SettingsItem(Glyph.CARDS, ICON_PINK, stringResource(R.string.memory_title), stringResource(R.string.memory_summary)) { onOpen(PAGE_MEMORY) }
                 ItemDivider()
                 SettingsItem(Glyph.LAYERS, ICON_BLUE, stringResource(R.string.stack_title), summary(R.string.stack_summary, bestStack)) { onOpen(PAGE_STACK) }
-                ItemDivider()
-                SettingsItem(Glyph.FACTORY, ICON_GREEN, stringResource(R.string.ty_title), stringResource(R.string.ty_summary)) { onOpen(PAGE_TYCOON) }
             }
         }
     }

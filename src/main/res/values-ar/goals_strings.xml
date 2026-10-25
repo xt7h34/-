@@ -123,4 +123,5 @@
     <string name="goals_quick_label">مبالغ سريعة تفصل بينها مسافة (اختياري)</string>
     <string name="goals_plan_line">خطة الادخار: %1$s كل مرة، وتؤكدها من التذكير</string>
     <string name="goals_plan_line_auto">خطة الادخار: %1$s كل مرة، وتُضاف تلقائيًا</string>
+    <string name="game_nero_low">لا يكفي لنيرو في هذه الجولة. واصل اللعب!</string>
 </resources>

@@ -1,5 +1,6 @@
 package com.rigen.volumeui
 
+import androidx.compose.runtime.rememberCoroutineScope
 import android.content.Context
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -55,6 +56,12 @@ internal fun StackGamePage(onBack: () -> Unit) {
     var perfectId by remember { mutableIntStateOf(0) }
     var perfectShow by remember { mutableStateOf(false) }
     var perfectCombo by remember { mutableIntStateOf(0) }
+    val scope = rememberCoroutineScope()
+    val nero = remember { GameNero(context, "stack", scope, 12) }
+    LaunchedEffect(Unit) {
+        nero.retry()
+        nero.begin()
+    }
 
     LaunchedEffect(Unit) {
         var prev = withFrameNanos { it }
@@ -86,6 +93,7 @@ internal fun StackGamePage(onBack: () -> Unit) {
                 prefs.edit().putInt("best", best).apply()
             }
             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            nero.finish(score)
         } else if (engine.lastPerfect) {
             perfectCombo = engine.combo
             perfectId++
@@ -94,6 +102,7 @@ internal fun StackGamePage(onBack: () -> Unit) {
     }
 
     fun restart() {
+        nero.begin()
         engine.reset()
         score = 0
         over = false
@@ -133,7 +142,7 @@ internal fun StackGamePage(onBack: () -> Unit) {
         if (over) {
             GameOverlay(
                 stringResource(R.string.blocks_over),
-                listOf(stringResource(R.string.stack_height, score.toString())),
+                listOfNotNull(stringResource(R.string.stack_height, score.toString()), nero.line()),
                 stringResource(R.string.blocks_play_again),
                 { restart() },
             )

@@ -1,5 +1,6 @@
 package com.rigen.volumeui
 
+import androidx.compose.runtime.rememberCoroutineScope
 import android.content.Context
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -78,6 +79,10 @@ internal fun MemoryGamePage(onBack: () -> Unit) {
     var mismatchId by remember { mutableIntStateOf(0) }
     var bestMoves by remember { mutableIntStateOf(prefs.getInt("best_$levelIdx", 0)) }
 
+    val scope = rememberCoroutineScope()
+    val nero = remember { GameNero(context, "memory", scope, 300) }
+    LaunchedEffect(Unit) { nero.retry() }
+
     val moves = rev.let { engine.moves }
     val done = rev.let { engine.done }
 
@@ -89,6 +94,7 @@ internal fun MemoryGamePage(onBack: () -> Unit) {
         started = false
         seconds = 0
         picking = false
+        nero.begin()
         rev++
     }
 
@@ -124,6 +130,8 @@ internal fun MemoryGamePage(onBack: () -> Unit) {
                         bestMoves = engine.moves
                         prefs.edit().putInt("best_$levelIdx", bestMoves).apply()
                     }
+                    // A level is worth its pairs, times the stars it earned.
+                    nero.finish(engine.level.pairs * engine.stars() * 20)
                 }
             }
             Flip.MISMATCH -> mismatchId++
@@ -181,7 +189,7 @@ internal fun MemoryGamePage(onBack: () -> Unit) {
                 listOf(
                     "★".repeat(stars) + "☆".repeat(3 - stars),
                     stringResource(R.string.memory_moves) + ": " + engine.moves + " · " + formatTime(seconds),
-                ),
+                ) + listOfNotNull(nero.line()),
                 stringResource(R.string.blocks_play_again),
                 { begin(levelIdx) },
                 stringResource(R.string.memory_change),

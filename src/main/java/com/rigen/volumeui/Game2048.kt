@@ -1,5 +1,6 @@
 package com.rigen.volumeui
 
+import androidx.compose.runtime.rememberCoroutineScope
 import android.content.Context
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -63,6 +64,13 @@ internal fun Game2048Page(onBack: () -> Unit) {
     var animT by remember { mutableFloatStateOf(1f) }
     var winAck by remember { mutableStateOf(engine.won) }
     var showWin by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val nero = remember { GameNero(context, "g2048", scope, 2000) }
+    LaunchedEffect(Unit) {
+        // The round that was left open on this page, and any score that could not be sent last time.
+        nero.retry()
+        if (!engine.over) nero.ensureOpen()
+    }
 
     val score = rev.let { engine.score }
     val over = rev.let { engine.over }
@@ -82,9 +90,11 @@ internal fun Game2048Page(onBack: () -> Unit) {
         if (engine.won && !winAck) showWin = true
         rev++
         save()
+        if (engine.over) nero.finish(engine.score)
     }
 
     fun restart() {
+        nero.begin()
         engine.reset()
         last = null
         winAck = false
@@ -152,7 +162,7 @@ internal fun Game2048Page(onBack: () -> Unit) {
         if (over) {
             GameOverlay(
                 stringResource(R.string.blocks_over),
-                listOf(stringResource(R.string.blocks_final_score, score.toString())),
+                listOfNotNull(stringResource(R.string.blocks_final_score, score.toString()), nero.line()),
                 stringResource(R.string.blocks_play_again),
                 { restart() },
             )

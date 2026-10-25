@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="alarms"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/sc_alarms">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetClass="com.rigen.volumeui.MainActivity"
+            android:targetPackage="com.kanade">
+            <extra android:name="page" android:value="alarms" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="timer"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/sc_timer">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetClass="com.rigen.volumeui.MainActivity"
+            android:targetPackage="com.kanade">
+            <extra android:name="page" android:value="timer" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="goals"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/sc_goals">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetClass="com.rigen.volumeui.MainActivity"
+            android:targetPackage="com.kanade">
+            <extra android:name="page" android:value="goals" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="budget"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/sc_budget">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetClass="com.rigen.volumeui.MainActivity"
+            android:targetPackage="com.kanade">
+            <extra android:name="page" android:value="budget" />
+        </intent>
+    </shortcut>
+</shortcuts>

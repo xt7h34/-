@@ -716,6 +716,8 @@ private fun HomePage(serviceEnabled: Boolean, onOpen: (String) -> Unit) {
             PageColumn(padding) {
                 AccountCard { onOpen(PAGE_ACCOUNT) }
 
+                TodayCards(onOpen)
+
                 SettingsGroup {
                     SettingsItem(
                         glyph = Glyph.ACCESS,
@@ -786,6 +788,12 @@ private fun HomePage(serviceEnabled: Boolean, onOpen: (String) -> Unit) {
                         stringResource(R.string.bud_title),
                         stringResource(R.string.bud_summary),
                     ) { onOpen(PAGE_BUDGET) }
+                    ItemDivider()
+                    SettingsItem(
+                        Glyph.DEEN, ICON_PURPLE,
+                        stringResource(R.string.deen_title),
+                        stringResource(R.string.deen_summary),
+                    ) { onOpen(PAGE_DEEN) }
                     ItemDivider()
                     SettingsItem(
                         Glyph.LOCK, ICON_GREEN,
@@ -859,11 +867,15 @@ private fun searchIndex(): List<SearchEntry> {
         SearchEntry(stringResource(R.string.kb_title), stringResource(R.string.app_title), PAGE_KEYBOARD),
         SearchEntry(stringResource(R.string.goals_title), stringResource(R.string.app_title), PAGE_GOALS),
         SearchEntry(stringResource(R.string.bud_title), stringResource(R.string.app_title), PAGE_BUDGET),
+        SearchEntry(stringResource(R.string.deen_title), stringResource(R.string.app_title), PAGE_DEEN),
+        SearchEntry(stringResource(R.string.azkar_title), stringResource(R.string.deen_title), PAGE_AZKAR),
+        SearchEntry(stringResource(R.string.tasbeeh_title), stringResource(R.string.deen_title), PAGE_TASBEEH),
+        SearchEntry(stringResource(R.string.qibla_title), stringResource(R.string.deen_title), PAGE_QIBLA),
+        SearchEntry(stringResource(R.string.tracker_title), stringResource(R.string.deen_title), PAGE_TRACKER),
         SearchEntry(stringResource(R.string.blocks_title), stringResource(R.string.games_title), PAGE_BLOCKS),
         SearchEntry(stringResource(R.string.g2048_title), stringResource(R.string.games_title), PAGE_2048),
         SearchEntry(stringResource(R.string.memory_title), stringResource(R.string.games_title), PAGE_MEMORY),
         SearchEntry(stringResource(R.string.stack_title), stringResource(R.string.games_title), PAGE_STACK),
-        SearchEntry(stringResource(R.string.ty_title), stringResource(R.string.games_title), PAGE_TYCOON),
         // ── From the first file: account pages ──
         SearchEntry(stringResource(R.string.habits_title), stringResource(R.string.account_title), PAGE_HABITS),
         SearchEntry(stringResource(R.string.sub_title), stringResource(R.string.account_title), PAGE_SUBSCRIPTION),
@@ -1947,8 +1959,9 @@ class MainActivity : ComponentActivity() {
             val parent = when (page) {
                 PAGE_PANEL, PAGE_BEHAVIOR, PAGE_STATION, PAGE_APPS -> PAGE_VOLUME
                 PAGE_CLOCK_TIME, PAGE_ALARMS, PAGE_TIMER, PAGE_STOPWATCH, PAGE_SLEEP -> PAGE_CLOCK
-                PAGE_BLOCKS, PAGE_2048, PAGE_MEMORY, PAGE_STACK, PAGE_TYCOON -> PAGE_GAMES
+                PAGE_BLOCKS, PAGE_2048, PAGE_MEMORY, PAGE_STACK -> PAGE_GAMES
                 PAGE_HABITS, PAGE_SUBSCRIPTION, PAGE_LINKED -> PAGE_ACCOUNT
+                PAGE_AZKAR, PAGE_TASBEEH, PAGE_QIBLA, PAGE_TRACKER -> PAGE_DEEN
                 PAGE_REELS_DIAG -> PAGE_REELS
                 else -> PAGE_HOME
             }
@@ -1984,7 +1997,6 @@ class MainActivity : ComponentActivity() {
                 PAGE_2048 -> Game2048Page(goBack)
                 PAGE_MEMORY -> MemoryGamePage(goBack)
                 PAGE_STACK -> StackGamePage(goBack)
-                PAGE_TYCOON -> TycoonPage(goBack)
                 // ── Reels counter ──
                 PAGE_REELS -> ReelsPage(serviceEnabled, { page = it }, goBack)
                 PAGE_REELS_DIAG -> ReelsDiagPage(goBack)
@@ -1993,6 +2005,11 @@ class MainActivity : ComponentActivity() {
                 "vault" -> VaultPage(goBack)
                 PAGE_GOALS -> GoalsPage(goBack)
                 PAGE_BUDGET -> BudgetPage(goBack)
+                PAGE_DEEN -> DeenHubPage({ page = it }, goBack)
+                PAGE_AZKAR -> AzkarPage(goBack)
+                PAGE_TASBEEH -> TasbeehPage(goBack)
+                PAGE_QIBLA -> QiblaPage(goBack)
+                PAGE_TRACKER -> PrayerTrackerPage(goBack)
                 // ── Home ──
                 else -> HomePage(serviceEnabled) { page = it }
             }

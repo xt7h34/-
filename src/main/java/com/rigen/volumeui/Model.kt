@@ -45,6 +45,11 @@ const val PAGE_ACCOUNT = "account"
 const val PAGE_HABITS = "habits"
 const val PAGE_GOALS = "goals"
 const val PAGE_BUDGET = "budget"
+const val PAGE_DEEN = "deen"
+const val PAGE_AZKAR = "azkar"
+const val PAGE_TASBEEH = "tasbeeh"
+const val PAGE_QIBLA = "qibla"
+const val PAGE_TRACKER = "prayers"
 const val PAGE_SUBSCRIPTION = "subscription"
 const val PAGE_LINKED = "linked"
 const val PAGE_VOLUME = "volume"
@@ -67,7 +72,6 @@ const val PAGE_BLOCKS = "blocks"
 const val PAGE_2048 = "g2048"
 const val PAGE_MEMORY = "memory"
 const val PAGE_STACK = "stack"
-const val PAGE_TYCOON = "tycoon"
 // Keyboard page
 const val PAGE_KEYBOARD = "keyboard"
 // Reels counter pages
@@ -125,6 +129,7 @@ enum class Glyph(val pathData: String) {
     SLEEP("M12,3a9,9 0 1,0 9,9c0,-0.46 -0.04,-0.92 -0.1,-1.36a5.389,5.389 0 0,1 -4.4,2.26 5.403,5.403 0 0,1 -3.14,-9.8c-0.44,-0.06 -0.9,-0.1 -1.36,-0.1z"),
     ADD("M19,13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"),
     GOALS("M14.4,6L14,4H5v17h2v-7h5.6l0.4,2h7V6z"),
+    DEEN("M12,17.27L18.18,21l-1.64,-7.03L22,9.24l-7.19,-0.61L12,2 9.19,8.63 2,9.24l5.46,4.73L5.82,21z"),
     BUDGET("M21,18v1c0,1.1 -0.9,2 -2,2H5c-1.11,0 -2,-0.9 -2,-2V5c0,-1.1 0.89,-2 2,-2h14c1.1,0 2,0.9 2,2v1h-9c-1.11,0 -2,0.9 -2,2v8c0,1.1 0.89,2 2,2h9zM12,16h10V8H12v8zM16,13.5c-0.83,0 -1.5,-0.67 -1.5,-1.5s0.67,-1.5 1.5,-1.5 1.5,0.67 1.5,1.5 -0.67,1.5 -1.5,1.5z"),
     DELETE("M6,19c0,1.1 0.9,2 2,2h8c1.1,0 2,-0.9 2,-2V7H6v12zM19,4h-3.5l-1,-1h-5l-1,1H5v2h14V4z"),
     SEARCH("M15.5,14h-0.79l-0.28,-0.27C15.41,12.59 16,11.11 16,9.5 16,5.91 13.09,3 9.5,3S3,5.91 3,9.5 5.91,16 9.5,16c1.61,0 3.09,-0.59 4.23,-1.57l0.27,0.28v0.79l5,4.99L20.49,19l-4.99,-5zM9.5,14C7.01,14 5,11.99 5,9.5S7.01,5 9.5,5 14,7.01 14,9.5 11.99,14 9.5,14z"),
