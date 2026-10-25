@@ -326,7 +326,7 @@
     <string name="acc_code_title">اكتب الكود</string>
     <string name="acc_code_hint">بعتنا كود من 6 أرقام على واتساب. صالح 10 دقايق.</string>
     <string name="acc_confirm">تأكيد</string>
-    <string name="acc_offline">كندا مش متصل. افتح Termux وتأكد إن البوت شغّال.</string>
+    <string name="acc_offline">مش قادر أوصل لكندا دلوقتي. اتأكد من النت وجرّب تاني.</string>
     <string name="acc_error">حصل خطأ، جرّب تاني.</string>
     <string name="acc_signed_as">داخل باسم %1$s</string>
     <string name="acc_referral">كود الدعوة: %1$s</string>

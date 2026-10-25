@@ -64,8 +64,19 @@ class ApiResult(val status: Int, val body: JSONObject?) {
 }
 
 object KanadeApi {
-    // The bot (in Termux) listens here, and only here. The app may speak plain http to this address only.
-    private const val BASE = "http://127.0.0.1:8787"
+    /**
+     * Public address of the bot (the ngrok static domain), e.g. "https://name.ngrok-free.dev".
+     * It comes from api-url.txt in the repo root at build time. Empty means the bot on this same phone (Termux).
+     */
+    private val PUBLIC_BASE: String get() = BuildConfig.PUBLIC_BASE
+
+    // Plain http is allowed to this address only (see network_security_config.xml).
+    private const val LOCAL_BASE = "http://127.0.0.1:8787"
+
+    private val remote: String?
+        get() = PUBLIC_BASE.trim().trimEnd('/').takeIf { it.startsWith("https://") }
+
+    private val BASE: String get() = remote ?: LOCAL_BASE
 
     suspend fun call(path: String, body: JSONObject? = null, token: String? = null): ApiResult =
         withContext(Dispatchers.IO) {
@@ -73,10 +84,12 @@ object KanadeApi {
             try {
                 val c = URL(BASE + path).openConnection() as HttpURLConnection
                 conn = c
-                c.connectTimeout = 4000
+                c.connectTimeout = if (remote != null) 10000 else 4000
                 c.readTimeout = 20000
                 c.requestMethod = if (body == null) "GET" else "POST"
                 c.setRequestProperty("Accept", "application/json")
+                // ngrok shows a warning page to browsers; this tells it the caller is an app.
+                c.setRequestProperty("ngrok-skip-browser-warning", "1")
                 if (token != null) c.setRequestProperty("Authorization", "Bearer $token")
                 if (body != null) {
                     c.doOutput = true

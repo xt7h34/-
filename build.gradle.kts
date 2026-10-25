@@ -28,10 +28,13 @@ android {
         applicationId = "com.kanade"
         minSdk = 26
         targetSdk = 35
-        versionCode = 29
-        versionName = "2.09"
+        versionCode = 30
+        versionName = "2.1"
         // Where the app looks for newer versions. The build passes it in (-PupdateRepo=owner/name).
         buildConfigField("String", "UPDATE_REPO", "\"${project.findProperty("updateRepo") ?: ""}\"")
+        // Public address of the Kanade bot (the tunnel), one line in api-url.txt at the repo root. Missing or empty = the bot on this same phone.
+        val apiUrl = File(rootDir, "api-url.txt").takeIf { it.exists() }?.readLines()?.firstOrNull()?.trim().orEmpty().replace("\"", "")
+        buildConfigField("String", "PUBLIC_BASE", "\"$apiUrl\"")
     }
 
     // Fixed debug key: every build is signed the same way, so a new APK installs over the old one.

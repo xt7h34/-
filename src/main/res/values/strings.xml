@@ -369,7 +369,7 @@
     <string name="acc_code_title">Enter the code</string>
     <string name="acc_code_hint">We sent a 6-digit code to your WhatsApp. It works for 10 minutes.</string>
     <string name="acc_confirm">Confirm</string>
-    <string name="acc_offline">Kanade is not reachable. Open Termux and make sure the bot is running.</string>
+    <string name="acc_offline">Can't reach Kanade right now. Check your connection and try again.</string>
     <string name="acc_error">Something went wrong, try again.</string>
     <string name="acc_signed_as">Signed in as %1$s</string>
     <string name="acc_referral">Invite code: %1$s</string>
