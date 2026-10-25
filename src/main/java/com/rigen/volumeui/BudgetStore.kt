@@ -204,6 +204,13 @@ object BudgetStore {
         save(c, copy(d, txs = d.txs + BudgetTx(UUID.randomUUID().toString(), amount, income, cat, note.trim().take(120), at)))
     }
 
+    /** Puts a deleted transaction back, with its original time. */
+    fun restoreTx(c: Context, tx: BudgetTx) {
+        val d = load(c)
+        if (d.txs.any { it.id == tx.id }) return
+        save(c, copy(d, txs = d.txs + tx))
+    }
+
     fun deleteTx(c: Context, id: String) {
         val d = load(c)
         save(c, copy(d, txs = d.txs.filter { it.id != id }))

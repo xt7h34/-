@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="accent_title">App color</string>
+    <string name="accent_default">Default</string>
+    <string name="amoled_title">Pure black (AMOLED)</string>
+    <string name="amoled_hint">Saves battery on OLED screens. Works in the dark theme.</string>
+</resources>

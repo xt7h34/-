@@ -46,6 +46,7 @@ const val PAGE_HABITS = "habits"
 const val PAGE_GOALS = "goals"
 const val PAGE_BUDGET = "budget"
 const val PAGE_DEEN = "deen"
+const val PAGE_GESTURES = "gestures"
 const val PAGE_AZKAR = "azkar"
 const val PAGE_TASBEEH = "tasbeeh"
 const val PAGE_QIBLA = "qibla"
@@ -216,6 +217,10 @@ data class PanelSettings(
     // The app itself
     val themeMode: Int = THEME_SYSTEM,
     val dynamicColor: Boolean = false,
+    /** The app's own colour as ARGB, or 0 to keep the default (or the system colours). */
+    val accent: Int = 0,
+    /** In the dark theme, paint every surface black instead of dark grey (saves battery on OLED screens). */
+    val amoled: Boolean = false,
     /** "" = follow the system, otherwise a language code such as "ar" or "en". */
     val language: String = "",
 )
@@ -254,6 +259,8 @@ object Prefs {
     private const val K_ALT_Y = "alt_pos_y"
     private const val K_THEME = "theme_mode"
     private const val K_DYNAMIC = "dynamic_color_v2"
+    private const val K_ACCENT = "accent_color"
+    private const val K_AMOLED = "amoled_black"
     private const val K_LANG = "language"
 
     private fun sp(context: Context) =
@@ -308,6 +315,8 @@ object Prefs {
             altPosY = p.getFloat(K_ALT_Y, d.altPosY),
             themeMode = p.getInt(K_THEME, d.themeMode),
             dynamicColor = p.getBoolean(K_DYNAMIC, d.dynamicColor),
+            accent = p.getInt(K_ACCENT, d.accent),
+            amoled = p.getBoolean(K_AMOLED, d.amoled),
             language = p.getString(K_LANG, "") ?: "",
         )
     }
@@ -345,6 +354,8 @@ object Prefs {
             .putFloat(K_ALT_Y, s.altPosY)
             .putInt(K_THEME, s.themeMode)
             .putBoolean(K_DYNAMIC, s.dynamicColor)
+            .putInt(K_ACCENT, s.accent)
+            .putBoolean(K_AMOLED, s.amoled)
             .putString(K_LANG, s.language)
             .apply()
     }

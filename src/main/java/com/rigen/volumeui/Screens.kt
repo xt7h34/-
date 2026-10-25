@@ -1,5 +1,7 @@
 package com.rigen.volumeui
 
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.material3.ColorScheme
 import android.app.Activity
 import android.app.NotificationManager
 import android.content.ClipData
@@ -169,20 +171,51 @@ private val KanadeDark = darkColorScheme(
     outlineVariant = Color(0xFF34363D),
 )
 
+/** The scheme with the person's own colour in place of the blue-violet one. */
+private fun withAccent(base: ColorScheme, accent: Color, dark: Boolean): ColorScheme {
+    // In the dark theme the colour is lightened so text in it stays readable on black.
+    val primary = if (dark) lerp(accent, Color.White, 0.35f) else accent
+    val container = if (dark) lerp(Color.Black, accent, 0.45f) else lerp(Color.White, accent, 0.18f)
+    return base.copy(
+        primary = primary,
+        onPrimary = if (primary.luminance() > 0.5f) Color.Black else Color.White,
+        primaryContainer = container,
+        onPrimaryContainer = if (container.luminance() > 0.5f) Color(0xFF111111) else Color(0xFFF3F3F3),
+        secondary = lerp(base.secondary, primary, 0.35f),
+        surfaceTint = primary,
+    )
+}
+
+/** Black where the dark theme is dark grey, so an OLED screen switches those pixels off. */
+private fun withBlackSurfaces(base: ColorScheme): ColorScheme = base.copy(
+    background = Color.Black,
+    surface = Color.Black,
+    surfaceVariant = Color(0xFF16171B),
+    surfaceContainerLowest = Color.Black,
+    surfaceContainerLow = Color(0xFF08080A),
+    surfaceContainer = Color(0xFF0D0D10),
+    surfaceContainerHigh = Color(0xFF141418),
+    surfaceContainerHighest = Color(0xFF1B1B20),
+)
+
 @Composable
-fun KanadeTheme(themeMode: Int, dynamicColor: Boolean, content: @Composable () -> Unit) {
+fun KanadeTheme(themeMode: Int, dynamicColor: Boolean, accent: Int = 0, amoled: Boolean = false, content: @Composable () -> Unit) {
     val dark = when (themeMode) {
         THEME_LIGHT -> false
         THEME_DARK -> true
         else -> isSystemInDarkTheme()
     }
     val context = LocalContext.current
-    val scheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
+    // A colour the person picked wins over the system's colours.
+    val picked = accent != 0
+    var scheme = when {
+        !picked && dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
             if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         dark -> KanadeDark
         else -> KanadeLight
     }
+    if (picked) scheme = withAccent(scheme, Color(accent), dark)
+    if (amoled && dark) scheme = withBlackSurfaces(scheme)
     // Make the status bar icons readable on top of the chosen theme.
     val view = LocalView.current
     SideEffect {
@@ -205,6 +238,12 @@ private val SWATCHES = listOf(
     0xFF1E1E1E, 0xFF000000, 0xFFFFFFFF, 0xFF1565C0,
     0xFF2E7D32, 0xFFC62828, 0xFF6A1B9A, 0xFFEF6C00,
     0xFF4F5BA5, 0xFF3A9DB5, 0xFF43B85A, 0xFFE0558A,
+).map { it.toInt() }
+
+/** The colours offered for the whole app. */
+private val ACCENTS = listOf(
+    0xFF1E88E5, 0xFF00897B, 0xFF43A047, 0xFFFB8C00, 0xFFE53935,
+    0xFFD81B60, 0xFF8E24AA, 0xFF5E35B1, 0xFF6D4C41, 0xFF546E7A,
 ).map { it.toInt() }
 
 internal val ICON_BLUE = Color(0xFF3D7BF5)
@@ -868,6 +907,7 @@ private fun searchIndex(): List<SearchEntry> {
         SearchEntry(stringResource(R.string.goals_title), stringResource(R.string.app_title), PAGE_GOALS),
         SearchEntry(stringResource(R.string.bud_title), stringResource(R.string.app_title), PAGE_BUDGET),
         SearchEntry(stringResource(R.string.deen_title), stringResource(R.string.app_title), PAGE_DEEN),
+        SearchEntry(stringResource(R.string.gest_title), stringResource(R.string.item_volume_title), PAGE_GESTURES),
         SearchEntry(stringResource(R.string.azkar_title), stringResource(R.string.deen_title), PAGE_AZKAR),
         SearchEntry(stringResource(R.string.tasbeeh_title), stringResource(R.string.deen_title), PAGE_TASBEEH),
         SearchEntry(stringResource(R.string.qibla_title), stringResource(R.string.deen_title), PAGE_QIBLA),
@@ -1208,6 +1248,12 @@ private fun VolumeHubPage(settings: PanelSettings, onOpen: (String) -> Unit, onB
                     stringResource(R.string.item_behavior_title),
                     stringResource(R.string.item_behavior_summary),
                 ) { onOpen(PAGE_BEHAVIOR) }
+                ItemDivider()
+                SettingsItem(
+                    Glyph.ACCESS, ICON_GREEN,
+                    stringResource(R.string.gest_title),
+                    stringResource(R.string.gest_summary),
+                ) { onOpen(PAGE_GESTURES) }
                 ItemDivider()
                 SettingsItem(
                     Glyph.MORE, ICON_GREEN,
@@ -1838,6 +1884,40 @@ private fun AppPage(settings: PanelSettings, onChange: (PanelSettings) -> Unit, 
                         onChange(settings.copy(dynamicColor = it))
                     }
                 }
+                SwitchRow(stringResource(R.string.amoled_title), settings.amoled) {
+                    onChange(settings.copy(amoled = it))
+                }
+                Text(
+                    stringResource(R.string.amoled_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(stringResource(R.string.accent_title), style = MaterialTheme.typography.titleSmall)
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    FilterChip(
+                        selected = settings.accent == 0,
+                        onClick = { onChange(settings.copy(accent = 0)) },
+                        label = { Text(stringResource(R.string.accent_default)) },
+                    )
+                    for (c in ACCENTS) {
+                        Box(
+                            Modifier
+                                .size(38.dp)
+                                .clip(CircleShape)
+                                .background(Color(c))
+                                .border(
+                                    if (settings.accent == c) 3.dp else 1.dp,
+                                    if (settings.accent == c) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outlineVariant,
+                                    CircleShape,
+                                )
+                                .clickable { onChange(settings.copy(accent = c)) },
+                        )
+                    }
+                }
             }
 
             Section(stringResource(R.string.section_language)) {
@@ -1952,12 +2032,12 @@ class MainActivity : ComponentActivity() {
             Prefs.save(this@MainActivity, new)
         }
 
-        KanadeTheme(settings.themeMode, settings.dynamicColor) {
+        KanadeTheme(settings.themeMode, settings.dynamicColor, settings.accent, settings.amoled) {
             // The service can ask for a page, for example from the Volume Station's gear.
             val startPage = this@MainActivity.intent?.getStringExtra(EXTRA_PAGE) ?: PAGE_HOME
             var page by rememberSaveable { mutableStateOf(startPage) }
             val parent = when (page) {
-                PAGE_PANEL, PAGE_BEHAVIOR, PAGE_STATION, PAGE_APPS -> PAGE_VOLUME
+                PAGE_PANEL, PAGE_BEHAVIOR, PAGE_STATION, PAGE_APPS, PAGE_GESTURES -> PAGE_VOLUME
                 PAGE_CLOCK_TIME, PAGE_ALARMS, PAGE_TIMER, PAGE_STOPWATCH, PAGE_SLEEP -> PAGE_CLOCK
                 PAGE_BLOCKS, PAGE_2048, PAGE_MEMORY, PAGE_STACK -> PAGE_GAMES
                 PAGE_HABITS, PAGE_SUBSCRIPTION, PAGE_LINKED -> PAGE_ACCOUNT
@@ -1969,11 +2049,13 @@ class MainActivity : ComponentActivity() {
             val goBack = { page = parent }
             // Asks when a newer version of the app is out.
             UpdatePrompt()
+            UndoBar()
             when (page) {
                 // ── Volume ──
                 PAGE_VOLUME -> VolumeHubPage(settings, { page = it }, goBack)
                 PAGE_PANEL -> PanelPage(settings, onChange, goBack)
                 PAGE_BEHAVIOR -> BehaviorPage(settings, onChange, goBack)
+                PAGE_GESTURES -> GesturePracticePage(serviceEnabled, settings, goBack)
                 PAGE_STATION -> StationPage(settings, dndAccess, mediaAccess, onChange, goBack)
                 PAGE_APPS -> AppsPage(settings, onChange, goBack)
                 // ── App ──

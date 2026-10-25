@@ -308,6 +308,38 @@ object GoalsStore {
         save(c, all)
     }
 
+    /** Removes a goal but keeps its photo, so it can be put back. Returns the goal and the place it was in. */
+    fun remove(c: Context, goalId: String): Pair<Goal, Int>? {
+        val all = load(c)
+        val i = all.indexOfFirst { it.id == goalId }
+        if (i < 0) return null
+        save(c, all.filter { it.id != goalId })
+        return all[i] to i
+    }
+
+    /** Puts a removed goal back where it was. */
+    fun restore(c: Context, goal: Goal, index: Int) {
+        val all = load(c).toMutableList()
+        if (all.any { it.id == goal.id }) return
+        all.add(index.coerceIn(0, all.size), goal)
+        save(c, all)
+    }
+
+    /** Puts a removed deposit or withdrawal back with its original time. */
+    fun restoreEntry(c: Context, goalId: String, entry: GoalEntry) {
+        val now = System.currentTimeMillis()
+        save(
+            c,
+            load(c).map {
+                if (it.id != goalId || it.entries.any { e -> e.id == entry.id }) {
+                    it
+                } else {
+                    settle(it.copyOf(entries = (it.entries + entry).sortedBy { e -> e.at }), now)
+                }
+            },
+        )
+    }
+
     fun delete(c: Context, goalId: String) {
         GoalsPhotos.delete(c, goalId)
         save(c, load(c).filter { it.id != goalId })

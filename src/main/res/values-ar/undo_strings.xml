@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="undo_action">تراجع</string>
+    <string name="goals_deleted">تم حذف الهدف</string>
+    <string name="goals_entry_deleted">تم حذف العملية</string>
+    <string name="bud_tx_deleted">تم حذف العملية</string>
+</resources>

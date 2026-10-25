@@ -675,9 +675,7 @@ private fun GoalDetail(
 ) {
     val ctx = LocalContext.current
     var amountMode by remember { mutableStateOf(0) } // 0 closed, 1 deposit, 2 withdraw
-    var confirmDelete by remember { mutableStateOf(false) }
     var showTransfer by remember { mutableStateOf(false) }
-    var entryToDelete by remember { mutableStateOf<GoalEntry?>(null) }
     var shown by remember { mutableStateOf(HISTORY_PAGE) }
     val targets = active.filter { it.id != g.id && GoalsStore.sameCurrency(it, g) }
     val photo by produceState<Bitmap?>(null, g.id, g.photoAt) {
@@ -793,7 +791,10 @@ private fun GoalDetail(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                TextButton(onClick = { entryToDelete = e }) { Text(stringResource(R.string.goals_delete)) }
+                TextButton(onClick = {
+                    GoalsStore.deleteEntry(ctx, g.id, e.id)
+                    Undo.show(ctx.getString(R.string.goals_entry_deleted)) { GoalsStore.restoreEntry(ctx, g.id, e) }
+                }) { Text(stringResource(R.string.goals_delete)) }
             }
         }
         if (sorted.size > shown) {
@@ -820,7 +821,16 @@ private fun GoalDetail(
             },
             modifier = Modifier.weight(1f),
         ) { Text(stringResource(if (g.archived) R.string.goals_restore else R.string.goals_archive)) }
-        TextButton(onClick = { confirmDelete = true }) {
+        TextButton(onClick = {
+            val removed = GoalsStore.remove(ctx, g.id)
+            onClose()
+            if (removed != null) {
+                // The photo goes only once the time to undo is over.
+                Undo.show(ctx.getString(R.string.goals_deleted), onExpire = { GoalsPhotos.delete(ctx, removed.first.id) }) {
+                    GoalsStore.restore(ctx, removed.first, removed.second)
+                }
+            }
+        }) {
             Text(stringResource(R.string.goals_delete), color = ICON_RED)
         }
     }
@@ -848,35 +858,6 @@ private fun GoalDetail(
                 showTransfer = false
                 if (reached) onCelebrate(to)
             },
-        )
-    }
-    if (confirmDelete) {
-        AlertDialog(
-            onDismissRequest = { confirmDelete = false },
-            title = { Text(stringResource(R.string.goals_delete_goal_title)) },
-            text = { Text(stringResource(R.string.goals_delete_goal_msg)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmDelete = false
-                    GoalsStore.delete(ctx, g.id)
-                    onClose()
-                }) { Text(stringResource(R.string.goals_delete), color = ICON_RED) }
-            },
-            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.goals_cancel)) } },
-        )
-    }
-    entryToDelete?.let { e ->
-        AlertDialog(
-            onDismissRequest = { entryToDelete = null },
-            title = { Text(stringResource(R.string.goals_delete_entry_title)) },
-            text = { Text(formatMoney(e.amount, g.currency) + " · " + fmtDate(e.at)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    GoalsStore.deleteEntry(ctx, g.id, e.id)
-                    entryToDelete = null
-                }) { Text(stringResource(R.string.goals_delete), color = ICON_RED) }
-            },
-            dismissButton = { TextButton(onClick = { entryToDelete = null }) { Text(stringResource(R.string.goals_cancel)) } },
         )
     }
 }

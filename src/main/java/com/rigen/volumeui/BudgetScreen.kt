@@ -122,7 +122,6 @@ private fun BudgetMain(onBack: () -> Unit) {
     var addMode by remember { mutableIntStateOf(0) } // 0 closed, 1 expense, 2 income
     var showSettings by remember { mutableStateOf(false) }
     var showSave by remember { mutableStateOf(false) }
-    var txToDelete by remember { mutableStateOf<BudgetTx?>(null) }
     var shown by remember { mutableIntStateOf(TX_PAGE) }
 
     val month = BudgetEngine.month(now, offset)
@@ -258,7 +257,10 @@ private fun BudgetMain(onBack: () -> Unit) {
                             color = if (t.income) ICON_GREEN else ICON_RED,
                             style = MaterialTheme.typography.titleSmall,
                         )
-                        TextButton(onClick = { txToDelete = t }) { Text(stringResource(R.string.goals_delete)) }
+                        TextButton(onClick = {
+                            BudgetStore.deleteTx(ctx, t.id)
+                            Undo.show(ctx.getString(R.string.bud_tx_deleted)) { BudgetStore.restoreTx(ctx, t) }
+                        }) { Text(stringResource(R.string.goals_delete)) }
                     }
                 }
                 if (monthTxs.size > shown) {
@@ -319,20 +321,6 @@ private fun BudgetMain(onBack: () -> Unit) {
                 showSave = false
                 if (reached) GoalsReminders.notifyDone(ctx, goal.id)
             },
-        )
-    }
-    txToDelete?.let { t ->
-        AlertDialog(
-            onDismissRequest = { txToDelete = null },
-            title = { Text(stringResource(R.string.goals_delete_entry_title)) },
-            text = { Text(formatMoney(t.amount, data.currency) + " \u00B7 " + fmtDay(t.at)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    BudgetStore.deleteTx(ctx, t.id)
-                    txToDelete = null
-                }) { Text(stringResource(R.string.goals_delete), color = ICON_RED) }
-            },
-            dismissButton = { TextButton(onClick = { txToDelete = null }) { Text(stringResource(R.string.goals_cancel)) } },
         )
     }
 }

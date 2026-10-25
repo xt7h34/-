@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="gest_title">تدريب الإيماءات</string>
+    <string name="gest_summary">جرّب إيماءات أزرار الصوت وشوف التعرّف عليها</string>
+    <string name="gest_off">شغّل خدمة إمكانية الوصول أولًا، وإلا لن تُرى الأزرار.</string>
+    <string name="gest_open">فتح إعدادات إمكانية الوصول</string>
+    <string name="gest_try">جرّب هذه</string>
+    <string name="gest_up">اضغط رفع الصوت</string>
+    <string name="gest_up_s">يرتفع الصوت خطوة</string>
+    <string name="gest_down">اضغط خفض الصوت</string>
+    <string name="gest_down_s">ينخفض الصوت خطوة</string>
+    <string name="gest_hold">اضغط مطوّلًا على زر</string>
+    <string name="gest_hold_s">يستمر الصوت في التغيّر ما دمت ضاغطًا</string>
+    <string name="gest_mute">ضغطتان</string>
+    <string name="gest_mute_s_up">اضغط رفع الصوت مرتين بسرعة: كتم أو إلغاء الكتم</string>
+    <string name="gest_mute_s_down">اضغط خفض الصوت مرتين بسرعة: كتم أو إلغاء الكتم</string>
+    <string name="gest_mute_off">الضغطتان متوقفتان في الإعدادات</string>
+    <string name="gest_seen">ما رآه التطبيق</string>
+    <string name="gest_seen_none">اضغط أزرار الصوت. كل ضغطة تظهر هنا.</string>
+    <string name="gest_reset">ابدأ من جديد</string>
+    <string name="gest_all_done">كل الإيماءات تعمل!</string>
+    <string name="gest_ev_up">رفع الصوت</string>
+    <string name="gest_ev_down">خفض الصوت</string>
+    <string name="gest_ev_hold">ضغط مطوّل</string>
+    <string name="gest_ev_mute">كتم أو إلغاء الكتم</string>
+</resources>

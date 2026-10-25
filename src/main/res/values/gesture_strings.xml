@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="gest_title">Gesture practice</string>
+    <string name="gest_summary">Try the volume button gestures and see them recognised</string>
+    <string name="gest_off">Turn on the accessibility service first, or the buttons cannot be seen.</string>
+    <string name="gest_open">Open accessibility settings</string>
+    <string name="gest_try">Try these</string>
+    <string name="gest_up">Press volume up</string>
+    <string name="gest_up_s">The volume goes up one step</string>
+    <string name="gest_down">Press volume down</string>
+    <string name="gest_down_s">The volume goes down one step</string>
+    <string name="gest_hold">Hold a button</string>
+    <string name="gest_hold_s">The volume keeps changing while you hold</string>
+    <string name="gest_mute">Double press</string>
+    <string name="gest_mute_s_up">Press volume up twice, quickly: mute or unmute</string>
+    <string name="gest_mute_s_down">Press volume down twice, quickly: mute or unmute</string>
+    <string name="gest_mute_off">Double press is off in the settings</string>
+    <string name="gest_seen">What the app saw</string>
+    <string name="gest_seen_none">Press the volume buttons. Each press shows up here.</string>
+    <string name="gest_reset">Start over</string>
+    <string name="gest_all_done">All gestures work!</string>
+    <string name="gest_ev_up">Volume up</string>
+    <string name="gest_ev_down">Volume down</string>
+    <string name="gest_ev_hold">Hold</string>
+    <string name="gest_ev_mute">Mute or unmute</string>
+</resources>

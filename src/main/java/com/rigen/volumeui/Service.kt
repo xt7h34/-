@@ -219,6 +219,7 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
                     stopRepeat()
                     return
                 }
+                if (!wasRepeating) GestureLog.add(GestureLog.HOLD)
                 wasRepeating = true
                 val stream = controller.activeStream()
                 val changed = stepVolume(stream, heldDirection > 0, settings.volumeLimits)
@@ -379,6 +380,7 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
             stopRepeat()
             toggleMute(stream, s.volumeLimits)
             showPanel(stream)
+            GestureLog.add(GestureLog.MUTE)
             return true
         }
 
@@ -388,6 +390,7 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
         val changed = stepVolume(stream, raise, s.volumeLimits)
         showPanel(stream)
         if (changed) haptic()
+        GestureLog.add(if (raise) GestureLog.UP else GestureLog.DOWN)
         startRepeat(code, if (raise) 1 else -1)
         return true // consume the key so the system panel stays hidden
     }

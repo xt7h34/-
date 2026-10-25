@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="accent_title">لون التطبيق</string>
+    <string name="accent_default">الافتراضي</string>
+    <string name="amoled_title">أسود كامل (AMOLED)</string>
+    <string name="amoled_hint">يوفّر البطارية على شاشات OLED. يعمل في الوضع الداكن.</string>
+</resources>

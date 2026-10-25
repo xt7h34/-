@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="undo_action">Undo</string>
+    <string name="goals_deleted">Goal deleted</string>
+    <string name="goals_entry_deleted">Entry deleted</string>
+    <string name="bud_tx_deleted">Transaction deleted</string>
+</resources>

@@ -75,7 +75,7 @@ class WidgetConfigActivity : ComponentActivity() {
         }
         val settings = Prefs.load(this)
         setContent {
-            KanadeTheme(settings.themeMode, settings.dynamicColor) {
+            KanadeTheme(settings.themeMode, settings.dynamicColor, settings.accent, settings.amoled) {
                 WidgetLookScreen(
                     kind = kind,
                     initial = WidgetLooks.load(this, id),
