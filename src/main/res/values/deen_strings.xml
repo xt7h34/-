@@ -39,7 +39,7 @@
     <string name="today_habits">Habits today</string>
     <string name="today_reels">Short videos today</string>
     <string name="today_goal">Top goal</string>
-    <string name="today_budget">Left in this month's budget</string>
+    <string name="today_budget">Left in this month\'s budget</string>
     <string name="today_notif_off">Notifications are off</string>
     <string name="today_notif_off_sum">Reminders and alarms cannot reach you. Tap to turn them on.</string>
     <string name="sc_alarms">Alarms</string>

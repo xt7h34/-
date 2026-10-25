@@ -28,8 +28,8 @@ android {
         applicationId = "com.kanade"
         minSdk = 26
         targetSdk = 35
-        versionCode = 26
-        versionName = "2.06"
+        versionCode = 27
+        versionName = "2.07"
         // Where the app looks for newer versions. The build passes it in (-PupdateRepo=owner/name).
         buildConfigField("String", "UPDATE_REPO", "\"${project.findProperty("updateRepo") ?: ""}\"")
     }
