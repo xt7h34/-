@@ -557,4 +557,12 @@
     <string name="widget_reels_label">مخ كندا</string>
     <string name="widget_reels_desc">عدد الفيديوهات القصيرة النهاردة وحالة مخك.</string>
     <string name="widget_reels_off">العدّاد مقفول</string>
+    <string name="avatar_title">صورة الحساب</string>
+    <string name="avatar_change">تغيير الصورة</string>
+    <string name="avatar_choose">اختر من المعرض</string>
+    <string name="avatar_whatsapp">استخدم صورة الواتساب</string>
+    <string name="avatar_use_saved">استخدم صورتي المحفوظة</string>
+    <string name="avatar_remove">احذف صورتي</string>
+    <string name="avatar_close">إغلاق</string>
+    <string name="avatar_unreadable">مش قادر أقرا الصورة دي، جرّب صورة تانية</string>
 </resources>

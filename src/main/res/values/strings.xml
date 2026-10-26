@@ -600,4 +600,12 @@
     <string name="widget_reels_label">Kanade brain</string>
     <string name="widget_reels_desc">Your short-video count for today and how your brain feels.</string>
     <string name="widget_reels_off">Counter is off</string>
+    <string name="avatar_title">Account photo</string>
+    <string name="avatar_change">Change photo</string>
+    <string name="avatar_choose">Choose from gallery</string>
+    <string name="avatar_whatsapp">Use my WhatsApp photo</string>
+    <string name="avatar_use_saved">Use my saved photo</string>
+    <string name="avatar_remove">Remove my photo</string>
+    <string name="avatar_close">Close</string>
+    <string name="avatar_unreadable">Could not read this picture, try another one</string>
 </resources>

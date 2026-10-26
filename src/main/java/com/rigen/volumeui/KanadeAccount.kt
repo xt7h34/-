@@ -63,6 +63,8 @@ class ApiResult(val status: Int, val body: JSONObject?) {
     }
 }
 
+class BytesResult(val status: Int, val bytes: ByteArray?, val etag: String?)
+
 object KanadeApi {
     /**
      * Public address of the bot (the ngrok static domain), e.g. "https://name.ngrok-free.dev".
@@ -102,6 +104,30 @@ object KanadeApi {
                 ApiResult(code, runCatching { JSONObject(text) }.getOrNull())
             } catch (e: Exception) {
                 ApiResult(0, null)
+            } finally {
+                conn?.disconnect()
+            }
+        }
+
+    /** Downloads a file (the account photo) with the same sign-in token. Pass the last etag to skip an unchanged file. */
+    suspend fun fetchBytes(path: String, token: String, etag: String? = null): BytesResult =
+        withContext(Dispatchers.IO) {
+            var conn: HttpURLConnection? = null
+            try {
+                val c = URL(BASE + path).openConnection() as HttpURLConnection
+                conn = c
+                c.connectTimeout = if (remote != null) 10000 else 4000
+                c.readTimeout = 20000
+                c.requestMethod = "GET"
+                c.setRequestProperty("ngrok-skip-browser-warning", "1")
+                c.setRequestProperty("Authorization", "Bearer $token")
+                if (etag != null) c.setRequestProperty("If-None-Match", etag)
+                val code = c.responseCode
+                val tooBig = c.contentLength > 3_000_000
+                val bytes = if (code in 200..299 && !tooBig) c.inputStream.use { it.readBytes() } else null
+                BytesResult(code, bytes, c.getHeaderField("ETag"))
+            } catch (e: Exception) {
+                BytesResult(0, null, null)
             } finally {
                 conn?.disconnect()
             }
@@ -161,6 +187,7 @@ object AccountStore {
 
     fun clear(c: Context) {
         c.getSharedPreferences(PREF, Context.MODE_PRIVATE).edit().remove("s").apply()
+        AvatarStore.clearCache(c)
     }
 }
 
@@ -512,6 +539,13 @@ fun AccountPage(onOpen: (String) -> Unit, onBack: () -> Unit) {
                 Step.Done -> {
                     val p = session?.profile
                     if (p != null) {
+                        session?.let { s ->
+                            AccountAvatarEditor(token = s.token, avatar = p.optJSONObject("avatar")) { av ->
+                                val ns = Session(s.token, JSONObject(p.toString()).put("avatar", av))
+                                AccountStore.save(ctx, ns)
+                                session = ns
+                            }
+                        }
                         val hashText = p.optString("hash")
                         val shown = p.optString("name").ifBlank { hashText }
                         Text(stringResource(R.string.acc_signed_as, shown), style = MaterialTheme.typography.titleLarge)
