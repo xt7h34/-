@@ -884,6 +884,7 @@ private fun AlarmSettingsDialog(onClose: () -> Unit, onCustomize: () -> Unit) {
                     DISMISS_TAP to R.string.dismiss_tap,
                     DISMISS_HOLD to R.string.dismiss_hold,
                     DISMISS_MATH to R.string.dismiss_math,
+                    DISMISS_SHAKE to R.string.dismiss_shake,
                 ).forEach { (mode, label) ->
                     FilterChip(
                         selected = dismissMode == mode,

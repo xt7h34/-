@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="fav_title">Favorites</string>
+    <string name="fav_edit">Edit</string>
+    <string name="fav_empty">Pin the pages you use most, for one tap from here.</string>
+    <string name="fav_pick">Pick up to %1$d pages</string>
+    <string name="fav_done">Done</string>
+</resources>

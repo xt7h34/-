@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="prayer_channel">تنبيهات الصلاة</string>
+    <string name="prayer_alerts_title">تنبيهات الصلاة</string>
+    <string name="prayer_lead_title">تنبيه إضافي قبل الصلاة</string>
+    <string name="prayer_lead_off">بدون</string>
+    <string name="prayer_lead_min">%1$d د</string>
+    <string name="prayer_sound_title">الصوت</string>
+    <string name="prayer_sound_default">صوت الهاتف الافتراضي</string>
+    <string name="prayer_sound_pick">اختر صوتًا</string>
+    <string name="prayer_sound_reset">استخدم الافتراضي</string>
+    <string name="prayer_alerts_hint">تحتاج تذكيرات الصلاة مفعّلة في حسابك. يمكنك اختيار أي نغمة، منها أذان محفوظ على هاتفك.</string>
+    <string name="rem_prayer_soon">%1$s بعد %2$d دقيقة</string>
+</resources>

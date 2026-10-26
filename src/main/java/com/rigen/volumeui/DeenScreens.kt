@@ -1,5 +1,10 @@
 package com.rigen.volumeui
 
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import android.net.Uri
+import android.media.RingtoneManager
+import android.content.Intent
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
@@ -212,7 +217,76 @@ fun DeenHubPage(onOpen: (String) -> Unit, onBack: () -> Unit) {
                     stringResource(R.string.tracker_summary, DeenStore.prayerCountToday(ctx)),
                 ) { onOpen(PAGE_TRACKER) }
             }
+            PrayerAlertSettings()
         }
+    }
+}
+
+/** The extra prayer alert and the sound for the prayer alerts. */
+@Composable
+private fun PrayerAlertSettings() {
+    val ctx = LocalContext.current
+    var lead by remember { mutableIntStateOf(PrayerAlerts.leadMinutes(ctx)) }
+    var sound by remember { mutableStateOf(PrayerAlerts.sound(ctx)) }
+    val soundName = remember(sound) {
+        if (sound.isEmpty()) {
+            null
+        } else {
+            try {
+                RingtoneManager.getRingtone(ctx, Uri.parse(sound))?.getTitle(ctx)
+            } catch (_: Exception) {
+                null
+            }
+        }
+    }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        @Suppress("DEPRECATION")
+        val picked = r.data?.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+        if (picked != null) {
+            sound = picked.toString()
+            PrayerAlerts.setSound(ctx, sound)
+            PrayerAlerts.apply(ctx)
+        }
+    }
+    Section(stringResource(R.string.prayer_alerts_title)) {
+        Text(stringResource(R.string.prayer_lead_title), style = MaterialTheme.typography.titleSmall)
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            for (m in listOf(0, 5, 10, 15)) {
+                FilterChip(
+                    selected = lead == m,
+                    onClick = {
+                        lead = m
+                        PrayerAlerts.setLead(ctx, m)
+                        PrayerAlerts.apply(ctx)
+                    },
+                    label = { Text(if (m == 0) stringResource(R.string.prayer_lead_off) else stringResource(R.string.prayer_lead_min, m)) },
+                )
+            }
+        }
+        Text(stringResource(R.string.prayer_sound_title), style = MaterialTheme.typography.titleSmall)
+        Text(soundName ?: stringResource(R.string.prayer_sound_default), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = {
+                val i = Intent(RingtoneManager.ACTION_RINGTONE_PICKER)
+                    .putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_NOTIFICATION or RingtoneManager.TYPE_ALARM or RingtoneManager.TYPE_RINGTONE)
+                    .putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+                    .putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
+                if (sound.isNotEmpty()) i.putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, Uri.parse(sound))
+                picker.launch(i)
+            }) { Text(stringResource(R.string.prayer_sound_pick)) }
+            if (sound.isNotEmpty()) {
+                OutlinedButton(onClick = {
+                    sound = ""
+                    PrayerAlerts.setSound(ctx, "")
+                    PrayerAlerts.apply(ctx)
+                }) { Text(stringResource(R.string.prayer_sound_reset)) }
+            }
+        }
+        Text(
+            stringResource(R.string.prayer_alerts_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

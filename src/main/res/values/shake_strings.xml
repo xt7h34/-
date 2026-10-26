@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dismiss_shake">Shake</string>
+    <string name="ring_hint_shake">Tap, then shake the phone to turn it off</string>
+    <string name="shake_title">Shake the phone</string>
+</resources>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="habit_heat_title">آخر 12 أسبوعًا</string>
+    <string name="habit_heat_stats">%1$d يوم كامل من %2$d يوم متابع</string>
+    <string name="habit_heat_hint">الأخضر الغامق: كل العادات تمّت. البرتقالي: ولا واحدة. الخريطة تبدأ تمتلئ من يوم تثبيت هذا التحديث.</string>
+</resources>

@@ -207,6 +207,7 @@ fun HabitsPage(onBack: () -> Unit) {
                         onUndo = { act("/me/habits/undo", JSONObject().put("name", h.name)) },
                     )
                 }
+                if (habits.isNotEmpty()) HabitHeatmap()
             }
         }
     }

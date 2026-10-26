@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="prayer_channel">Prayer alerts</string>
+    <string name="prayer_alerts_title">Prayer alerts</string>
+    <string name="prayer_lead_title">Extra alert before the prayer</string>
+    <string name="prayer_lead_off">Off</string>
+    <string name="prayer_lead_min">%1$d min</string>
+    <string name="prayer_sound_title">Sound</string>
+    <string name="prayer_sound_default">The phone\'s default sound</string>
+    <string name="prayer_sound_pick">Choose a sound</string>
+    <string name="prayer_sound_reset">Use the default</string>
+    <string name="prayer_alerts_hint">Needs the prayer reminders switched on in your account. You can pick any ringtone, including an adhan you saved on this phone.</string>
+    <string name="rem_prayer_soon">%1$s in %2$d minutes</string>
+</resources>

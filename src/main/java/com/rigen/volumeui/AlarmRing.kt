@@ -104,6 +104,7 @@ const val DISMISS_DRAG = 0
 const val DISMISS_TAP = 1
 const val DISMISS_HOLD = 2
 const val DISMISS_MATH = 3
+const val DISMISS_SHAKE = 4
 
 private const val CH_RING = "kanade_ring"
 private const val CH_RING_DND = "kanade_ring_dnd"
@@ -494,6 +495,7 @@ fun AlarmRingScreen(
 ) {
     val ctx = LocalContext.current
     var solving by remember { mutableStateOf(false) }
+    var shaking by remember { mutableStateOf(false) }
     var bg by remember { mutableStateOf(ClockStore.ringBg(ctx)) }
     var bgVer by remember { mutableLongStateOf(ClockStore.ringBgVersion(ctx)) }
     var clockStyle by remember { mutableIntStateOf(ClockStore.ringClock(ctx)) }
@@ -580,6 +582,10 @@ fun AlarmRingScreen(
                         dismissMode = DISMISS_MATH
                         ClockStore.setRingDismiss(ctx, DISMISS_MATH)
                     }
+                    GlassChip(stringResource(R.string.dismiss_shake), dismissMode == DISMISS_SHAKE) {
+                        dismissMode = DISMISS_SHAKE
+                        ClockStore.setRingDismiss(ctx, DISMISS_SHAKE)
+                    }
                 }
             } else {
                 Text(
@@ -588,6 +594,7 @@ fun AlarmRingScreen(
                             DISMISS_TAP -> R.string.ring_hint_tap
                             DISMISS_HOLD -> R.string.ring_hint_hold
                             DISMISS_MATH -> R.string.ring_hint_math
+                            DISMISS_SHAKE -> R.string.ring_hint_shake
                             else -> R.string.ring_hint_drag
                         },
                     ),
@@ -599,7 +606,13 @@ fun AlarmRingScreen(
             DismissButton(
                 dismissMode,
                 enabled = !editing,
-                onDismiss = { if (dismissMode == DISMISS_MATH) solving = true else onDismiss() },
+                onDismiss = {
+                    when (dismissMode) {
+                        DISMISS_MATH -> solving = true
+                        DISMISS_SHAKE -> shaking = true
+                        else -> onDismiss()
+                    }
+                },
             )
             Spacer(Modifier.height(40.dp))
             if (showSnooze || editing) {
@@ -636,6 +649,9 @@ fun AlarmRingScreen(
             }
         }
 
+        if (shaking && !editing) {
+            ShakeChallenge(onDone = onDismiss, onCancel = { shaking = false })
+        }
         if (solving && !editing) {
             MathChallenge(loc, onSolved = onDismiss, onCancel = { solving = false })
         }
@@ -769,7 +785,7 @@ private fun DismissButton(mode: Int, enabled: Boolean, onDismiss: () -> Unit) {
         Modifier
     } else {
         when (mode) {
-            DISMISS_TAP, DISMISS_MATH -> Modifier.pointerInput(Unit) {
+            DISMISS_TAP, DISMISS_MATH, DISMISS_SHAKE -> Modifier.pointerInput(Unit) {
                 detectTapGestures(onTap = { dismissNow() })
             }
             DISMISS_HOLD -> Modifier.pointerInput(Unit) {
@@ -1018,6 +1034,67 @@ private fun MathChallenge(loc: Locale, onSolved: () -> Unit, onCancel: () -> Uni
                 Spacer(Modifier.height(14.dp))
             }
             Spacer(Modifier.height(6.dp))
+            GlassPill(stringResource(R.string.ring_back)) { onCancel() }
+        }
+    }
+}
+
+private const val SHAKES_NEEDED = 15
+
+/**
+ * Turning the alarm off by shaking the phone: a hard shake (the accelerometer well above gravity) counts
+ * once, at most four times a second. A phone with no accelerometer is let through rather than trapped.
+ */
+@Composable
+private fun ShakeChallenge(onDone: () -> Unit, onCancel: () -> Unit) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    var count by remember { mutableIntStateOf(0) }
+    val sm = remember { ctx.getSystemService(android.hardware.SensorManager::class.java) }
+    val sensor = remember { sm?.getDefaultSensor(android.hardware.Sensor.TYPE_ACCELEROMETER) }
+    androidx.compose.runtime.DisposableEffect(sensor) {
+        var last = 0L
+        val listener = object : android.hardware.SensorEventListener {
+            override fun onSensorChanged(e: android.hardware.SensorEvent) {
+                val g = Math.sqrt((e.values[0] * e.values[0] + e.values[1] * e.values[1] + e.values[2] * e.values[2]).toDouble())
+                val now = System.currentTimeMillis()
+                if (g > 18.0 && now - last > 250L) {
+                    last = now
+                    count++
+                }
+            }
+
+            override fun onAccuracyChanged(s: android.hardware.Sensor?, a: Int) {}
+        }
+        if (sm != null && sensor != null) sm.registerListener(listener, sensor, android.hardware.SensorManager.SENSOR_DELAY_GAME)
+        onDispose { sm?.unregisterListener(listener) }
+    }
+    androidx.compose.runtime.LaunchedEffect(count, sensor) {
+        if (sensor == null || count >= SHAKES_NEEDED) onDone()
+    }
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Color(0xEB000000))
+            .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {},
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            Modifier.statusBarsPadding().navigationBarsPadding().padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(stringResource(R.string.shake_title), color = Color(0xCCFFFFFF), fontSize = 16.sp)
+            Spacer(Modifier.height(18.dp))
+            Text("\uD83D\uDCF3", fontSize = 64.sp)
+            Spacer(Modifier.height(10.dp))
+            Text("$count / $SHAKES_NEEDED", color = Color.White, fontSize = 44.sp, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(16.dp))
+            androidx.compose.material3.LinearProgressIndicator(
+                progress = { (count.toFloat() / SHAKES_NEEDED).coerceIn(0f, 1f) },
+                color = Color.White,
+                trackColor = Color(0x33FFFFFF),
+                modifier = Modifier.width(220.dp),
+            )
+            Spacer(Modifier.height(30.dp))
             GlassPill(stringResource(R.string.ring_back)) { onCancel() }
         }
     }

@@ -1,5 +1,8 @@
 package com.rigen.volumeui
 
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.material3.ColorScheme
 import android.app.Activity
@@ -757,6 +760,8 @@ private fun HomePage(serviceEnabled: Boolean, onOpen: (String) -> Unit) {
 
                 TodayCards(onOpen)
 
+                FavoritesCard(onOpen)
+
                 SettingsGroup {
                     SettingsItem(
                         glyph = Glyph.ACCESS,
@@ -858,6 +863,65 @@ private fun HomePage(serviceEnabled: Boolean, onOpen: (String) -> Unit) {
 }
 
 private class SearchEntry(val title: String, val where: String, val page: String)
+
+private const val MAX_FAVORITES = 6
+
+/** The pages the person pinned, as quick buttons under "your day". Pick them with Edit. */
+@Composable
+private fun FavoritesCard(onOpen: (String) -> Unit) {
+    val ctx = LocalContext.current
+    val prefs = remember { ctx.getSharedPreferences("kanade_favorites", Context.MODE_PRIVATE) }
+    var pinned by remember { mutableStateOf((prefs.getString("pages", "") ?: "").split(',').filter { it.isNotBlank() }) }
+    var editing by remember { mutableStateOf(false) }
+    val appTitle = stringResource(R.string.app_title)
+    // One entry per page; a page's own name when it has one, else the setting that points to it.
+    val pages = searchIndex().distinctBy { it.page }
+    val label = { e: SearchEntry -> if (e.where == appTitle) e.title else e.title + " \u00B7 " + e.where }
+    val shown = pinned.mapNotNull { id -> pages.firstOrNull { it.page == id } }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("\u2B50  " + stringResource(R.string.fav_title), style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+            TextButton(onClick = { editing = true }) { Text(stringResource(R.string.fav_edit)) }
+        }
+        if (shown.isEmpty()) {
+            Text(stringResource(R.string.fav_empty), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                for (e in shown) AssistChip(onClick = { onOpen(e.page) }, label = { Text(label(e)) })
+            }
+        }
+    }
+
+    if (editing) {
+        AlertDialog(
+            onDismissRequest = { editing = false },
+            title = { Text(stringResource(R.string.fav_pick, MAX_FAVORITES)) },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    for (e in pages) {
+                        val on = e.page in pinned
+                        Row(
+                            Modifier.fillMaxWidth().clickable {
+                                pinned = when {
+                                    on -> pinned - e.page
+                                    pinned.size < MAX_FAVORITES -> pinned + e.page
+                                    else -> pinned
+                                }
+                                prefs.edit().putString("pages", pinned.joinToString(",")).apply()
+                            },
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Checkbox(checked = on, onCheckedChange = null)
+                            Text(label(e), modifier = Modifier.padding(start = 8.dp))
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { editing = false }) { Text(stringResource(R.string.fav_done)) } },
+        )
+    }
+}
 
 /** Every setting people may look for, and the page it lives on. */
 @Composable

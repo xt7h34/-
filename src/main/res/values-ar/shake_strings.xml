@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dismiss_shake">هزّ</string>
+    <string name="ring_hint_shake">اضغط ثم هزّ الموبايل لإيقافه</string>
+    <string name="shake_title">هزّ الموبايل</string>
+</resources>

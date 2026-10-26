@@ -88,7 +88,9 @@ internal fun TodayCards(onOpen: (String) -> Unit) {
             prayers.firstOrNull()?.let {
                 out.add(DayRow("\uD83D\uDD4C", prayerTitle, it.name + " \u00B7 " + DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(it.at)), PAGE_DEEN))
             }
-            val due = KanadeReminders.cachedHabits(ctx).filter { it.due && !it.frozen }
+            val habitStates = KanadeReminders.cachedHabits(ctx)
+            HabitLog.record(ctx, habitStates)
+            val due = habitStates.filter { it.due && !it.frozen }
             if (due.isNotEmpty()) out.add(DayRow("\u2705", habitsTitle, "${due.count { it.done }}/${due.size}", PAGE_HABITS))
         }
 

@@ -41,6 +41,7 @@ object KanadeReminders {
     private const val RC_REFRESH = 940002
     private const val RC_REWARD = 940010 // + the reward's index
     private const val RC_PRAYER = 940100 // + the prayer's position
+    private const val RC_PRAYER_LEAD = 940300 // + the prayer's position, for the early alert
     private const val SYNC_EVERY_MS = 3 * 3_600_000L
 
     private fun sp(c: Context) = c.getSharedPreferences(PREF, Context.MODE_PRIVATE)
@@ -114,16 +115,26 @@ object KanadeReminders {
     fun schedulePrayers(c: Context, list: List<PrayerTime>) {
         val am = alarms(c)
         rcSet(c, "rcs_p").forEach { am.cancel(notifyIntent(c, it, "", "")) }
+        rcSet(c, "rcs_pl").forEach { am.cancel(notifyIntent(c, it, "", "")) }
         val used = mutableSetOf<Int>()
+        val usedLead = mutableSetOf<Int>()
         if ("prayer" in enabled(c)) {
             val now = System.currentTimeMillis()
+            val lead = PrayerAlerts.leadMinutes(c)
             list.filter { it.at > now }.take(10).forEachIndexed { i, p ->
                 val rc = RC_PRAYER + i
                 setAt(c, p.at, notifyIntent(c, rc, "prayer", p.name))
                 used.add(rc)
+                // The early alert, when there is still time for it.
+                if (lead > 0 && p.at - lead * 60_000L > now) {
+                    val rcl = RC_PRAYER_LEAD + i
+                    setAt(c, p.at - lead * 60_000L, notifyIntent(c, rcl, "prayer_soon", p.name))
+                    usedLead.add(rcl)
+                }
             }
         }
         saveRcSet(c, "rcs_p", used)
+        saveRcSet(c, "rcs_pl", usedLead)
     }
 
     /** Turns one reminder off right away, even if the bot cannot be reached. */
@@ -131,7 +142,9 @@ object KanadeReminders {
         val am = alarms(c)
         if (id == "prayer") {
             rcSet(c, "rcs_p").forEach { am.cancel(notifyIntent(c, it, "", "")) }
+            rcSet(c, "rcs_pl").forEach { am.cancel(notifyIntent(c, it, "", "")) }
             saveRcSet(c, "rcs_p", emptySet())
+            saveRcSet(c, "rcs_pl", emptySet())
         } else {
             val idx = REWARD_IDS.indexOf(id)
             if (idx >= 0) {
@@ -144,9 +157,10 @@ object KanadeReminders {
     fun cancelAll(c: Context) {
         val am = alarms(c)
         am.cancel(syncIntent(c))
-        (rcSet(c, "rcs_r") + rcSet(c, "rcs_p")).forEach { am.cancel(notifyIntent(c, it, "", "")) }
+        (rcSet(c, "rcs_r") + rcSet(c, "rcs_p") + rcSet(c, "rcs_pl")).forEach { am.cancel(notifyIntent(c, it, "", "")) }
         saveRcSet(c, "rcs_r", emptySet())
         saveRcSet(c, "rcs_p", emptySet())
+        saveRcSet(c, "rcs_pl", emptySet())
     }
 
     /** Signing out: no alarms, nothing stays switched on, and the widget forgets the account. */
@@ -226,6 +240,7 @@ object KanadeReminders {
     }
 
     fun cacheHabits(c: Context, list: List<HabitState>) {
+        HabitLog.record(c, list)
         val arr = JSONArray()
         list.forEach {
             arr.put(
@@ -337,15 +352,18 @@ object KanadeReminders {
             "treasure" -> c.getString(R.string.rem_treasure_ready)
             "weekly" -> c.getString(R.string.rem_weekly_ready)
             "monthly" -> c.getString(R.string.rem_monthly_ready)
+            "prayer_soon" -> c.getString(R.string.rem_prayer_soon, name, PrayerAlerts.leadMinutes(c))
             else -> c.getString(R.string.rem_prayer_now, name)
         }
+        // Prayer alerts have their own channel, so they can have the sound the person chose.
+        val channel = if (id == "prayer" || id == "prayer_soon") PrayerAlerts.channel(c, nm) else CHANNEL
         val open = PendingIntent.getActivity(
             c, 940900,
             Intent(c, MainActivity::class.java).putExtra(EXTRA_PAGE, PAGE_ACCOUNT)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val n = Notification.Builder(c, CHANNEL)
+        val n = Notification.Builder(c, channel)
             .setSmallIcon(R.drawable.ic_stat_alarm)
             .setContentTitle(c.getString(R.string.rem_title))
             .setContentText(text)

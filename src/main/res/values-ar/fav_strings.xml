@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="fav_title">المفضلة</string>
+    <string name="fav_edit">تعديل</string>
+    <string name="fav_empty">ثبّت الصفحات اللي بتستخدمها أكتر لتفتحها بضغطة من هنا.</string>
+    <string name="fav_pick">اختر حتى %1$d صفحات</string>
+    <string name="fav_done">تم</string>
+</resources>
