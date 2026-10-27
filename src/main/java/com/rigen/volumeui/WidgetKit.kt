@@ -23,7 +23,7 @@ enum class WidgetKind { ALARM, PRAYER, REWARDS, SLEEP, HABITS, REELS, GOALS }
 enum class WSize { COMPACT, NORMAL, EXPANDED }
 
 /** [style]: 0 is the widget's own look, 1 to 7 are the shared looks, 8 is one plain colour ([solid]). */
-class WidgetLook(val style: Int, val solid: Int, val opacity: Int)
+class WidgetLook(val style: Int, val solid: Int, val opacity: Int, val corner: Int = WidgetCorners.DEFAULT_STEP)
 
 object WidgetLooks {
     private const val PREF = "kanade_widget_look"
@@ -37,6 +37,7 @@ object WidgetLooks {
             style = p.getInt("s$id", 0).coerceIn(0, 8),
             solid = p.getInt("c$id", DEFAULT_SOLID),
             opacity = p.getInt("o$id", 100).coerceIn(20, 100),
+            corner = p.getInt("r$id", WidgetCorners.DEFAULT_STEP).coerceIn(0, WidgetCorners.STEPS.size - 1),
         )
     }
 
@@ -45,6 +46,7 @@ object WidgetLooks {
             .putInt("s$id", look.style.coerceIn(0, 8))
             .putInt("c$id", look.solid)
             .putInt("o$id", look.opacity.coerceIn(20, 100))
+            .putInt("r$id", look.corner.coerceIn(0, WidgetCorners.STEPS.size - 1))
             .apply()
     }
 }
@@ -63,6 +65,8 @@ class WidgetPal(
     val bgAlpha: Int,
     val start: Int,
     val end: Int,
+    /** Index into [WidgetCorners.STEPS]. */
+    val corner: Int = WidgetCorners.DEFAULT_STEP,
 )
 
 object WidgetStyle {
@@ -83,6 +87,7 @@ object WidgetStyle {
                 bgAlpha = alpha,
                 start = c or 0xFF000000.toInt(),
                 end = c or 0xFF000000.toInt(),
+                corner = look.corner,
             )
         }
         val def = if (look.style in 1..7) WidgetPalettes.STYLES[look.style - 1] else WidgetPalettes.SIGNATURE.getValue(kind)
@@ -96,6 +101,7 @@ object WidgetStyle {
             bgAlpha = alpha,
             start = def.start,
             end = def.end,
+            corner = look.corner,
         )
     }
 
@@ -104,7 +110,7 @@ object WidgetStyle {
      * because a launcher can keep the old one when it redraws the same layout.
      */
     fun applyBackground(rv: RemoteViews, pal: WidgetPal) {
-        rv.setImageViewResource(R.id.w_bg, pal.bgRes)
+        rv.setImageViewResource(R.id.w_bg, WidgetCorners.res(pal.bgRes, pal.corner))
         rv.setInt(R.id.w_bg, "setImageAlpha", pal.bgAlpha)
         rv.setInt(R.id.w_bg, "setColorFilter", pal.bgTint)
     }

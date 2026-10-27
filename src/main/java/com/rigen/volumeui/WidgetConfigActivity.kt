@@ -130,7 +130,9 @@ private fun WidgetLookScreen(kind: WidgetKind, initial: WidgetLook, onCancel: ()
     var style by remember { mutableIntStateOf(initial.style) }
     var solid by remember { mutableIntStateOf(initial.solid) }
     var opacity by remember { mutableFloatStateOf(initial.opacity.toFloat()) }
-    val look = WidgetLook(style, solid, opacity.toInt())
+    var corner by remember { mutableIntStateOf(initial.corner) }
+    val look = WidgetLook(style, solid, opacity.toInt(), corner)
+    val radius = WidgetCorners.STEPS[corner].dp
     val pal = WidgetStyle.palette(look, kind)
     val alpha = opacity / 100f
 
@@ -153,7 +155,7 @@ private fun WidgetLookScreen(kind: WidgetKind, initial: WidgetLook, onCancel: ()
                 Box(
                     Modifier
                         .fillMaxSize()
-                        .clip(RoundedCornerShape(28.dp))
+                        .clip(RoundedCornerShape(radius))
                         .background(Brush.linearGradient(swatchColors(kind, style, solid).map { it.copy(alpha = alpha) }))
                         .padding(18.dp),
                     contentAlignment = Alignment.CenterStart,
@@ -223,6 +225,17 @@ private fun WidgetLookScreen(kind: WidgetKind, initial: WidgetLook, onCancel: ()
                 style = MaterialTheme.typography.titleSmall,
             )
             Slider(value = opacity, onValueChange = { opacity = it }, valueRange = 20f..100f)
+
+            Text(
+                stringResource(R.string.widget_cfg_corners) + ": " + WidgetCorners.STEPS[corner] + "dp",
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Slider(
+                value = corner.toFloat(),
+                onValueChange = { corner = it.toInt().coerceIn(0, WidgetCorners.STEPS.size - 1) },
+                valueRange = 0f..(WidgetCorners.STEPS.size - 1).toFloat(),
+                steps = WidgetCorners.STEPS.size - 2,
+            )
 
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.widget_cfg_cancel)) }

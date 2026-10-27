@@ -45,4 +45,5 @@
     <string name="widget_alarm_then">Then</string>
     <string name="widget_sleep_week">Last 7 days</string>
     <string name="widget_reels_week_avg">7-day average: %1$d</string>
+    <string name="widget_cfg_corners">Corners</string>
 </resources>

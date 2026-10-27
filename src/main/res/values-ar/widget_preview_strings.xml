@@ -45,4 +45,5 @@
     <string name="widget_alarm_then">بعدها</string>
     <string name="widget_sleep_week">آخر 7 أيام</string>
     <string name="widget_reels_week_avg">متوسط 7 أيام: %1$d</string>
+    <string name="widget_cfg_corners">الزوايا</string>
 </resources>
