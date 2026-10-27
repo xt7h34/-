@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="chl_title">تحديات العادات</string>
+    <string name="chl_open">تحديات الجروبات</string>
+    <string name="chl_info">تحديات جروبات واتساب اللي إنت فيها. التسجيل من هنا أو من البوت يتحسب نفسه. تسجيل واحد في اليوم، لمدة 7 أيام.</string>
+    <string name="chl_offline">البوت مش متصل بواتساب دلوقتي، فبتظهر بس التحديات اللي شاركت فيها.</string>
+    <string name="chl_none">مفيش تحدي شغال في جروباتك.</string>
+    <string name="chl_new">ابدأ تحدي</string>
+    <string name="chl_pick_group">الجروب</string>
+    <string name="chl_no_groups">ما لقيت جروبات.</string>
+    <string name="chl_habit">العادة</string>
+    <string name="chl_prize">الجائزة بالنيرو (حتى %1$d)</string>
+    <string name="chl_prize_note">الجائزة بتتخصم من رصيدك دلوقتي (عندك %1$d نيرو) وتروح للفايز. وبترجع لك لو محدش شارك.</string>
+    <string name="chl_start">ابدأ</string>
+    <string name="chl_started">بدأ التحدي في الجروب.</string>
+    <string name="chl_check">عملتها النهارده</string>
+    <string name="chl_done_today">تم النهارده</string>
+    <string name="chl_checked">اتسجلت. كمّل!</string>
+    <string name="chl_left">باقي %1$d يوم و%2$d ساعة</string>
+    <string name="chl_prize_line">الجائزة %1$d نيرو</string>
+    <string name="chl_my_days">أيامك: %1$d / 7</string>
+    <string name="chl_days_n">%1$d يوم</string>
+</resources>

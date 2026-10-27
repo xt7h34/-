@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="chl_title">Habit challenges</string>
+    <string name="chl_open">Group challenges</string>
+    <string name="chl_info">Challenges from your WhatsApp groups. Checking here or with the bot counts the same. One check per day, for 7 days.</string>
+    <string name="chl_offline">The bot is not connected to WhatsApp right now, so only the challenges you took part in are shown.</string>
+    <string name="chl_none">No challenge is running in your groups.</string>
+    <string name="chl_new">Start a challenge</string>
+    <string name="chl_pick_group">Group</string>
+    <string name="chl_no_groups">No groups found.</string>
+    <string name="chl_habit">Habit</string>
+    <string name="chl_prize">Prize in Nero (up to %1$d)</string>
+    <string name="chl_prize_note">The prize is taken from your balance now (%1$d Nero) and goes to the winner. It comes back if nobody joins.</string>
+    <string name="chl_start">Start</string>
+    <string name="chl_started">Challenge started in the group.</string>
+    <string name="chl_check">I did it today</string>
+    <string name="chl_done_today">Done today</string>
+    <string name="chl_checked">Saved. Keep going!</string>
+    <string name="chl_left">%1$dd %2$dh left</string>
+    <string name="chl_prize_line">Prize %1$d Nero</string>
+    <string name="chl_my_days">Your days: %1$d / 7</string>
+    <string name="chl_days_n">%1$d days</string>
+</resources>
