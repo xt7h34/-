@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="kbs_tab">الاختصارات</string>
+    <string name="kbs_title">اختصارات النصوص</string>
+    <string name="kbs_hint">اكتب كلمة قصيرة من اختيارك واضغط مسافة: تتحوّل للنص الكامل. لا تعمل في حقول كلمات المرور.</string>
+    <string name="kbs_trigger">الاختصار (من 2 إلى 20 حرفًا بدون مسافات)</string>
+    <string name="kbs_text">يتحوّل إلى هذا النص</string>
+    <string name="kbs_save">حفظ الاختصار</string>
+    <string name="kbs_list">اختصاراتك (اضغط على واحد لتعديله)</string>
+    <string name="kbs_deleted">تم حذف الاختصار</string>
+    <string name="kbs_err_trigger">من 2 إلى 20 حرفًا بدون مسافات</string>
+    <string name="kbs_err_text">اكتب النص الذي يتحوّل إليه</string>
+    <string name="kbs_full">يمكنك حفظ 100 اختصار كحد أقصى</string>
+    <string name="timer_saved_title">مؤقتات محفوظة</string>
+    <string name="timer_saved_empty">اضبط وقتًا على القرص واحفظه باسم، مثل الشاي أو التمرين.</string>
+    <string name="timer_saved_add">احفظ %1$s كمؤقت</string>
+    <string name="timer_saved_name_title">حفظ %1$s</string>
+    <string name="timer_saved_name">الاسم</string>
+    <string name="timer_saved_deleted">تم حذف المؤقت</string>
+</resources>

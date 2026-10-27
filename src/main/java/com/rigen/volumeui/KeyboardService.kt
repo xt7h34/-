@@ -340,6 +340,25 @@ class KanadeKeyboardService : InputMethodService(), LifecycleOwner, SavedStateRe
 
     internal fun onSpace() {
         val c = ic ?: return
+        // A text shortcut: the word typed before this space is one the person made up, so it is replaced
+        // by its text. Never in a password field.
+        if (!secure) {
+            val token = (c.getTextBeforeCursor(40, 0)?.toString() ?: "").takeLastWhile { !it.isWhitespace() }
+            val expansion = if (token.isNotEmpty()) SnippetStore.expansionFor(this, token) else null
+            if (expansion != null) {
+                c.beginBatchEdit()
+                c.deleteSurroundingText(token.length, 0)
+                c.commitText("$expansion ", 1)
+                c.endBatchEdit()
+                if (shift == 1) shift = 0
+                alts = emptyList()
+                toolbarOpen = false
+                clipSuggestion = null
+                updateAutoCap()
+                scheduleRefresh()
+                return
+            }
+        }
         learnBefore(c)
         c.commitText(" ", 1)
         if (shift == 1) shift = 0

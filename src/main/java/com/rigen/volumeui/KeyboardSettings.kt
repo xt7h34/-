@@ -101,6 +101,7 @@ internal fun KeyboardPage(onBack: () -> Unit) {
                     stringResource(R.string.kb_tab_design),
                     stringResource(R.string.kb_tab_effects),
                     stringResource(R.string.kb_tab_layout),
+                    stringResource(R.string.kbs_tab),
                 ),
                 tab,
             ) { tab = it }
@@ -108,6 +109,7 @@ internal fun KeyboardPage(onBack: () -> Unit) {
                 1 -> KbDesignTab(cfg) { update(it) }
                 2 -> KbEffectsTab(cfg) { update(it) }
                 3 -> KbLayoutTab(cfg) { update(it) }
+                4 -> KbSnippetsTab()
                 else -> KbGeneralTab(
                     cfg = cfg,
                     enabled = enabled,

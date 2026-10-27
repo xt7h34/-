@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="kbs_tab">Shortcuts</string>
+    <string name="kbs_title">Text shortcuts</string>
+    <string name="kbs_hint">Type a short word you made up and press space: it turns into the full text. It does not work in password fields.</string>
+    <string name="kbs_trigger">Shortcut (2 to 20 characters, no spaces)</string>
+    <string name="kbs_text">It becomes this text</string>
+    <string name="kbs_save">Save shortcut</string>
+    <string name="kbs_list">Your shortcuts (tap one to change it)</string>
+    <string name="kbs_deleted">Shortcut deleted</string>
+    <string name="kbs_err_trigger">2 to 20 characters, no spaces</string>
+    <string name="kbs_err_text">Write the text it turns into</string>
+    <string name="kbs_full">You can keep up to 100 shortcuts</string>
+    <string name="timer_saved_title">Saved timers</string>
+    <string name="timer_saved_empty">Set a time on the dial and save it under a name, like Tea or Workout.</string>
+    <string name="timer_saved_add">Save %1$s as a timer</string>
+    <string name="timer_saved_name_title">Save %1$s</string>
+    <string name="timer_saved_name">Name</string>
+    <string name="timer_saved_deleted">Timer deleted</string>
+</resources>

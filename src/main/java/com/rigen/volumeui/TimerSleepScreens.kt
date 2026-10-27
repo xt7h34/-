@@ -241,6 +241,7 @@ fun TimerPage(onBack: () -> Unit) {
                 enabled = setMs > 0 && timers.size < ClockEngine.MAX_TIMERS,
                 modifier = Modifier.fillMaxWidth(),
             ) { Text(stringResource(R.string.timer_start)) }
+            TimerPresetsSection(setMs, timers.size < ClockEngine.MAX_TIMERS, askNotifications) { id -> if (id > 0) openId = id }
             Section(stringResource(R.string.timer_floating)) {
                 SwitchRow(stringResource(R.string.timer_floating), floating) {
                     floating = it
