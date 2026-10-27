@@ -1,8 +1,5 @@
 package com.rigen.volumeui
 
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Checkbox
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.material3.ColorScheme
 import android.app.Activity
@@ -717,20 +714,7 @@ private fun AccountCard(onClick: () -> Unit) {
                 .padding(20.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFFF4F1FF)),
-            ) {
-                Image(
-                    painter = painterResource(R.drawable.ic_launcher_foreground),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .scale(1.4f),
-                )
-            }
+            AccountAvatar(56.dp, remember { AccountStore.load(ctx)?.token })
             Spacer(Modifier.width(16.dp))
             Column {
                 Text(
@@ -759,8 +743,6 @@ private fun HomePage(serviceEnabled: Boolean, onOpen: (String) -> Unit) {
                 AccountCard { onOpen(PAGE_ACCOUNT) }
 
                 TodayCards(onOpen)
-
-                FavoritesCard(onOpen)
 
                 SettingsGroup {
                     SettingsItem(
@@ -864,65 +846,6 @@ private fun HomePage(serviceEnabled: Boolean, onOpen: (String) -> Unit) {
 
 private class SearchEntry(val title: String, val where: String, val page: String)
 
-private const val MAX_FAVORITES = 6
-
-/** The pages the person pinned, as quick buttons under "your day". Pick them with Edit. */
-@Composable
-private fun FavoritesCard(onOpen: (String) -> Unit) {
-    val ctx = LocalContext.current
-    val prefs = remember { ctx.getSharedPreferences("kanade_favorites", Context.MODE_PRIVATE) }
-    var pinned by remember { mutableStateOf((prefs.getString("pages", "") ?: "").split(',').filter { it.isNotBlank() }) }
-    var editing by remember { mutableStateOf(false) }
-    val appTitle = stringResource(R.string.app_title)
-    // One entry per page; a page's own name when it has one, else the setting that points to it.
-    val pages = searchIndex().distinctBy { it.page }
-    val label = { e: SearchEntry -> if (e.where == appTitle) e.title else e.title + " \u00B7 " + e.where }
-    val shown = pinned.mapNotNull { id -> pages.firstOrNull { it.page == id } }
-
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("\u2B50  " + stringResource(R.string.fav_title), style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-            TextButton(onClick = { editing = true }) { Text(stringResource(R.string.fav_edit)) }
-        }
-        if (shown.isEmpty()) {
-            Text(stringResource(R.string.fav_empty), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        } else {
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                for (e in shown) AssistChip(onClick = { onOpen(e.page) }, label = { Text(label(e)) })
-            }
-        }
-    }
-
-    if (editing) {
-        AlertDialog(
-            onDismissRequest = { editing = false },
-            title = { Text(stringResource(R.string.fav_pick, MAX_FAVORITES)) },
-            text = {
-                Column(Modifier.verticalScroll(rememberScrollState())) {
-                    for (e in pages) {
-                        val on = e.page in pinned
-                        Row(
-                            Modifier.fillMaxWidth().clickable {
-                                pinned = when {
-                                    on -> pinned - e.page
-                                    pinned.size < MAX_FAVORITES -> pinned + e.page
-                                    else -> pinned
-                                }
-                                prefs.edit().putString("pages", pinned.joinToString(",")).apply()
-                            },
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Checkbox(checked = on, onCheckedChange = null)
-                            Text(label(e), modifier = Modifier.padding(start = 8.dp))
-                        }
-                    }
-                }
-            },
-            confirmButton = { TextButton(onClick = { editing = false }) { Text(stringResource(R.string.fav_done)) } },
-        )
-    }
-}
-
 /** Every setting people may look for, and the page it lives on. */
 @Composable
 private fun searchIndex(): List<SearchEntry> {
@@ -982,6 +905,8 @@ private fun searchIndex(): List<SearchEntry> {
         SearchEntry(stringResource(R.string.stack_title), stringResource(R.string.games_title), PAGE_STACK),
         // ── From the first file: account pages ──
         SearchEntry(stringResource(R.string.habits_title), stringResource(R.string.account_title), PAGE_HABITS),
+        SearchEntry(stringResource(R.string.myrem_title), stringResource(R.string.clock_title), PAGE_MYREM),
+        SearchEntry(stringResource(R.string.chl_title), stringResource(R.string.habits_title), PAGE_CHALLENGES),
         SearchEntry(stringResource(R.string.sub_title), stringResource(R.string.account_title), PAGE_SUBSCRIPTION),
         SearchEntry(stringResource(R.string.linked_title), stringResource(R.string.account_title), PAGE_LINKED),
     )
@@ -2102,9 +2027,10 @@ class MainActivity : ComponentActivity() {
             var page by rememberSaveable { mutableStateOf(startPage) }
             val parent = when (page) {
                 PAGE_PANEL, PAGE_BEHAVIOR, PAGE_STATION, PAGE_APPS, PAGE_GESTURES -> PAGE_VOLUME
-                PAGE_CLOCK_TIME, PAGE_ALARMS, PAGE_TIMER, PAGE_STOPWATCH, PAGE_SLEEP -> PAGE_CLOCK
+                PAGE_CLOCK_TIME, PAGE_ALARMS, PAGE_TIMER, PAGE_STOPWATCH, PAGE_SLEEP, PAGE_MYREM -> PAGE_CLOCK
                 PAGE_BLOCKS, PAGE_2048, PAGE_MEMORY, PAGE_STACK -> PAGE_GAMES
                 PAGE_HABITS, PAGE_SUBSCRIPTION, PAGE_LINKED -> PAGE_ACCOUNT
+                PAGE_CHALLENGES -> PAGE_HABITS
                 PAGE_AZKAR, PAGE_TASBEEH, PAGE_QIBLA, PAGE_TRACKER -> PAGE_DEEN
                 PAGE_REELS_DIAG -> PAGE_REELS
                 else -> PAGE_HOME
@@ -2132,9 +2058,11 @@ class MainActivity : ComponentActivity() {
                 PAGE_TIMER -> TimerPage(goBack)
                 PAGE_STOPWATCH -> StopwatchPage(goBack)
                 PAGE_SLEEP -> SleepPage(goBack)
+                PAGE_MYREM -> MyRemindersPage(goBack)
                 // ── Account ──
                 PAGE_ACCOUNT -> AccountPage({ page = it }, goBack)
-                PAGE_HABITS -> HabitsPage(goBack)
+                PAGE_HABITS -> HabitsPage(goBack) { page = PAGE_CHALLENGES }
+                PAGE_CHALLENGES -> ChallengesPage(goBack)
                 PAGE_SUBSCRIPTION -> SubscriptionPage(goBack)
                 PAGE_LINKED -> LinkedAccountsPage(goBack)
                 // ── Games ──

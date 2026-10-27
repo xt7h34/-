@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="myrem_title">تذكيراتي</string>
+    <string name="myrem_summary">تذكيرات مشتركة مع البوت</string>
+    <string name="myrem_info">نفس تذكيرات أمر .ذكرني في البوت. أضف من هنا أو من واتساب وتظهر نفس القايمة في الاتنين.</string>
+    <string name="myrem_new">تذكير جديد</string>
+    <string name="myrem_text">فكّرني بإيه</string>
+    <string name="myrem_after">بعد</string>
+    <string name="myrem_amount">العدد</string>
+    <string name="myrem_unit_min">دقائق</string>
+    <string name="myrem_unit_hour">ساعات</string>
+    <string name="myrem_unit_day">أيام</string>
+    <string name="myrem_repeat">التكرار</string>
+    <string name="myrem_once">مرة واحدة</string>
+    <string name="myrem_daily">كل يوم</string>
+    <string name="myrem_weekly">كل أسبوع</string>
+    <string name="myrem_notify">نبّهني على</string>
+    <string name="myrem_both">التطبيق وواتساب</string>
+    <string name="myrem_app">التطبيق فقط</string>
+    <string name="myrem_wa">واتساب فقط</string>
+    <string name="myrem_add">أضف التذكير</string>
+    <string name="myrem_too_long">أطول تذكير شهر واحد (30 يوم).</string>
+    <string name="myrem_none">مفيش تذكيرات لسه.</string>
+    <string name="myrem_delete">حذف</string>
+</resources>

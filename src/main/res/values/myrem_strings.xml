@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="myrem_title">My reminders</string>
+    <string name="myrem_summary">Reminders shared with the bot</string>
+    <string name="myrem_info">The same reminders as the bot\'s .ذكرني command. Add here or in WhatsApp and both show the same list.</string>
+    <string name="myrem_new">New reminder</string>
+    <string name="myrem_text">What to remind you about</string>
+    <string name="myrem_after">After</string>
+    <string name="myrem_amount">Number</string>
+    <string name="myrem_unit_min">Minutes</string>
+    <string name="myrem_unit_hour">Hours</string>
+    <string name="myrem_unit_day">Days</string>
+    <string name="myrem_repeat">Repeat</string>
+    <string name="myrem_once">Once</string>
+    <string name="myrem_daily">Every day</string>
+    <string name="myrem_weekly">Every week</string>
+    <string name="myrem_notify">Remind me on</string>
+    <string name="myrem_both">App and WhatsApp</string>
+    <string name="myrem_app">App only</string>
+    <string name="myrem_wa">WhatsApp only</string>
+    <string name="myrem_add">Add reminder</string>
+    <string name="myrem_too_long">The longest reminder is 30 days.</string>
+    <string name="myrem_none">No reminders yet.</string>
+    <string name="myrem_delete">Delete</string>
+</resources>

@@ -164,6 +164,11 @@ fun ClockHubPage(onOpen: (String) -> Unit, onBack: () -> Unit) {
                     Glyph.SLEEP, ICON_PURPLE,
                     stringResource(R.string.clock_tab_sleep), stringResource(R.string.clock_tab_sleep_sum),
                 ) { onOpen(PAGE_SLEEP) }
+                ItemDivider()
+                SettingsItem(
+                    Glyph.NOTIFICATION, ICON_BLUE,
+                    stringResource(R.string.myrem_title), stringResource(R.string.myrem_summary),
+                ) { onOpen(PAGE_MYREM) }
             }
         }
     }

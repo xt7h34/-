@@ -82,7 +82,7 @@ private fun parseHabitInfos(b: JSONObject?): List<HabitInfo> {
 
 /** Your habits from the Kanade bot: see the streaks, check a habit, undo today's check, add a new one. */
 @Composable
-fun HabitsPage(onBack: () -> Unit) {
+fun HabitsPage(onBack: () -> Unit, onChallenges: () -> Unit = {}) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var session by remember { mutableStateOf(AccountStore.load(ctx)) }
@@ -188,6 +188,7 @@ fun HabitsPage(onBack: () -> Unit) {
                         modifier = Modifier.fillMaxWidth(),
                     ) { Text(stringResource(R.string.habit_add)) }
                 }
+                OutlinedButton(onClick = onChallenges, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.chl_open)) }
                 if (info.isNotBlank()) {
                     Text(info, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
                 }

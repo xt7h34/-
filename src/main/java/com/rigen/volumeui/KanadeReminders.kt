@@ -56,7 +56,7 @@ object KanadeReminders {
     }
 
     // ── Alarms ──
-    private fun alarms(c: Context): AlarmManager = c.getSystemService(AlarmManager::class.java)
+    internal fun alarms(c: Context): AlarmManager = c.getSystemService(AlarmManager::class.java)
 
     private fun notifyIntent(c: Context, rc: Int, id: String, name: String): PendingIntent =
         PendingIntent.getBroadcast(
@@ -73,7 +73,7 @@ object KanadeReminders {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
-    private fun setAt(c: Context, at: Long, pi: PendingIntent) {
+    internal fun setAt(c: Context, at: Long, pi: PendingIntent) {
         val am = alarms(c)
         try {
             if (Build.VERSION.SDK_INT < 31 || am.canScheduleExactAlarms()) {
@@ -168,6 +168,7 @@ object KanadeReminders {
         cancelAll(c)
         alarms(c).cancel(refreshIntent(c))
         sp(c).edit().remove("on").remove("rw").remove("pr").remove("hb").apply()
+        MyReminders.reset(c)
         ClockWidgets.updateAll(c)
     }
 
@@ -186,7 +187,7 @@ object KanadeReminders {
     }
 
     fun scheduleSync(c: Context, delayMs: Long = SYNC_EVERY_MS) {
-        if (enabled(c).isEmpty()) {
+        if (enabled(c).isEmpty() && !MyReminders.any(c)) {
             alarms(c).cancel(syncIntent(c))
             return
         }
@@ -195,7 +196,8 @@ object KanadeReminders {
 
     /** After a reboot the alarms are gone: sync again a minute later. */
     fun onBoot(c: Context) {
-        if (enabled(c).isNotEmpty()) scheduleSync(c, 60_000L)
+        MyReminders.reschedule(c)
+        if (enabled(c).isNotEmpty() || MyReminders.any(c)) scheduleSync(c, 60_000L)
     }
 
     // ── Prayer times and habits as the bot last said. The widgets draw from these, so they work offline. ──
@@ -316,8 +318,19 @@ object KanadeReminders {
     /** Asks the bot for the current times and sets the alarms. If the bot is off, what was set stays. */
     suspend fun syncNow(c: Context) {
         val s = AccountStore.load(c)
-        if (s == null || enabled(c).isEmpty()) {
-            if (s == null) reset(c) else cancelAll(c)
+        if (s == null) {
+            reset(c)
+            return
+        }
+        // The reminders made with the bot's .ذكرني: they come first, because they matter even when nothing else is on.
+        val mine = MyReminders.sync(c, s.token)
+        if (mine.status == 401) {
+            AccountStore.clear(c)
+            reset(c)
+            return
+        }
+        if (enabled(c).isEmpty()) {
+            if (!MyReminders.any(c)) cancelAll(c)
             return
         }
         val t = KanadeApi.call("/me/timers", token = s.token)
@@ -353,6 +366,7 @@ object KanadeReminders {
             "weekly" -> c.getString(R.string.rem_weekly_ready)
             "monthly" -> c.getString(R.string.rem_monthly_ready)
             "prayer_soon" -> c.getString(R.string.rem_prayer_soon, name, PrayerAlerts.leadMinutes(c))
+            "myrem" -> name
             else -> c.getString(R.string.rem_prayer_now, name)
         }
         // Prayer alerts have their own channel, so they can have the sound the person chose.
@@ -388,6 +402,13 @@ class KanadeReminderReceiver : BroadcastReceiver() {
                     )
                 } catch (e: Throwable) {
                     Diag.error(context, "KanadeReminderReceiver notify", e)
+                }
+            }
+            MyReminders.ACTION -> {
+                try {
+                    MyReminders.onFire(context, intent)
+                } catch (e: Throwable) {
+                    Diag.error(context, "KanadeReminderReceiver myrem", e)
                 }
             }
             KanadeReminders.ACTION_REFRESH -> ClockWidgets.updateAll(context)

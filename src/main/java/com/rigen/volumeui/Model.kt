@@ -68,6 +68,7 @@ const val PAGE_ALARMS = "alarms"
 const val PAGE_TIMER = "timer"
 const val PAGE_STOPWATCH = "stopwatch"
 const val PAGE_SLEEP = "sleep"
+const val PAGE_MYREM = "myrem"
 // Games pages
 const val PAGE_GAMES = "games"
 const val PAGE_BLOCKS = "blocks"
