@@ -28,13 +28,17 @@ android {
         applicationId = "com.kanade"
         minSdk = 26
         targetSdk = 35
-        versionCode = 36
-        versionName = "2.6"
+        versionCode = 33
+        versionName = "2.4"
         // Where the app looks for newer versions. The build passes it in (-PupdateRepo=owner/name).
         buildConfigField("String", "UPDATE_REPO", "\"${project.findProperty("updateRepo") ?: ""}\"")
         // Public address of the Kanade bot (the tunnel), one line in api-url.txt at the repo root. Missing or empty = the bot on this same phone.
         val apiUrl = File(rootDir, "api-url.txt").takeIf { it.exists() }?.readLines()?.firstOrNull()?.trim().orEmpty().replace("\"", "")
         buildConfigField("String", "PUBLIC_BASE", "\"$apiUrl\"")
+        // Where to download Candy (one line in candy-url.txt at the repo root). Without it, the Candy card
+        // on the home screen only shows up once Candy is installed.
+        val candyUrl = File(rootDir, "candy-url.txt").takeIf { it.exists() }?.readLines()?.firstOrNull()?.trim().orEmpty().replace("\"", "")
+        buildConfigField("String", "CANDY_URL", "\"$candyUrl\"")
     }
 
     // Fixed debug key: every build is signed the same way, so a new APK installs over the old one.

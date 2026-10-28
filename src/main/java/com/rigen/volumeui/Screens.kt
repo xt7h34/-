@@ -742,6 +742,8 @@ private fun HomePage(serviceEnabled: Boolean, onOpen: (String) -> Unit) {
             PageColumn(padding) {
                 AccountCard { onOpen(PAGE_ACCOUNT) }
 
+                CandyPromoCard()
+
                 TodayCards(onOpen)
 
                 SettingsGroup {
@@ -905,8 +907,6 @@ private fun searchIndex(): List<SearchEntry> {
         SearchEntry(stringResource(R.string.stack_title), stringResource(R.string.games_title), PAGE_STACK),
         // ── From the first file: account pages ──
         SearchEntry(stringResource(R.string.habits_title), stringResource(R.string.account_title), PAGE_HABITS),
-        SearchEntry(stringResource(R.string.myrem_title), stringResource(R.string.clock_title), PAGE_MYREM),
-        SearchEntry(stringResource(R.string.chl_title), stringResource(R.string.habits_title), PAGE_CHALLENGES),
         SearchEntry(stringResource(R.string.sub_title), stringResource(R.string.account_title), PAGE_SUBSCRIPTION),
         SearchEntry(stringResource(R.string.linked_title), stringResource(R.string.account_title), PAGE_LINKED),
     )
@@ -2027,10 +2027,9 @@ class MainActivity : ComponentActivity() {
             var page by rememberSaveable { mutableStateOf(startPage) }
             val parent = when (page) {
                 PAGE_PANEL, PAGE_BEHAVIOR, PAGE_STATION, PAGE_APPS, PAGE_GESTURES -> PAGE_VOLUME
-                PAGE_CLOCK_TIME, PAGE_ALARMS, PAGE_TIMER, PAGE_STOPWATCH, PAGE_SLEEP, PAGE_MYREM -> PAGE_CLOCK
+                PAGE_CLOCK_TIME, PAGE_ALARMS, PAGE_TIMER, PAGE_STOPWATCH, PAGE_SLEEP -> PAGE_CLOCK
                 PAGE_BLOCKS, PAGE_2048, PAGE_MEMORY, PAGE_STACK -> PAGE_GAMES
                 PAGE_HABITS, PAGE_SUBSCRIPTION, PAGE_LINKED -> PAGE_ACCOUNT
-                PAGE_CHALLENGES -> PAGE_HABITS
                 PAGE_AZKAR, PAGE_TASBEEH, PAGE_QIBLA, PAGE_TRACKER -> PAGE_DEEN
                 PAGE_REELS_DIAG -> PAGE_REELS
                 else -> PAGE_HOME
@@ -2058,11 +2057,9 @@ class MainActivity : ComponentActivity() {
                 PAGE_TIMER -> TimerPage(goBack)
                 PAGE_STOPWATCH -> StopwatchPage(goBack)
                 PAGE_SLEEP -> SleepPage(goBack)
-                PAGE_MYREM -> MyRemindersPage(goBack)
                 // ── Account ──
                 PAGE_ACCOUNT -> AccountPage({ page = it }, goBack)
-                PAGE_HABITS -> HabitsPage(goBack) { page = PAGE_CHALLENGES }
-                PAGE_CHALLENGES -> ChallengesPage(goBack)
+                PAGE_HABITS -> HabitsPage(goBack)
                 PAGE_SUBSCRIPTION -> SubscriptionPage(goBack)
                 PAGE_LINKED -> LinkedAccountsPage(goBack)
                 // ── Games ──

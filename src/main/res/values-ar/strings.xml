@@ -565,4 +565,10 @@
     <string name="avatar_remove">احذف صورتي</string>
     <string name="avatar_close">إغلاق</string>
     <string name="avatar_unreadable">مش قادر أقرا الصورة دي، جرّب صورة تانية</string>
+    <string name="candy_promo_title">كاندي</string>
+    <string name="candy_promo_text">تطبيق السوشيال لحساب كندا: بوستات ودريفتس ومتابعين. افتحه بنفس حسابك بضغطة واحدة.</string>
+    <string name="candy_promo_open">افتح كاندي بحسابي</string>
+    <string name="candy_promo_get">نزّل كاندي</string>
+    <string name="candy_promo_hide">مش مهتم</string>
+    <string name="candy_promo_failed">مقدرتش أفتح كاندي. حدّث كاندي وجرّب تاني.</string>
 </resources>

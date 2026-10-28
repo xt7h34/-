@@ -608,4 +608,10 @@
     <string name="avatar_remove">Remove my photo</string>
     <string name="avatar_close">Close</string>
     <string name="avatar_unreadable">Could not read this picture, try another one</string>
+    <string name="candy_promo_title">Candy</string>
+    <string name="candy_promo_text">The social app for your Kanade account: posts, drifts and followers. Open it with this account in one tap.</string>
+    <string name="candy_promo_open">Open Candy with my account</string>
+    <string name="candy_promo_get">Get Candy</string>
+    <string name="candy_promo_hide">Not interested</string>
+    <string name="candy_promo_failed">Could not open Candy. Update Candy and try again.</string>
 </resources>
