@@ -28,8 +28,8 @@ android {
         applicationId = "com.kanade"
         minSdk = 26
         targetSdk = 35
-        versionCode = 33
-        versionName = "2.4"
+        versionCode = 37
+        versionName = "2.7"
         // Where the app looks for newer versions. The build passes it in (-PupdateRepo=owner/name).
         buildConfigField("String", "UPDATE_REPO", "\"${project.findProperty("updateRepo") ?: ""}\"")
         // Public address of the Kanade bot (the tunnel), one line in api-url.txt at the repo root. Missing or empty = the bot on this same phone.
