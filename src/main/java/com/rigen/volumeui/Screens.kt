@@ -1571,6 +1571,21 @@ private fun BehaviorPage(settings: PanelSettings, onChange: (PanelSettings) -> U
                 SwitchRow(stringResource(R.string.haptics), settings.haptics) {
                     onChange(settings.copy(haptics = it))
                 }
+                var edgeOn by remember { mutableStateOf(EdgePrefs.enabled(context)) }
+                var edgeLeft by remember { mutableStateOf(EdgePrefs.left(context)) }
+                SwitchRow(stringResource(R.string.edge_panel), edgeOn) {
+                    edgeOn = it
+                    EdgePrefs.setEnabled(context, it)
+                    VolumeAccessibilityService.instance?.refreshEdgePanel()
+                }
+                Text(stringResource(R.string.edge_panel_hint), style = MaterialTheme.typography.bodySmall)
+                if (edgeOn) {
+                    SwitchRow(stringResource(R.string.edge_panel_left), edgeLeft) {
+                        edgeLeft = it
+                        EdgePrefs.setLeft(context, it)
+                        VolumeAccessibilityService.instance?.refreshEdgePanel()
+                    }
+                }
                 OutlinedButton(onClick = { Haptics.tick(context) }) {
                     Text(stringResource(R.string.haptic_test))
                 }

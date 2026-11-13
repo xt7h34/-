@@ -184,6 +184,12 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
     private var floatingTimer: FloatingTimer? = null
     private var reelsBadge: ReelsBadge? = null
     private var reelsLock: ReelsLock? = null
+    private var edgePanel: EdgePanel? = null
+
+    /** Called from the settings when the Edge Panel is switched on or off, or moved to the other side. */
+    fun refreshEdgePanel() {
+        handler.post { edgePanel?.refresh() }
+    }
 
     /** Called by the Clock section whenever the timer starts, pauses, ends or its settings change. */
     fun refreshFloatingTimer() {
@@ -266,6 +272,7 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
         floatingTimer = FloatingTimer(this)
         reelsBadge = ReelsBadge(this)
         reelsLock = ReelsLock(this)
+        edgePanel = EdgePanel(this).also { it.refresh() }
         Diag.mark(this, "svc_connected")
     }
 
@@ -970,6 +977,8 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
         removePanel()
         floatingTimer?.remove()
         floatingTimer = null
+        edgePanel?.remove()
+        edgePanel = null
         reelsBadge?.remove()
         reelsBadge = null
         reelsLock?.remove()

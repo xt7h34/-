@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="edge_panel">Edge panel</string>
+    <string name="edge_panel_hint">Swipe in from the screen edge, over any app, for volume and ringer controls. Needs the accessibility service to be on.</string>
+    <string name="edge_panel_left">Put it on the left edge</string>
+</resources>
