@@ -7,6 +7,7 @@ import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
 import android.view.WindowManager
+import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import android.widget.FrameLayout
 import androidx.compose.animation.core.animateFloatAsState
@@ -57,6 +58,8 @@ class BloomCapsule(private val service: VolumeAccessibilityService) {
     private var followed = false
     private var lostTicks = 0
     private var usingRule = false
+    private var cachedWindowBottom = -1
+    private var cachedCardBottom = -1
 
     private val tickRunnable = object : Runnable {
         override fun run() {
@@ -76,6 +79,8 @@ class BloomCapsule(private val service: VolumeAccessibilityService) {
         followed = false
         lostTicks = 0
         usingRule = false
+        cachedWindowBottom = -1
+        cachedCardBottom = -1
         main.postDelayed(tickRunnable, FIRST_TICK_MS)
     }
 
@@ -147,9 +152,59 @@ class BloomCapsule(private val service: VolumeAccessibilityService) {
             if (w.type != AccessibilityWindowInfo.TYPE_SYSTEM) continue
             w.getBoundsInScreen(r)
             val h = r.height()
-            if (r.top <= dp(140) && h in dp(56)..dp(280) && r.width() >= screenW * 0.6f) return Rect(r)
+            if (r.top <= dp(140) && h in dp(56)..dp(280) && r.width() >= screenW * 0.6f) {
+                val card = cardBottom(w, r, screenW)
+                return Rect(r.left, r.top, r.right, card)
+            }
         }
         return null
+    }
+
+    /**
+     * Some phones make the pop-up's window taller than the card you see, which leaves a gap. This looks for the
+     * card itself: the widest tappable box inside the window. Only box sizes are read, never any text. The answer is
+     * kept until the window changes size, so the service does not keep asking another app about its views.
+     */
+    private fun cardBottom(w: AccessibilityWindowInfo, window: Rect, screenW: Int): Int {
+        if (window.bottom == cachedWindowBottom && cachedCardBottom > 0) return cachedCardBottom
+        var best = -1
+        try {
+            val root = w.root
+            if (root != null) {
+                var visited = 0
+                val box = Rect()
+                fun walk(node: AccessibilityNodeInfo, depth: Int) {
+                    if (depth > 5) return
+                    for (i in 0 until node.childCount) {
+                        if (visited++ > 80) return
+                        val child = node.getChild(i) ?: continue
+                        if (child.isVisibleToUser && child.isClickable) {
+                            child.getBoundsInScreen(box)
+                            if (box.width() >= screenW * 0.6f && box.height() >= dp(40) && box.bottom > best) best = box.bottom
+                        }
+                        walk(child, depth + 1)
+                        release(child)
+                    }
+                }
+                walk(root, 0)
+                release(root)
+            }
+        } catch (e: Exception) {
+            best = -1
+        }
+        val result = if (best > window.top + dp(40) && best <= window.bottom) best else window.bottom
+        cachedWindowBottom = window.bottom
+        cachedCardBottom = result
+        return result
+    }
+
+    @Suppress("DEPRECATION")
+    private fun release(node: AccessibilityNodeInfo) {
+        try {
+            node.recycle()
+        } catch (e: Exception) {
+            // Nothing to free.
+        }
     }
 
     /** Where to put it when the window cannot be seen: under a typical pop-up. */
@@ -254,8 +309,15 @@ class BloomCapsule(private val service: VolumeAccessibilityService) {
         val c = Prefs.localized(service)
         return when (a.kind) {
             BA_EVENT -> {
-                val date = java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(java.util.Date(a.at))
-                val whenText = if (a.allDay) date else date + " " +
+                // Short, so it fits: "Sun 15 Nov, 7:00 PM". The year only shows when it is not this year.
+                val locale = c.resources.configuration.locales[0]
+                val sameYear = CalendarEngine.ld(a.at).year == java.time.LocalDate.now().year
+                val pattern = android.text.format.DateFormat.getBestDateTimePattern(
+                    locale,
+                    if (sameYear) "EEEdMMM" else "EEEdMMMy",
+                )
+                val date = java.text.SimpleDateFormat(pattern, locale).format(java.util.Date(a.at))
+                val whenText = if (a.allDay) date else date + ", " +
                     android.text.format.DateFormat.getTimeFormat(service).format(java.util.Date(a.at))
                 c.getString(R.string.bloom_add_event, whenText)
             }
@@ -323,7 +385,7 @@ private fun BloomCapsuleContent(
                         fontSize = 14.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.widthIn(max = 190.dp),
+                        modifier = Modifier.widthIn(max = 250.dp),
                     )
                 }
             }
