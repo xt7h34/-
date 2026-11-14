@@ -1,6 +1,6 @@
 <resources>
     <string name="app_title">Kanade System</string>
-    <string name="a11y_description">يعترض أزرار الصوت ويعرض لوحة الصوت المخصصة. لا يقرأ محتوى الشاشة.</string>
+    <string name="a11y_description">يعترض أزرار الصوت ويعرض لوحة الصوت ولوحة الحافة. وبيشوف كمان مكان الإشعار المنبثق عشان Kanade Bloom يتحط تحته. مبيقراش اللي على شاشتك.</string>
     <string name="tab_home">الرئيسية</string>
     <string name="tab_panel">اللوحة</string>
     <string name="tab_behavior">السلوك</string>
@@ -141,7 +141,7 @@
     <string name="station_output_hint">أندرويد مش بيسمح للتطبيقات تحوّل الصوت لمخرج تاني، فالزرار بيفتح مبدّل المخرج بتاع النظام.</string>
     <string name="station_now_playing">إظهار التطبيق الشغال وأزرار التحكم فيه</string>
     <string name="media_perm_title">صلاحية الميديا</string>
-    <string name="media_perm_text">عشان نعرض مين شغّال ميديا، أندرويد بيطلب صلاحية الإشعارات. Kanade بيستخدم اسم وعنوان جلسة الميديا النشطة بس، ومبيقراش إشعاراتك ولا بيخزّنها ولا بيبعتها.</string>
+    <string name="media_perm_text">عشان نعرض مين شغّال ميديا، أندرويد بيطلب صلاحية الإشعارات. Kanade بيستخدم اسم وعنوان جلسة الميديا النشطة بس، ولما Kanade Bloom يكون مقفول مبيقراش إشعاراتك ولا بيخزّنها ولا بيبعتها. ولما يكون شغّال بيقرا إشعارات التطبيقات اللي إنت تختارها بس، جوه الموبايل لوحده، ومبيخزّنش ولا بيبعت حاجة.</string>
     <string name="media_perm_button">امنح صلاحية الميديا</string>
     <string name="ringer_sound">صوت</string>
     <string name="ringer_vibrate">اهتزاز</string>

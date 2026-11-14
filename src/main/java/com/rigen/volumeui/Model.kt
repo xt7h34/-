@@ -70,6 +70,7 @@ const val PAGE_STOPWATCH = "stopwatch"
 const val PAGE_SLEEP = "sleep"
 const val PAGE_MYREM = "myrem"
 const val PAGE_CALENDAR = "calendar"
+const val PAGE_BLOOM = "bloom"
 // Games pages
 const val PAGE_GAMES = "games"
 const val PAGE_BLOCKS = "blocks"

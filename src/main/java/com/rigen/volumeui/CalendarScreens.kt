@@ -336,7 +336,7 @@ private fun DayPanel(
 }
 
 @Composable
-private fun ChipRow(options: List<Pair<Int, String>>, selected: Int, onSelect: (Int) -> Unit) {
+internal fun ChipRow(options: List<Pair<Int, String>>, selected: Int, onSelect: (Int) -> Unit) {
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         options.forEach { (value, label) ->
             FilterChip(selected = value == selected, onClick = { onSelect(value) }, label = { Text(label) })
@@ -345,7 +345,13 @@ private fun ChipRow(options: List<Pair<Int, String>>, selected: Int, onSelect: (
 }
 
 @Composable
-private fun EventEditor(initial: CalEvent, isNew: Boolean, onDismiss: () -> Unit) {
+internal fun EventEditor(
+    initial: CalEvent,
+    isNew: Boolean,
+    warning: String? = null,
+    onSaved: (CalEvent) -> Unit = {},
+    onDismiss: () -> Unit,
+) {
     val ctx = LocalContext.current
     var title by remember { mutableStateOf(initial.title) }
     var notes by remember { mutableStateOf(initial.notes) }
@@ -381,6 +387,9 @@ private fun EventEditor(initial: CalEvent, isNew: Boolean, onDismiss: () -> Unit
         title = { Text(stringResource(if (isNew) R.string.cal_add else R.string.cal_edit)) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (warning != null) {
+                    Text(warning, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                }
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
@@ -438,19 +447,18 @@ private fun EventEditor(initial: CalEvent, isNew: Boolean, onDismiss: () -> Unit
                 enabled = title.isNotBlank(),
                 onClick = {
                     val s = if (allDay) CalendarEngine.startOfDay(start) else start
-                    CalendarStore.upsert(
-                        ctx,
-                        initial.copy(
-                            title = title.trim(),
-                            notes = notes.trim(),
-                            start = s,
-                            end = if (allDay) s else s + 3_600_000L,
-                            allDay = allDay,
-                            kind = kind,
-                            repeat = repeat,
-                            remindBefore = remind,
-                        ),
+                    val saved = initial.copy(
+                        title = title.trim(),
+                        notes = notes.trim(),
+                        start = s,
+                        end = if (allDay) s else s + 3_600_000L,
+                        allDay = allDay,
+                        kind = kind,
+                        repeat = repeat,
+                        remindBefore = remind,
                     )
+                    CalendarStore.upsert(ctx, saved)
+                    onSaved(saved)
                     onDismiss()
                 },
             ) { Text(stringResource(R.string.cal_save)) }

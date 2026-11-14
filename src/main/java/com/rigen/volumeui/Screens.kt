@@ -254,14 +254,14 @@ internal val ICON_PINK = Color(0xFFE0558A)
 internal val ICON_RED = Color(0xFFE5484D)
 
 private val LocalPageScroll = compositionLocalOf<ScrollState> { error("No page scroll state") }
-private val LocalPageList = compositionLocalOf<LazyListState> { error("No page list state") }
+internal val LocalPageList = compositionLocalOf<LazyListState> { error("No page list state") }
 
 private val HEADER_EXPANDED = 250.dp
 private val HEADER_COLLAPSED = 96.dp
 
 /** The empty room at the top of a page where the big title lives. */
 @Composable
-private fun HeaderSpacer() {
+internal fun HeaderSpacer() {
     Spacer(
         Modifier
             .statusBarsPadding()
@@ -812,6 +812,12 @@ private fun HomePage(serviceEnabled: Boolean, onOpen: (String) -> Unit) {
                     ) { onOpen(PAGE_CALENDAR) }
                     ItemDivider()
                     SettingsItem(
+                        Glyph.BRAIN, ICON_ORANGE,
+                        stringResource(R.string.bloom_title),
+                        stringResource(R.string.bloom_summary),
+                    ) { onOpen(PAGE_BLOOM) }
+                    ItemDivider()
+                    SettingsItem(
                         Glyph.GOALS, ICON_ORANGE,
                         stringResource(R.string.goals_title),
                         stringResource(R.string.goals_summary),
@@ -900,6 +906,7 @@ private fun searchIndex(): List<SearchEntry> {
         SearchEntry(stringResource(R.string.games_title), stringResource(R.string.app_title), PAGE_GAMES),
         SearchEntry(stringResource(R.string.kb_title), stringResource(R.string.app_title), PAGE_KEYBOARD),
         SearchEntry(stringResource(R.string.cal_title), stringResource(R.string.app_title), PAGE_CALENDAR),
+        SearchEntry(stringResource(R.string.bloom_title), stringResource(R.string.app_title), PAGE_BLOOM),
         SearchEntry(stringResource(R.string.goals_title), stringResource(R.string.app_title), PAGE_GOALS),
         SearchEntry(stringResource(R.string.bud_title), stringResource(R.string.app_title), PAGE_BUDGET),
         SearchEntry(stringResource(R.string.deen_title), stringResource(R.string.app_title), PAGE_DEEN),
@@ -2099,6 +2106,7 @@ class MainActivity : ComponentActivity() {
                 PAGE_GOALS -> GoalsPage(goBack)
                 PAGE_BUDGET -> BudgetPage(goBack)
                 PAGE_CALENDAR -> CalendarPage(goBack)
+                PAGE_BLOOM -> BloomPage(mediaAccess, goBack)
                 PAGE_DEEN -> DeenHubPage({ page = it }, goBack)
                 PAGE_AZKAR -> AzkarPage(goBack)
                 PAGE_TASBEEH -> TasbeehPage(goBack)

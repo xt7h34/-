@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="bloom_title">Kanade Bloom</string>
+    <string name="bloom_summary">Smart buttons under your notifications</string>
+    <string name="bloom_desc">When a message pops up with a date, an amount, a code, a link or a phone number, a small capsule appears under it with a button for it: add to the calendar, log the expense, copy the code, open the link or call.</string>
+    <string name="bloom_access_needed">Bloom needs notification access. Turn on Kanade in the list that opens.</string>
+    <string name="bloom_open_access">Open notification access</string>
+    <string name="bloom_privacy">Bloom works on this phone alone. It only reads notifications from the apps you pick below, looks at each message once, and stores, logs and sends nothing. Codes are copied as sensitive items.</string>
+    <string name="bloom_kinds">What Bloom looks for</string>
+    <string name="bloom_kind_event">Dates and times (add to calendar)</string>
+    <string name="bloom_kind_expense">Payments (log an expense)</string>
+    <string name="bloom_kind_code">Verification codes (copy)</string>
+    <string name="bloom_kind_link">Links (open)</string>
+    <string name="bloom_kind_call">Phone numbers (call)</string>
+    <string name="bloom_apps">Apps Bloom reads</string>
+    <string name="bloom_add_event">Add event · %1$s</string>
+    <string name="bloom_add_expense">Log %1$s</string>
+    <string name="bloom_copy_code">Copy %1$s</string>
+    <string name="bloom_open_link">Open link</string>
+    <string name="bloom_call">Call %1$s</string>
+    <string name="bloom_conflict">Close to \"%1$s\" at %2$s.</string>
+    <string name="bloom_remind_set">I\'ll remind you in an hour</string>
+    <string name="bloom_code_copied">Code copied</string>
+    <string name="bloom_expense_title">Log expense</string>
+    <string name="bloom_amount">Amount</string>
+    <string name="bloom_saved">Saved</string>
+    <string name="bloom_saved_hint">You can undo this now.</string>
+    <string name="bloom_done">Done</string>
+    <string name="bloom_undo">Undo</string>
+</resources>

@@ -1,6 +1,6 @@
 <resources>
     <string name="app_title">Kanade System</string>
-    <string name="a11y_description">Intercepts the volume keys and shows the custom volume panel. It does not read screen content.</string>
+    <string name="a11y_description">Intercepts the volume keys and shows the custom volume panel and the edge panel. It also looks at where a pop-up notification is, so Kanade Bloom can sit under it. It does not read what is on your screen.</string>
     <string name="tab_home">Home</string>
     <string name="tab_panel">Panel</string>
     <string name="tab_behavior">Behavior</string>
@@ -184,7 +184,7 @@
     <string name="station_output_hint">Android does not let apps move the sound to another output, so this button opens the system output switcher.</string>
     <string name="station_now_playing">Show the playing app and its controls</string>
     <string name="media_perm_title">Media access</string>
-    <string name="media_perm_text">To show which app is playing, Android asks for notification access. Kanade only uses the name and title of the active media session. It never reads, stores or sends your notifications.</string>
+    <string name="media_perm_text">To show which app is playing, Android asks for notification access. Kanade only uses the name and title of the active media session. With Kanade Bloom off, it never reads, stores or sends your notifications. With Bloom on, it reads notifications only from the apps you pick, on this phone alone, and stores and sends nothing.</string>
     <string name="media_perm_button">Grant media access</string>
     <string name="ringer_sound">Sound</string>
     <string name="ringer_vibrate">Vibrate</string>

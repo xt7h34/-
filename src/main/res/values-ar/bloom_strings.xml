@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="bloom_title">Kanade Bloom</string>
+    <string name="bloom_summary">أزرار ذكية تحت إشعاراتك</string>
+    <string name="bloom_desc">لما رسالة تطلع فيها تاريخ أو مبلغ أو كود أو رابط أو رقم تليفون، بتظهر كبسولة صغيرة تحتها بزرار مناسب: إضافة للتقويم، أو تسجيل المصروف، أو نسخ الكود، أو فتح الرابط، أو الاتصال.</string>
+    <string name="bloom_access_needed">Bloom محتاج صلاحية الوصول للإشعارات. فعّل Kanade من القايمة اللي هتفتح.</string>
+    <string name="bloom_open_access">افتح الوصول للإشعارات</string>
+    <string name="bloom_privacy">Bloom بيشتغل جوه الموبايل لوحده. بيقرا إشعارات التطبيقات اللي تختارها تحت بس، وبيبص على كل رسالة مرة واحدة، ومبيخزّنش ولا بيسجّل ولا بيبعت حاجة. والأكواد بتتنسخ كعناصر حساسة.</string>
+    <string name="bloom_kinds">Bloom بيدوّر على إيه</string>
+    <string name="bloom_kind_event">التواريخ والأوقات (إضافة للتقويم)</string>
+    <string name="bloom_kind_expense">المدفوعات (تسجيل مصروف)</string>
+    <string name="bloom_kind_code">أكواد التحقق (نسخ)</string>
+    <string name="bloom_kind_link">الروابط (فتح)</string>
+    <string name="bloom_kind_call">أرقام التليفون (اتصال)</string>
+    <string name="bloom_apps">التطبيقات اللي Bloom بيقراها</string>
+    <string name="bloom_add_event">إضافة موعد · %1$s</string>
+    <string name="bloom_add_expense">سجّل %1$s</string>
+    <string name="bloom_copy_code">انسخ %1$s</string>
+    <string name="bloom_open_link">افتح الرابط</string>
+    <string name="bloom_call">اتصل بـ %1$s</string>
+    <string name="bloom_conflict">قريب من \"%1$s\" الساعة %2$s.</string>
+    <string name="bloom_remind_set">هفكّرك بعد ساعة</string>
+    <string name="bloom_code_copied">اتنسخ الكود</string>
+    <string name="bloom_expense_title">تسجيل مصروف</string>
+    <string name="bloom_amount">المبلغ</string>
+    <string name="bloom_saved">اتحفظ</string>
+    <string name="bloom_saved_hint">تقدر تتراجع دلوقتي.</string>
+    <string name="bloom_done">تمام</string>
+    <string name="bloom_undo">تراجع</string>
+</resources>

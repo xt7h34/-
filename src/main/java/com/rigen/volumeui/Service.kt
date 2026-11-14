@@ -185,6 +185,17 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
     private var reelsBadge: ReelsBadge? = null
     private var reelsLock: ReelsLock? = null
     private var edgePanel: EdgePanel? = null
+    private var bloom: BloomCapsule? = null
+
+    /** Kanade Bloom has something to offer for a notification that just popped up. */
+    fun showBloom(offer: BloomOffer) {
+        handler.post { bloom?.show(offer) }
+    }
+
+    /** The notification with this key is gone. */
+    fun dismissBloom(key: String) {
+        handler.post { bloom?.onRemoved(key) }
+    }
 
     /** Called from the settings when the Edge Panel is switched on or off, or moved to the other side. */
     fun refreshEdgePanel() {
@@ -273,6 +284,7 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
         reelsBadge = ReelsBadge(this)
         reelsLock = ReelsLock(this)
         edgePanel = EdgePanel(this).also { it.refresh() }
+        bloom = BloomCapsule(this)
         Diag.mark(this, "svc_connected")
     }
 
@@ -979,6 +991,8 @@ class VolumeAccessibilityService : AccessibilityService(), LifecycleOwner, Saved
         floatingTimer = null
         edgePanel?.remove()
         edgePanel = null
+        bloom?.remove()
+        bloom = null
         reelsBadge?.remove()
         reelsBadge = null
         reelsLock?.remove()
