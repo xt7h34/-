@@ -241,7 +241,7 @@ class EdgePanel(private val service: VolumeAccessibilityService) {
                         maxLevel = maxLevel,
                         onSeek = { seek(it) },
                         ringer = ringer,
-                        onRinger = { setRinger(it) },
+                        onRinger = { applyRinger(it) },
                     )
                 }
             }
@@ -305,7 +305,7 @@ class EdgePanel(private val service: VolumeAccessibilityService) {
         }
     }
 
-    private fun setRinger(mode: Int) {
+    private fun applyRinger(mode: Int) {
         try {
             try {
                 controller.setRingerMode(mode)
