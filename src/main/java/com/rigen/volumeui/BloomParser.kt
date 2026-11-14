@@ -267,9 +267,6 @@ object BloomParser {
             }
         }
         if (isToday) return today
-        if (n.contains("الاسبوع الجاي") || n.contains("الاسبوع القادم") || n.contains("الاسبوع اللي جاي") || n.contains("next week")) {
-            return today.plusDays(7)
-        }
         ORDINAL.find(n)?.let {
             val d = it.groupValues[1].toInt()
             if (d in 1..31) {
@@ -277,6 +274,9 @@ object BloomParser {
                 val next = today.plusMonths(1)
                 safeDate(next.year, next.monthValue, d)?.let { r -> return r }
             }
+        }
+        if (n.contains("الاسبوع الجاي") || n.contains("الاسبوع القادم") || n.contains("الاسبوع اللي جاي") || n.contains("next week")) {
+            return today.plusDays(7)
         }
         return null
     }
