@@ -364,7 +364,7 @@ private class EdgeShape(private val left: Boolean, private val insetDp: Float) :
         val w = size.width
         val h = size.height
         val inset = insetDp * density.density
-        val fillet = minOf(h / 2f, 46f * density.density)
+        val fillet = minOf(h / 2f, 30f * density.density)
         fun x(v: Float) = if (left) w - v else v
         val p = Path()
         p.moveTo(x(w), 0f)
@@ -394,12 +394,12 @@ private fun EdgePanelContent(
     onRinger: (Int) -> Unit,
 ) {
     val t by animateFloatAsState(if (visible) 1f else 0f, tween(220), label = "edge_in")
-    val height by animateDpAsState(if (page == 0) 300.dp else 222.dp, tween(260), label = "edge_h")
-    val inset = 24.dp
+    val height by animateDpAsState(if (page == 0) 200.dp else 150.dp, tween(260), label = "edge_h")
+    val inset = 16.dp
 
     Box(
         Modifier
-            .width(124.dp)
+            .width(88.dp)
             .height(height)
             .graphicsLayer {
                 translationX = (1f - t) * size.width * (if (left) -1f else 1f)
@@ -423,7 +423,7 @@ private fun EdgePanelContent(
                 .padding(
                     start = if (left) 0.dp else inset,
                     end = if (left) inset else 0.dp,
-                    bottom = 20.dp,
+                    bottom = 14.dp,
                 ),
             contentAlignment = Alignment.Center,
         ) {
@@ -439,15 +439,15 @@ private fun EdgePanelContent(
                 .padding(
                     start = if (left) 0.dp else inset,
                     end = if (left) inset else 0.dp,
-                    bottom = 8.dp,
+                    bottom = 5.dp,
                 ),
             contentAlignment = Alignment.BottomCenter,
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
                 for (i in 0 until 2) {
                     Box(
                         Modifier
-                            .size(if (i == page) 7.dp else 5.dp)
+                            .size(if (i == page) 5.dp else 4.dp)
                             .clip(CircleShape)
                             .background(if (i == page) Color.White else Color(0xFF636366))
                             .clickable { onPage(i) },
@@ -464,8 +464,8 @@ private fun VolumePage(level: Int, maxLevel: Int, onSeek: (Float) -> Unit) {
     val shown by animateFloatAsState(fraction, tween(90), label = "edge_vol")
     Box(
         Modifier
-            .size(64.dp, 220.dp)
-            .clip(RoundedCornerShape(24.dp))
+            .size(44.dp, 140.dp)
+            .clip(RoundedCornerShape(16.dp))
             .background(PanelTrack)
             .pointerInput(Unit) {
                 awaitEachGesture {
@@ -492,10 +492,10 @@ private fun VolumePage(level: Int, maxLevel: Int, onSeek: (Float) -> Unit) {
         PathIcon(
             pathData = (if (level == 0) Glyph.MUTED else Glyph.VOLUME).pathData,
             color = if (shown > 0.14f) PanelTrack else Color.White,
-            iconSize = 26.dp,
+            iconSize = 18.dp,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 14.dp),
+                .padding(bottom = 9.dp),
         )
     }
 }
@@ -503,7 +503,7 @@ private fun VolumePage(level: Int, maxLevel: Int, onSeek: (Float) -> Unit) {
 @Composable
 private fun RingerPage(ringer: Int, onRinger: (Int) -> Unit) {
     Column(
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         RingerItem(Glyph.VOLUME, ringer == AudioManager.RINGER_MODE_NORMAL, PanelMuted) {
@@ -527,12 +527,12 @@ private fun RingerItem(glyph: Glyph, selected: Boolean, accent: Color, onTap: ()
     }
     Box(
         Modifier
-            .size(50.dp)
+            .size(36.dp)
             .clip(CircleShape)
             .background(if (selected) Color.White else PanelButton)
             .clickable { onTap() },
         contentAlignment = Alignment.Center,
     ) {
-        PathIcon(glyph.pathData, tint, 24.dp)
+        PathIcon(glyph.pathData, tint, 18.dp)
     }
 }
