@@ -806,6 +806,12 @@ private fun HomePage(serviceEnabled: Boolean, onOpen: (String) -> Unit) {
 
                 SettingsGroup {
                     SettingsItem(
+                        Glyph.CALENDAR, ICON_BLUE,
+                        stringResource(R.string.cal_title),
+                        stringResource(R.string.cal_summary),
+                    ) { onOpen(PAGE_CALENDAR) }
+                    ItemDivider()
+                    SettingsItem(
                         Glyph.GOALS, ICON_ORANGE,
                         stringResource(R.string.goals_title),
                         stringResource(R.string.goals_summary),
@@ -893,6 +899,7 @@ private fun searchIndex(): List<SearchEntry> {
         // ── From the second file: games + keyboard ──
         SearchEntry(stringResource(R.string.games_title), stringResource(R.string.app_title), PAGE_GAMES),
         SearchEntry(stringResource(R.string.kb_title), stringResource(R.string.app_title), PAGE_KEYBOARD),
+        SearchEntry(stringResource(R.string.cal_title), stringResource(R.string.app_title), PAGE_CALENDAR),
         SearchEntry(stringResource(R.string.goals_title), stringResource(R.string.app_title), PAGE_GOALS),
         SearchEntry(stringResource(R.string.bud_title), stringResource(R.string.app_title), PAGE_BUDGET),
         SearchEntry(stringResource(R.string.deen_title), stringResource(R.string.app_title), PAGE_DEEN),
@@ -2091,6 +2098,7 @@ class MainActivity : ComponentActivity() {
                 "vault" -> VaultPage(goBack)
                 PAGE_GOALS -> GoalsPage(goBack)
                 PAGE_BUDGET -> BudgetPage(goBack)
+                PAGE_CALENDAR -> CalendarPage(goBack)
                 PAGE_DEEN -> DeenHubPage({ page = it }, goBack)
                 PAGE_AZKAR -> AzkarPage(goBack)
                 PAGE_TASBEEH -> TasbeehPage(goBack)

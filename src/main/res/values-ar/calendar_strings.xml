@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="cal_title">التقويم</string>
+    <string name="cal_summary">المواعيد والمناسبات والمنبّهات والصلاة والأهداف في مكان واحد</string>
+    <string name="cal_today">النهارده</string>
+    <string name="cal_add">إضافة</string>
+    <string name="cal_edit">تعديل</string>
+    <string name="cal_save">حفظ</string>
+    <string name="cal_delete">حذف</string>
+    <string name="cal_cancel">إلغاء</string>
+    <string name="cal_title_hint">العنوان</string>
+    <string name="cal_notes_hint">ملاحظات (اختياري)</string>
+    <string name="cal_all_day">اليوم كله</string>
+    <string name="cal_all_day_short">طول اليوم</string>
+    <string name="cal_kind_event">موعد</string>
+    <string name="cal_kind_occasion">مناسبة</string>
+    <string name="cal_kind_reminder">تذكير</string>
+    <string name="cal_kind_bill">فاتورة</string>
+    <string name="cal_repeat_label">التكرار</string>
+    <string name="cal_repeat_none">مرة واحدة</string>
+    <string name="cal_repeat_daily">كل يوم</string>
+    <string name="cal_repeat_weekly">كل أسبوع</string>
+    <string name="cal_repeat_monthly">كل شهر</string>
+    <string name="cal_repeat_yearly">كل سنة</string>
+    <string name="cal_remind_label">ذكّرني</string>
+    <string name="cal_remind_none">من غير تذكير</string>
+    <string name="cal_remind_at">في الميعاد</string>
+    <string name="cal_remind_10m">قبلها بـ 10 دقايق</string>
+    <string name="cal_remind_1h">قبلها بساعة</string>
+    <string name="cal_remind_1d">قبلها بيوم</string>
+    <string name="cal_empty">مفيش حاجة في اليوم ده.</string>
+    <string name="cal_alarm">منبّه</string>
+    <string name="cal_prayer">صلاة</string>
+    <string name="cal_goal_due">موعد هدف</string>
+    <string name="cal_hijri_tag">مناسبة إسلامية</string>
+    <string name="cal_channel">تذكيرات التقويم</string>
+    <string name="cal_occ_new_year">رأس السنة الهجرية</string>
+    <string name="cal_occ_ashura">يوم عاشوراء</string>
+    <string name="cal_occ_mawlid">المولد النبوي</string>
+    <string name="cal_occ_ramadan">أول يوم رمضان</string>
+    <string name="cal_occ_eid_fitr">عيد الفطر</string>
+    <string name="cal_occ_arafah">يوم عرفة</string>
+    <string name="cal_occ_eid_adha">عيد الأضحى</string>
+    <string-array name="cal_hijri_months">
+        <item>محرم</item>
+        <item>صفر</item>
+        <item>ربيع الأول</item>
+        <item>ربيع الآخر</item>
+        <item>جمادى الأولى</item>
+        <item>جمادى الآخرة</item>
+        <item>رجب</item>
+        <item>شعبان</item>
+        <item>رمضان</item>
+        <item>شوال</item>
+        <item>ذو القعدة</item>
+        <item>ذو الحجة</item>
+    </string-array>
+</resources>

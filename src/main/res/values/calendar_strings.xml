@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="cal_title">Calendar</string>
+    <string name="cal_summary">Events, occasions, alarms, prayers and goals in one place</string>
+    <string name="cal_today">Today</string>
+    <string name="cal_add">Add</string>
+    <string name="cal_edit">Edit</string>
+    <string name="cal_save">Save</string>
+    <string name="cal_delete">Delete</string>
+    <string name="cal_cancel">Cancel</string>
+    <string name="cal_title_hint">Title</string>
+    <string name="cal_notes_hint">Notes (optional)</string>
+    <string name="cal_all_day">All day</string>
+    <string name="cal_all_day_short">All day</string>
+    <string name="cal_kind_event">Event</string>
+    <string name="cal_kind_occasion">Occasion</string>
+    <string name="cal_kind_reminder">Reminder</string>
+    <string name="cal_kind_bill">Bill</string>
+    <string name="cal_repeat_label">Repeats</string>
+    <string name="cal_repeat_none">Never</string>
+    <string name="cal_repeat_daily">Daily</string>
+    <string name="cal_repeat_weekly">Weekly</string>
+    <string name="cal_repeat_monthly">Monthly</string>
+    <string name="cal_repeat_yearly">Yearly</string>
+    <string name="cal_remind_label">Remind me</string>
+    <string name="cal_remind_none">No reminder</string>
+    <string name="cal_remind_at">At the time</string>
+    <string name="cal_remind_10m">10 minutes before</string>
+    <string name="cal_remind_1h">1 hour before</string>
+    <string name="cal_remind_1d">1 day before</string>
+    <string name="cal_empty">Nothing on this day.</string>
+    <string name="cal_alarm">Alarm</string>
+    <string name="cal_prayer">Prayer</string>
+    <string name="cal_goal_due">Goal deadline</string>
+    <string name="cal_hijri_tag">Islamic occasion</string>
+    <string name="cal_channel">Calendar reminders</string>
+    <string name="cal_occ_new_year">Islamic New Year</string>
+    <string name="cal_occ_ashura">Day of Ashura</string>
+    <string name="cal_occ_mawlid">Mawlid (Prophet\'s birthday)</string>
+    <string name="cal_occ_ramadan">First day of Ramadan</string>
+    <string name="cal_occ_eid_fitr">Eid al-Fitr</string>
+    <string name="cal_occ_arafah">Day of Arafah</string>
+    <string name="cal_occ_eid_adha">Eid al-Adha</string>
+    <string-array name="cal_hijri_months">
+        <item>Muharram</item>
+        <item>Safar</item>
+        <item>Rabi\' al-awwal</item>
+        <item>Rabi\' al-thani</item>
+        <item>Jumada al-awwal</item>
+        <item>Jumada al-thani</item>
+        <item>Rajab</item>
+        <item>Sha\'ban</item>
+        <item>Ramadan</item>
+        <item>Shawwal</item>
+        <item>Dhu al-Qi\'dah</item>
+        <item>Dhu al-Hijjah</item>
+    </string-array>
+</resources>

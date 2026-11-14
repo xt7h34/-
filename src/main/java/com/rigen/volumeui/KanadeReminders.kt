@@ -197,6 +197,7 @@ object KanadeReminders {
     /** After a reboot the alarms are gone: sync again a minute later. */
     fun onBoot(c: Context) {
         MyReminders.reschedule(c)
+        CalendarEngine.reschedule(c)
         if (enabled(c).isNotEmpty() || MyReminders.any(c)) scheduleSync(c, 60_000L)
     }
 
@@ -409,6 +410,13 @@ class KanadeReminderReceiver : BroadcastReceiver() {
                     MyReminders.onFire(context, intent)
                 } catch (e: Throwable) {
                     Diag.error(context, "KanadeReminderReceiver myrem", e)
+                }
+            }
+            CalendarEngine.ACTION -> {
+                try {
+                    CalendarEngine.onFire(context, intent)
+                } catch (e: Throwable) {
+                    Diag.error(context, "KanadeReminderReceiver calendar", e)
                 }
             }
             KanadeReminders.ACTION_REFRESH -> ClockWidgets.updateAll(context)

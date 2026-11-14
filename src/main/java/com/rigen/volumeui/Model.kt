@@ -69,6 +69,7 @@ const val PAGE_TIMER = "timer"
 const val PAGE_STOPWATCH = "stopwatch"
 const val PAGE_SLEEP = "sleep"
 const val PAGE_MYREM = "myrem"
+const val PAGE_CALENDAR = "calendar"
 // Games pages
 const val PAGE_GAMES = "games"
 const val PAGE_BLOCKS = "blocks"
@@ -152,6 +153,7 @@ enum class Glyph(val pathData: String) {
     KEYBOARD("M20,5H4c-1.1,0 -1.99,0.9 -1.99,2L2,17c0,1.1 0.9,2 2,2h16c1.1,0 2,-0.9 2,-2V7c0,-1.1 -0.9,-2 -2,-2zM11,8h2v2h-2V8zM11,11h2v2h-2v-2zM8,8h2v2H8V8zM8,11h2v2H8v-2zM7,13H5v-2h2v2zM7,10H5V8h2v2zM16,17H8v-2h8v2zM16,13h-2v-2h2v2zM16,10h-2V8h2v2zM19,13h-2v-2h2v2zM19,10h-2V8h2v2z"),
     FACTORY("M2,20V9l6,4V9l6,4V5h4v15z"),
     BRAIN("M12,3.2c-1.5,-1.3 -3.9,-1.1 -5,0.6c-1.8,0.1 -3.1,1.8 -2.7,3.5c-1.2,1 -1.4,2.9 -0.5,4.2c-0.7,1.5 -0.1,3.3 1.3,4.1c0.2,1.8 1.9,3.1 3.6,2.7c0.8,1.1 2.3,1.5 3.3,0.8zM12,3.2c1.5,-1.3 3.9,-1.1 5,0.6c1.8,0.1 3.1,1.8 2.7,3.5c1.2,1 1.4,2.9 0.5,4.2c0.7,1.5 0.1,3.3 -1.3,4.1c-0.2,1.8 -1.9,3.1 -3.6,2.7c-0.8,1.1 -2.3,1.5 -3.3,0.8z"),
+    CALENDAR("M19,4h-1V2h-2v2H8V2H6v2H5C3.89,4 3.01,4.9 3.01,6L3,20c0,1.1 0.89,2 2,2h14c1.1,0 2,-0.9 2,-2V6C21,4.9 20.1,4 19,4zM19,20H5V10h14V20zM9,14H7v-2h2V14zM13,14h-2v-2h2V14zM17,14h-2v-2h2V14zM9,18H7v-2h2V18zM13,18h-2v-2h2V18z"),
 }
 
 class StreamInfo(val stream: Int, val glyph: Glyph, val labelRes: Int)
