@@ -17,9 +17,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -40,9 +40,10 @@ import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 
 /**
- * The small capsule Kanade Bloom shows under a pop-up notification. It follows the real notification window:
- * it sits just under it and leaves when the notification leaves (swiped away, tapped or timed out). If Android
- * does not let the service see that window, it is placed by a rule instead and leaves after five seconds.
+ * The capsule Kanade Bloom shows under a pop-up notification. It is as wide as the notification, sits just under
+ * it, and leaves when the notification leaves. It waits until the notification has settled on screen before it
+ * appears. If Android does not let the service see that window, it is placed by a rule and leaves after five
+ * seconds.
  */
 class BloomCapsule(private val service: VolumeAccessibilityService) {
     private val wm = service.getSystemService(Context.WINDOW_SERVICE) as WindowManager
@@ -58,8 +59,10 @@ class BloomCapsule(private val service: VolumeAccessibilityService) {
     private var followed = false
     private var lostTicks = 0
     private var usingRule = false
-    private var cachedWindowBottom = -1
-    private var cachedCardBottom = -1
+    private var stableTicks = 0
+    private var lastKey = ""
+    private var cachedWindowKey = ""
+    private var cachedCard: Rect? = null
 
     private val tickRunnable = object : Runnable {
         override fun run() {
@@ -79,8 +82,10 @@ class BloomCapsule(private val service: VolumeAccessibilityService) {
         followed = false
         lostTicks = 0
         usingRule = false
-        cachedWindowBottom = -1
-        cachedCardBottom = -1
+        stableTicks = 0
+        lastKey = ""
+        cachedWindowKey = ""
+        cachedCard = null
         main.postDelayed(tickRunnable, FIRST_TICK_MS)
     }
 
@@ -114,11 +119,18 @@ class BloomCapsule(private val service: VolumeAccessibilityService) {
             followed = true
             usingRule = false
             lostTicks = 0
-            place(rect.bottom + dp(8))
+            // The window can appear a moment before the notification slides in, so wait until it stops moving.
+            val key = rect.left.toString() + "," + rect.bottom + "," + rect.right
+            stableTicks = if (key == lastKey) stableTicks + 1 else 0
+            lastKey = key
+            if (root != null || (stableTicks >= STABLE_TICKS && elapsed >= SHOW_AFTER_MS)) {
+                place(rect.bottom + dp(8), rect.left, rect.width())
+            }
         } else if (!followed) {
             if (elapsed >= RULE_AFTER_MS && !usingRule) {
                 usingRule = true
-                place(ruleTop())
+                val screenW = service.resources.displayMetrics.widthPixels
+                place(ruleTop(), dp(16), screenW - dp(32))
             }
         } else {
             lostTicks++
@@ -128,7 +140,7 @@ class BloomCapsule(private val service: VolumeAccessibilityService) {
                 return
             }
         }
-        if (usingRule && elapsed >= RULE_LIFETIME_MS) {
+        if (usingRule && elapsed >= RULE_AFTER_MS + RULE_LIFETIME_MS) {
             dismiss()
             return
         }
@@ -139,7 +151,10 @@ class BloomCapsule(private val service: VolumeAccessibilityService) {
         main.postDelayed(tickRunnable, TICK_MS)
     }
 
-    /** The pop-up notification's window, found by where it is and how big: a wide, short window at the very top. */
+    /**
+     * The pop-up notification's card: its window is found by where it is and how big, then the card inside it is
+     * measured, because on some phones the window is taller than the card and leaves a gap.
+     */
     private fun findHeadsUp(): Rect? {
         val windows = try {
             service.windows
@@ -153,48 +168,56 @@ class BloomCapsule(private val service: VolumeAccessibilityService) {
             w.getBoundsInScreen(r)
             val h = r.height()
             if (r.top <= dp(140) && h in dp(56)..dp(280) && r.width() >= screenW * 0.6f) {
-                val card = cardBottom(w, r, screenW)
-                return Rect(r.left, r.top, r.right, card)
+                val window = Rect(r)
+                return cardBounds(w, window, screenW) ?: Rect(window.left + dp(12), window.top, window.right - dp(12), window.bottom)
             }
         }
         return null
     }
 
     /**
-     * Some phones make the pop-up's window taller than the card you see, which leaves a gap. This looks for the
-     * card itself: the widest tappable box inside the window. Only box sizes are read, never any text. The answer is
-     * kept until the window changes size, so the service does not keep asking another app about its views.
+     * The widest box inside the window that is not the window itself, found by size only (no text is read). That is
+     * the card. Kept until the window changes, so the service does not keep asking another app about its views.
      */
-    private fun cardBottom(w: AccessibilityWindowInfo, window: Rect, screenW: Int): Int {
-        if (window.bottom == cachedWindowBottom && cachedCardBottom > 0) return cachedCardBottom
-        var best = -1
+    private fun cardBounds(w: AccessibilityWindowInfo, window: Rect, screenW: Int): Rect? {
+        val key = window.left.toString() + "," + window.top + "," + window.right + "," + window.bottom
+        if (key == cachedWindowKey) return cachedCard
+        var best: Rect? = null
         try {
-            val root = w.root
-            if (root != null) {
+            val rootNode = w.root
+            if (rootNode != null) {
                 var visited = 0
                 val box = Rect()
+                val tol = dp(4)
                 fun walk(node: AccessibilityNodeInfo, depth: Int) {
-                    if (depth > 5) return
+                    if (depth > 6) return
                     for (i in 0 until node.childCount) {
-                        if (visited++ > 80) return
+                        if (visited++ > 120) return
                         val child = node.getChild(i) ?: continue
-                        if (child.isVisibleToUser && child.isClickable) {
+                        if (child.isVisibleToUser) {
                             child.getBoundsInScreen(box)
-                            if (box.width() >= screenW * 0.6f && box.height() >= dp(40) && box.bottom > best) best = box.bottom
+                            val fillsWindow = box.left <= window.left + tol && box.right >= window.right - tol &&
+                                box.top <= window.top + tol && box.bottom >= window.bottom - tol
+                            if (!fillsWindow && box.width() >= window.width() * 0.8f && box.height() >= dp(40) &&
+                                (best == null || box.bottom > best!!.bottom)
+                            ) {
+                                best = Rect(box)
+                            }
                         }
                         walk(child, depth + 1)
                         release(child)
                     }
                 }
-                walk(root, 0)
-                release(root)
+                walk(rootNode, 0)
+                release(rootNode)
             }
         } catch (e: Exception) {
-            best = -1
+            best = null
         }
-        val result = if (best > window.top + dp(40) && best <= window.bottom) best else window.bottom
-        cachedWindowBottom = window.bottom
-        cachedCardBottom = result
+        val card = best
+        val result = if (card != null && card.bottom > window.top + dp(40) && card.bottom <= window.bottom && card.width() <= screenW) card else null
+        cachedWindowKey = key
+        cachedCard = result
         return result
     }
 
@@ -216,14 +239,16 @@ class BloomCapsule(private val service: VolumeAccessibilityService) {
 
     // ───────────── The window ─────────────
 
-    private fun place(top: Int) {
+    private fun place(top: Int, left: Int, width: Int) {
         val lp = params
         if (root == null || lp == null) {
-            createWindow(top)
+            createWindow(top, left, width)
             return
         }
-        if (lp.y != top) {
+        if (lp.y != top || lp.x != left || lp.width != width) {
             lp.y = top
+            lp.x = left
+            lp.width = width
             try {
                 wm.updateViewLayout(root, lp)
             } catch (e: Exception) {
@@ -232,10 +257,10 @@ class BloomCapsule(private val service: VolumeAccessibilityService) {
         }
     }
 
-    private fun createWindow(top: Int) {
+    private fun createWindow(top: Int, left: Int, width: Int) {
         try {
             val lp = WindowManager.LayoutParams(
-                WindowManager.LayoutParams.WRAP_CONTENT,
+                width,
                 WindowManager.LayoutParams.WRAP_CONTENT,
                 WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
@@ -243,7 +268,8 @@ class BloomCapsule(private val service: VolumeAccessibilityService) {
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                 PixelFormat.TRANSLUCENT,
             )
-            lp.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+            lp.gravity = Gravity.TOP or Gravity.START
+            lp.x = left
             lp.y = top
             val container = FrameLayout(service)
             container.setViewTreeLifecycleOwner(service)
@@ -273,7 +299,7 @@ class BloomCapsule(private val service: VolumeAccessibilityService) {
             container.addView(
                 view,
                 FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT,
                     FrameLayout.LayoutParams.WRAP_CONTENT,
                 ),
             )
@@ -336,8 +362,10 @@ class BloomCapsule(private val service: VolumeAccessibilityService) {
     private companion object {
         const val FIRST_TICK_MS = 150L
         const val TICK_MS = 120L
-        const val RULE_AFTER_MS = 700L
-        const val RULE_LIFETIME_MS = 5000L
+        const val STABLE_TICKS = 2
+        const val SHOW_AFTER_MS = 450L
+        const val RULE_AFTER_MS = 900L
+        const val RULE_LIFETIME_MS = 4500L
         const val MAX_LIFETIME_MS = 15000L
     }
 }
@@ -351,6 +379,10 @@ private fun bloomEmoji(kind: Int): String = when (kind) {
     else -> "\uD83D\uDCDE"
 }
 
+/**
+ * The first thing Bloom found is the main button, with its words and as wide as it can be. Anything else it found
+ * is a round button with just its picture, and the last round button is "remind me in an hour".
+ */
 @Composable
 private fun BloomCapsuleContent(
     offer: BloomOffer,
@@ -360,51 +392,63 @@ private fun BloomCapsuleContent(
     onLater: () -> Unit,
 ) {
     val t by animateFloatAsState(if (visible) 1f else 0f, tween(220), label = "bloom_in")
+    val actions = offer.actions.take(3)
     Box(
-        Modifier.graphicsLayer {
-            alpha = t
-            translationY = (1f - t) * -24.dp.toPx()
-        },
+        Modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                alpha = t
+                translationY = (1f - t) * -24.dp.toPx()
+            },
     ) {
         Row(
             Modifier
-                .clip(RoundedCornerShape(26.dp))
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(30.dp))
                 .background(Color(0xE61C1C1E))
                 .padding(6.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            offer.actions.take(2).forEach { a ->
-                Row(
-                    Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(Color(0x33FFFFFF))
-                        .clickable { onAction(a) }
-                        .padding(horizontal = 12.dp, vertical = 9.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(bloomEmoji(a.kind), fontSize = 15.sp)
-                    Text(
-                        label(a),
-                        color = Color.White,
-                        fontSize = 14.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.widthIn(max = 250.dp),
-                    )
-                }
-            }
-            Box(
+            val first = actions.first()
+            Row(
                 Modifier
-                    .size(38.dp)
-                    .clip(CircleShape)
+                    .weight(1f)
+                    .clip(RoundedCornerShape(24.dp))
                     .background(Color(0x33FFFFFF))
-                    .clickable { onLater() },
-                contentAlignment = Alignment.Center,
+                    .clickable { onAction(first) }
+                    .padding(horizontal = 14.dp, vertical = 11.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("\u23F0", fontSize = 16.sp)
+                Text(bloomEmoji(first.kind), fontSize = 16.sp)
+                Text(
+                    label(first),
+                    color = Color.White,
+                    fontSize = 15.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
             }
+            actions.drop(1).forEach { a ->
+                RoundButton(bloomEmoji(a.kind)) { onAction(a) }
+            }
+            RoundButton("\u23F0") { onLater() }
         }
+    }
+}
+
+@Composable
+private fun RoundButton(emoji: String, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .size(44.dp)
+            .clip(CircleShape)
+            .background(Color(0x33FFFFFF))
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(emoji, fontSize = 18.sp)
     }
 }
