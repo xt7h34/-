@@ -65,6 +65,7 @@ fun BloomPage(notificationAccess: Boolean, onBack: () -> Unit) {
         BA_CODE to R.string.bloom_kind_code,
         BA_LINK to R.string.bloom_kind_link,
         BA_CALL to R.string.bloom_kind_call,
+        BA_MAP to R.string.bloom_kind_map,
     )
     val loaded = apps
     val shown = loaded?.filter { query.isBlank() || it.label.contains(query, ignoreCase = true) } ?: emptyList()

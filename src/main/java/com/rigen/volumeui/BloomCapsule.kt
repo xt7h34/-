@@ -316,14 +316,19 @@ class BloomCapsule(private val service: VolumeAccessibilityService) {
                     locale,
                     if (sameYear) "EEEdMMM" else "EEEdMMMy",
                 )
-                val date = java.text.SimpleDateFormat(pattern, locale).format(java.util.Date(a.at))
-                val whenText = if (a.allDay) date else date + ", " +
-                    android.text.format.DateFormat.getTimeFormat(service).format(java.util.Date(a.at))
+                val format = java.text.SimpleDateFormat(pattern, locale)
+                val date = format.format(java.util.Date(a.at))
+                val whenText = when {
+                    a.endAt >= a.at + CAL_MULTIDAY_MS -> date + " \u2013 " + format.format(java.util.Date(a.endAt))
+                    a.allDay -> date
+                    else -> date + ", " + android.text.format.DateFormat.getTimeFormat(service).format(java.util.Date(a.at))
+                }
                 c.getString(R.string.bloom_add_event, whenText)
             }
             BA_EXPENSE -> c.getString(R.string.bloom_add_expense, formatMoney(a.amount, a.value))
             BA_CODE -> c.getString(R.string.bloom_copy_code, a.value)
             BA_LINK -> c.getString(R.string.bloom_open_link)
+            BA_MAP -> c.getString(R.string.bloom_open_map)
             else -> c.getString(R.string.bloom_call, a.value)
         }
     }
@@ -342,6 +347,7 @@ private fun bloomEmoji(kind: Int): String = when (kind) {
     BA_EXPENSE -> "\uD83D\uDCB8"
     BA_CODE -> "\uD83D\uDD11"
     BA_LINK -> "\uD83D\uDD17"
+    BA_MAP -> "\uD83D\uDCCD"
     else -> "\uD83D\uDCDE"
 }
 

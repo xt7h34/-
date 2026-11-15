@@ -26,7 +26,7 @@ class BloomOffer(
 
 /** Kanade Bloom's settings. It is off until you turn it on, and it only looks at the apps you pick. */
 object BloomPrefs {
-    val ALL_KINDS: Set<Int> = setOf(BA_EVENT, BA_EXPENSE, BA_CODE, BA_LINK, BA_CALL)
+    val ALL_KINDS: Set<Int> = setOf(BA_EVENT, BA_EXPENSE, BA_CODE, BA_LINK, BA_CALL, BA_MAP)
 
     /** Messaging apps that are chosen the first time, if they are installed. */
     private val KNOWN = listOf(
@@ -45,8 +45,17 @@ object BloomPrefs {
 
     fun setEnabled(c: Context, on: Boolean) = sp(c).edit().putBoolean("on", on).apply()
 
-    fun kinds(c: Context): Set<Int> =
-        sp(c).getStringSet("kinds", null)?.mapNotNull { it.toIntOrNull() }?.toSet() ?: ALL_KINDS
+    fun kinds(c: Context): Set<Int> {
+        val saved = sp(c).getStringSet("kinds", null)?.mapNotNull { it.toIntOrNull() }?.toSet() ?: return ALL_KINDS
+        // The map button came later: someone who already chose their kinds gets it switched on once.
+        if (!sp(c).getBoolean("map_added", false)) {
+            val withMap = saved + BA_MAP
+            sp(c).edit().putBoolean("map_added", true)
+                .putStringSet("kinds", withMap.map { it.toString() }.toSet()).apply()
+            return withMap
+        }
+        return saved
+    }
 
     fun setKinds(c: Context, kinds: Set<Int>) =
         sp(c).edit().putStringSet("kinds", kinds.map { it.toString() }.toSet()).apply()
@@ -139,6 +148,17 @@ object BloomEngine {
                     val url = if (a.value.startsWith("http", ignoreCase = true)) a.value else "https://" + a.value
                     c.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 }
+                BA_MAP -> {
+                    val q = Uri.encode(a.value)
+                    try {
+                        c.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=" + q)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    } catch (e: android.content.ActivityNotFoundException) {
+                        c.startActivity(
+                            Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/maps/search/?api=1&query=" + q))
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                        )
+                    }
+                }
                 BA_CALL -> c.startActivity(
                     Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + Uri.encode(a.value))).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                 )
@@ -149,6 +169,7 @@ object BloomEngine {
                         .putExtra("value", a.value)
                         .putExtra("at", a.at)
                         .putExtra("allDay", a.allDay)
+                        .putExtra("endAt", a.endAt)
                         .putExtra("amount", a.amount)
                         .putExtra("sender", offer.sender)
                         .putExtra("snippet", offer.text),

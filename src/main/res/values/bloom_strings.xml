@@ -27,4 +27,6 @@
     <string name="bloom_saved_hint">You can undo this now.</string>
     <string name="bloom_done">Done</string>
     <string name="bloom_undo">Undo</string>
+    <string name="bloom_kind_map">Addresses (open in Maps)</string>
+    <string name="bloom_open_map">Open in Maps</string>
 </resources>

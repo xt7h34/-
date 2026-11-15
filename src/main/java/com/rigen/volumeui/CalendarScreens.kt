@@ -383,6 +383,12 @@ internal fun EventEditor(
     var kind by remember { mutableIntStateOf(initial.kind) }
     var repeat by remember { mutableIntStateOf(initial.repeat) }
     var remind by remember { mutableIntStateOf(initial.remindBefore) }
+    var endDay by remember {
+        mutableLongStateOf(
+            if (initial.end - initial.start >= CAL_MULTIDAY_MS) CalendarEngine.startOfDay(initial.end)
+            else CalendarEngine.startOfDay(initial.start),
+        )
+    }
 
     val kinds = listOf(
         CAL_EVENT to stringResource(R.string.cal_kind_event),
@@ -459,6 +465,16 @@ internal fun EventEditor(
                         ) { Text(android.text.format.DateFormat.getTimeFormat(ctx).format(Date(start))) }
                     }
                 }
+                if (repeat == REP_NONE) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(stringResource(R.string.cal_until), Modifier.weight(1f), style = MaterialTheme.typography.labelMedium)
+                        OutlinedButton(
+                            onClick = { calPickDate(ctx, maxOf(endDay, CalendarEngine.startOfDay(start))) { endDay = it } },
+                        ) {
+                            Text(DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(maxOf(endDay, CalendarEngine.startOfDay(start)))))
+                        }
+                    }
+                }
                 Text(stringResource(R.string.cal_repeat_label), style = MaterialTheme.typography.labelMedium)
                 ChipRow(repeats, repeat) { repeat = it }
                 Text(stringResource(R.string.cal_remind_label), style = MaterialTheme.typography.labelMedium)
@@ -470,11 +486,19 @@ internal fun EventEditor(
                 enabled = title.isNotBlank(),
                 onClick = {
                     val s = if (allDay) CalendarEngine.startOfDay(start) else start
+                    val firstDay = CalendarEngine.startOfDay(s)
+                    val lastDay = if (repeat == REP_NONE) maxOf(endDay, firstDay) else firstDay
+                    val endsAt = when {
+                        lastDay > firstDay && allDay -> lastDay
+                        lastDay > firstDay -> lastDay + (s - firstDay) + 3_600_000L
+                        allDay -> s
+                        else -> s + 3_600_000L
+                    }
                     val saved = initial.copy(
                         title = title.trim(),
                         notes = notes.trim(),
                         start = s,
-                        end = if (allDay) s else s + 3_600_000L,
+                        end = endsAt,
                         allDay = allDay,
                         kind = kind,
                         repeat = repeat,

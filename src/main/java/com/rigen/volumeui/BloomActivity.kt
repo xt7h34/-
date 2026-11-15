@@ -50,13 +50,14 @@ class BloomActivity : ComponentActivity() {
         val value = intent.getStringExtra("value").orEmpty()
         val at = intent.getLongExtra("at", 0L)
         val allDay = intent.getBooleanExtra("allDay", false)
+        val endAt = intent.getLongExtra("endAt", 0L)
         val amount = intent.getLongExtra("amount", 0L)
         val sender = intent.getStringExtra("sender").orEmpty()
         val settings = Prefs.load(this)
         setContent {
             KanadeTheme(settings.themeMode, settings.dynamicColor, settings.accent, settings.amoled) {
                 when (kind) {
-                    BA_EVENT -> BloomEventSheet(value, sender, at, allDay) { finish() }
+                    BA_EVENT -> BloomEventSheet(value, sender, at, allDay, endAt) { finish() }
                     BA_EXPENSE -> BloomExpenseSheet(value, sender, amount) { finish() }
                     else -> QuickGoalSheet { finish() }
                 }
@@ -66,7 +67,7 @@ class BloomActivity : ComponentActivity() {
 }
 
 @Composable
-private fun BloomEventSheet(title: String, sender: String, at: Long, allDay: Boolean, onClose: () -> Unit) {
+private fun BloomEventSheet(title: String, sender: String, at: Long, allDay: Boolean, endAt: Long, onClose: () -> Unit) {
     val ctx = LocalContext.current
     val initial = remember {
         CalEvent(
@@ -74,7 +75,7 @@ private fun BloomEventSheet(title: String, sender: String, at: Long, allDay: Boo
             title = title,
             notes = sender,
             start = at,
-            end = if (allDay) at else at + 3_600_000L,
+            end = if (endAt > at) endAt else if (allDay) at else at + 3_600_000L,
             allDay = allDay,
             kind = CAL_EVENT,
             repeat = REP_NONE,
@@ -82,7 +83,7 @@ private fun BloomEventSheet(title: String, sender: String, at: Long, allDay: Boo
             source = "bloom",
         )
     }
-    val warning = remember { BloomEngine.conflict(ctx, at, allDay) }
+    val warning = remember { if (endAt > at) null else BloomEngine.conflict(ctx, at, allDay) }
     var saved by remember { mutableStateOf<CalEvent?>(null) }
     val done = saved
     if (done == null) {

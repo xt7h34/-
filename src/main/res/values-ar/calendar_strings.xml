@@ -57,4 +57,5 @@
     </string-array>
     <string name="cal_view_wheel">العجلة</string>
     <string name="cal_view_month">الشهر</string>
+    <string name="cal_until">لحد</string>
 </resources>

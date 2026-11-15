@@ -9,6 +9,7 @@ const val BA_EXPENSE = 1
 const val BA_CODE = 2
 const val BA_LINK = 3
 const val BA_CALL = 4
+const val BA_MAP = 5
 
 /**
  * One button Bloom can show. [value] is the title (event), the currency (expense), the code, the link or the number.
@@ -20,6 +21,7 @@ class BloomAction(
     val at: Long = 0L,
     val allDay: Boolean = false,
     val amount: Long = 0L,
+    val endAt: Long = 0L,
 )
 
 /**
@@ -54,6 +56,19 @@ object BloomParser {
         DayOfWeek.THURSDAY to listOf("الخميس", "thursday"),
         DayOfWeek.FRIDAY to listOf("الجمعه", "friday"),
         DayOfWeek.SATURDAY to listOf("السبت", "saturday"),
+    )
+
+    private val WEEKDAY_ALT = WEEKDAYS.flatMap { it.second }.joinToString("|")
+    private const val RANGE_SEP = "الي|لحد|لغايه|حتي|to|until|till|through|thru|-"
+    private val RANGE_DAYS = Regex(
+        """(?<!\d)(\d{1,2})(?:st|nd|rd|th)?\s*(?:$RANGE_SEP)\s*(\d{1,2})(?:st|nd|rd|th)?\s*($MONTH_ANY)(?![a-z])""",
+    )
+    private val RANGE_WEEKDAYS = Regex("""($WEEKDAY_ALT)\s*(?:$RANGE_SEP|ل)\s*($WEEKDAY_ALT)""")
+
+    private val MAP_LABEL = Regex("""(?i)(?:العنوان|عنوان|address|location|الموقع)\s*[:\-]?\s*([^\n]{6,90})""")
+    private val MAP_STREET_AR = Regex("""(?:شارع|ش\.|ميدان|طريق|كورنيش)\s+[\p{L}\d ]{2,40}""")
+    private val MAP_STREET_EN = Regex(
+        """(?i)\b\d{1,4}\s+[A-Za-z][A-Za-z ]{2,30}\s(?:street|st|avenue|ave|road|rd|boulevard|blvd|lane)\b\.?""",
     )
 
     private val ISO_DATE = Regex("""(?<!\d)(20\d{2})-(\d{2})-(\d{2})(?!\d)""")
@@ -123,14 +138,17 @@ object BloomParser {
         }
 
         if (BA_EVENT in kinds) {
-            findEvent(n, now)?.let { (at, allDay) ->
-                out.add(BloomAction(BA_EVENT, snippet(body, sender), at, allDay))
+            findEvent(n, now)?.let { hit ->
+                out.add(BloomAction(BA_EVENT, snippet(body, sender), hit.at, hit.allDay, endAt = hit.endAt))
             }
         }
         if (BA_EXPENSE in kinds) {
             findExpense(n)?.let { (minor, currency) ->
                 out.add(BloomAction(BA_EXPENSE, currency, amount = minor))
             }
+        }
+        if (BA_MAP in kinds) {
+            findAddress(body)?.let { out.add(BloomAction(BA_MAP, it)) }
         }
         if (BA_LINK in kinds) {
             link(body)?.let { out.add(BloomAction(BA_LINK, it)) }
@@ -161,6 +179,16 @@ object BloomParser {
         val raw = LINK.find(body)?.value ?: return null
         val t = raw.trimEnd('.', ',', ';', ':', ')', '!', '?', '،')
         return if (t.length < 8) null else t
+    }
+
+    /** An address written after a label ("العنوان: ...", "Address: ...") or a street name, from the original text. */
+    private fun findAddress(body: String): String? {
+        val found = MAP_LABEL.find(body)?.groupValues?.get(1)
+            ?: MAP_STREET_AR.find(body)?.value
+            ?: MAP_STREET_EN.find(body)?.value
+            ?: return null
+        val t = found.trim().trimEnd('.', ',', ';', '،')
+        return if (t.length < 6 || t.contains("http", ignoreCase = true)) null else t.take(90)
     }
 
     private fun findPhone(n: String): String? {
@@ -198,22 +226,61 @@ object BloomParser {
     // ───────────── Dates and times ─────────────
 
     /** When the thing happens (start of the day for "all day") and whether it has no time, or null. */
-    private fun findEvent(n: String, now: Long): Pair<Long, Boolean>? {
+    private fun findEvent(n: String, now: Long): EventHit? {
         val today = CalendarEngine.ld(now)
-        val date = findDate(n, today)
         val minutes = findTime(n)
+        findRange(n, today)?.let { (from, to) ->
+            val first = CalendarEngine.startMs(from)
+            val last = CalendarEngine.startMs(to)
+            return if (minutes == null) {
+                EventHit(first, true, last)
+            } else {
+                EventHit(first + minutes * 60_000L, false, last + minutes * 60_000L + 3_600_000L)
+            }
+        }
+        val date = findDate(n, today)
         if (date == null && minutes == null) return null
         if (date == null) {
             // Only a time: today if it is still to come, tomorrow if not.
             val t = CalendarEngine.startMs(today) + minutes!! * 60_000L
             val at = if (t > now) t else t + 86_400_000L
-            return Pair(at, false)
+            return EventHit(at, false)
         }
         if (date.isBefore(today)) return null
-        if (minutes == null) return Pair(CalendarEngine.startMs(date), true)
+        if (minutes == null) return EventHit(CalendarEngine.startMs(date), true)
         val at = CalendarEngine.startMs(date) + minutes * 60_000L
-        return if (at > now) Pair(at, false) else null
+        return if (at > now) EventHit(at, false) else null
     }
+
+    /** A run of days: "من 5 إلى 8 ديسمبر", "5-8 Dec", "من الأحد للثلاثاء". Null if it is not one, or it is over a month long. */
+    private fun findRange(n: String, today: LocalDate): Pair<LocalDate, LocalDate>? {
+        RANGE_DAYS.find(n)?.let {
+            val d1 = it.groupValues[1].toInt()
+            val d2 = it.groupValues[2].toInt()
+            val month = monthOf(it.groupValues[3])
+            if (month > 0 && d2 > d1) {
+                val a = upcoming(month, d1, today)
+                val b = a?.let { start -> safeDate(start.year, month, d2) }
+                if (a != null && b != null && b.toEpochDay() - a.toEpochDay() <= 31) return Pair(a, b)
+            }
+        }
+        RANGE_WEEKDAYS.find(n)?.let {
+            val a = WEEKDAYS.firstOrNull { (_, names) -> names.contains(it.groupValues[1]) }?.first
+            val b = WEEKDAYS.firstOrNull { (_, names) -> names.contains(it.groupValues[2]) }?.first
+            if (a != null && b != null) {
+                var ahead = (a.value - today.dayOfWeek.value + 7) % 7
+                if (ahead == 0) ahead = 7
+                val gap = (b.value - a.value + 7) % 7
+                if (gap in 1..6) {
+                    val start = today.plusDays(ahead.toLong())
+                    return Pair(start, start.plusDays(gap.toLong()))
+                }
+            }
+        }
+        return null
+    }
+
+    private class EventHit(val at: Long, val allDay: Boolean, val endAt: Long = 0L)
 
     private fun safeDate(y: Int, m: Int, d: Int): LocalDate? = try {
         LocalDate.of(y, m, d)

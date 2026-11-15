@@ -27,4 +27,6 @@
     <string name="bloom_saved_hint">تقدر تتراجع دلوقتي.</string>
     <string name="bloom_done">تمام</string>
     <string name="bloom_undo">تراجع</string>
+    <string name="bloom_kind_map">العناوين (فتح في الخرائط)</string>
+    <string name="bloom_open_map">افتح الخريطة</string>
 </resources>

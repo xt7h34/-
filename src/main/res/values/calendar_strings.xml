@@ -57,4 +57,5 @@
     </string-array>
     <string name="cal_view_wheel">Wheel</string>
     <string name="cal_view_month">Month</string>
+    <string name="cal_until">Until</string>
 </resources>

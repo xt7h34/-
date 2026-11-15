@@ -40,6 +40,9 @@ const val REP_WEEKLY = 2
 const val REP_MONTHLY = 3
 const val REP_YEARLY = 4
 
+/** An entry that lasts this long or longer, and does not repeat, shows on every day it covers. */
+const val CAL_MULTIDAY_MS = 23 * 3_600_000L
+
 /**
  * One entry of the calendar. [remindBefore] is in minutes (-1 for no reminder). [source] says who made it:
  * empty for you, "bloom" for the ones Kanade Bloom suggested.
@@ -143,13 +146,15 @@ class CalSnapshot(
         events.forEach { e ->
             val at = CalendarEngine.occursOn(e, d)
             if (at >= 0) {
+                val continuing = e.repeat == REP_NONE && e.end - e.start >= CAL_MULTIDAY_MS && d != CalendarEngine.ld(e.start)
+                val wholeDay = e.allDay || continuing
                 val type = when (e.kind) {
                     CAL_OCCASION -> CT_OCCASION
                     CAL_REMINDER -> CT_REMINDER
                     CAL_BILL -> CT_BILL
                     else -> CT_EVENT
                 }
-                out.add(CalItem(type, e.title, if (e.allDay) dayStart else at, e.allDay, e.id, e.notes))
+                out.add(CalItem(type, e.title, if (wholeDay) dayStart else at, wholeDay, e.id, e.notes))
             }
         }
 
@@ -214,7 +219,7 @@ object CalendarEngine {
         if (d.isBefore(sd)) return -1L
         val last = d.lengthOfMonth()
         val ok = when (e.repeat) {
-            REP_NONE -> d == sd
+            REP_NONE -> d == sd || (e.end - e.start >= CAL_MULTIDAY_MS && !d.isAfter(ld(e.end)))
             REP_DAILY -> true
             REP_WEEKLY -> ChronoUnit.DAYS.between(sd, d) % 7L == 0L
             REP_MONTHLY -> d.dayOfMonth == minOf(sd.dayOfMonth, last)
