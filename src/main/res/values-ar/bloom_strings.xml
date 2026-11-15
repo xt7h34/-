@@ -34,4 +34,9 @@
     <string name="bloom_report_empty">لسه مفيش حاجة. ابعت لنفسك رسالة تطلّع الكبسولة وارجع اعمل تحديث.</string>
     <string name="bloom_report_copy">نسخ</string>
     <string name="bloom_report_refresh">تحديث</string>
+    <string name="bloom_pos_title">مكان الكبسولة</string>
+    <string name="bloom_pos_hint">في بعض الموبايلات Bloom مبيشوفش الإشعار المنبثق، فبيحط الكبسولة بالرقمين دول. ابعت لنفسك رسالة تشوف الإشعار بيطلع فين، وبعدين دوس معاينة وظبّط لحد ما الكبسولة تبقى تحته على طول.</string>
+    <string name="bloom_pos_top">البعد عن أعلى الشاشة: %1$d dp</string>
+    <string name="bloom_pos_delay">تظهر بعد: %1$.1f ث</string>
+    <string name="bloom_pos_preview">معاينة</string>
 </resources>

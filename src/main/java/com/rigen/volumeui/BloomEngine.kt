@@ -41,6 +41,18 @@ object BloomPrefs {
 
     private fun sp(c: Context) = c.getSharedPreferences("kanade_bloom", Context.MODE_PRIVATE)
 
+    /**
+     * Some phones show the pop-up in a way the service cannot see. Then the capsule is placed by these two numbers:
+     * how far down from the top of the screen, in dp, and how long to wait after the notification arrives.
+     */
+    fun ruleTopDp(c: Context): Int = sp(c).getInt("rule_top_dp", 55)
+
+    fun setRuleTopDp(c: Context, dp: Int) = sp(c).edit().putInt("rule_top_dp", dp).apply()
+
+    fun ruleDelayMs(c: Context): Int = sp(c).getInt("rule_delay_ms", 1200)
+
+    fun setRuleDelayMs(c: Context, ms: Int) = sp(c).edit().putInt("rule_delay_ms", ms).apply()
+
     fun enabled(c: Context): Boolean = sp(c).getBoolean("on", false)
 
     fun setEnabled(c: Context, on: Boolean) = sp(c).edit().putBoolean("on", on).apply()

@@ -34,4 +34,9 @@
     <string name="bloom_report_empty">Nothing yet. Send yourself a message that makes the capsule appear, then come back and refresh.</string>
     <string name="bloom_report_copy">Copy</string>
     <string name="bloom_report_refresh">Refresh</string>
+    <string name="bloom_pos_title">Capsule position</string>
+    <string name="bloom_pos_hint">On some phones Bloom cannot see the pop-up notification, so it places the capsule by these two numbers. Send yourself a message to see where the pop-up sits, then press Preview and adjust until the capsule sits right under it.</string>
+    <string name="bloom_pos_top">Distance from the top: %1$d dp</string>
+    <string name="bloom_pos_delay">Show it after: %1$.1f s</string>
+    <string name="bloom_pos_preview">Preview</string>
 </resources>

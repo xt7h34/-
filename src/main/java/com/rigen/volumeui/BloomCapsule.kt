@@ -66,6 +66,7 @@ class BloomCapsule(private val service: VolumeAccessibilityService) {
     private var reported = false
     private var lastWindows: List<AccessibilityWindowInfo> = emptyList()
     private var windowsProblem = ""
+    private var ruleDelay = 1200L
 
     private val tickRunnable = object : Runnable {
         override fun run() {
@@ -90,6 +91,7 @@ class BloomCapsule(private val service: VolumeAccessibilityService) {
         cachedWindowKey = ""
         cachedCard = null
         reported = false
+        ruleDelay = BloomPrefs.ruleDelayMs(service).toLong()
         main.postDelayed(tickRunnable, FIRST_TICK_MS)
     }
 
@@ -131,14 +133,14 @@ class BloomCapsule(private val service: VolumeAccessibilityService) {
                 place(rect.bottom + dp(8), rect.left, rect.width())
             }
         } else if (!followed) {
-            if (elapsed >= RULE_AFTER_MS && !usingRule) {
+            if (elapsed >= ruleDelay && !usingRule) {
                 usingRule = true
                 if (!reported) {
                     reported = true
                     writeReport(lastWindows, null, null, null)
                 }
                 val screenW = service.resources.displayMetrics.widthPixels
-                place(ruleTop(), dp(16), screenW - dp(32))
+                place(ruleTop(), dp(20), screenW - dp(40))
             }
         } else {
             lostTicks++
@@ -148,7 +150,7 @@ class BloomCapsule(private val service: VolumeAccessibilityService) {
                 return
             }
         }
-        if (usingRule && elapsed >= RULE_AFTER_MS + RULE_LIFETIME_MS) {
+        if (usingRule && elapsed >= ruleDelay + RULE_LIFETIME_MS) {
             dismiss()
             return
         }
@@ -322,11 +324,7 @@ class BloomCapsule(private val service: VolumeAccessibilityService) {
     }
 
     /** Where to put it when the window cannot be seen: under a typical pop-up. */
-    private fun ruleTop(): Int {
-        val id = service.resources.getIdentifier("status_bar_height", "dimen", "android")
-        val status = if (id > 0) service.resources.getDimensionPixelSize(id) else dp(24)
-        return status + dp(92)
-    }
+    private fun ruleTop(): Int = dp(BloomPrefs.ruleTopDp(service))
 
     // ───────────── The window ─────────────
 
@@ -456,7 +454,6 @@ class BloomCapsule(private val service: VolumeAccessibilityService) {
         const val TICK_MS = 120L
         const val STABLE_TICKS = 2
         const val SHOW_AFTER_MS = 450L
-        const val RULE_AFTER_MS = 900L
         const val RULE_LIFETIME_MS = 4500L
         const val MAX_LIFETIME_MS = 15000L
     }

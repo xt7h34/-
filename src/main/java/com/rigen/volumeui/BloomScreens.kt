@@ -18,11 +18,13 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -117,6 +119,44 @@ fun BloomPage(notificationAccess: Boolean, onBack: () -> Unit) {
                 }
             }
             item { Text(stringResource(R.string.bloom_privacy), style = MaterialTheme.typography.bodySmall) }
+            item {
+                var topDp by remember { mutableFloatStateOf(BloomPrefs.ruleTopDp(ctx).toFloat()) }
+                var delayS by remember { mutableFloatStateOf(BloomPrefs.ruleDelayMs(ctx) / 1000f) }
+                Card(
+                    Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                ) {
+                    androidx.compose.foundation.layout.Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(stringResource(R.string.bloom_pos_title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.bloom_pos_hint), style = MaterialTheme.typography.bodySmall)
+                        Text(stringResource(R.string.bloom_pos_top, topDp.toInt()), style = MaterialTheme.typography.bodyMedium)
+                        Slider(
+                            value = topDp,
+                            onValueChange = { topDp = it },
+                            onValueChangeFinished = { BloomPrefs.setRuleTopDp(ctx, topDp.toInt()) },
+                            valueRange = 0f..220f,
+                        )
+                        Text(stringResource(R.string.bloom_pos_delay, delayS), style = MaterialTheme.typography.bodyMedium)
+                        Slider(
+                            value = delayS,
+                            onValueChange = { delayS = it },
+                            onValueChangeFinished = { BloomPrefs.setRuleDelayMs(ctx, (delayS * 1000f).toInt()) },
+                            valueRange = 0.3f..2.5f,
+                        )
+                        Button(onClick = {
+                            BloomPrefs.setRuleTopDp(ctx, topDp.toInt())
+                            BloomPrefs.setRuleDelayMs(ctx, (delayS * 1000f).toInt())
+                            val at = System.currentTimeMillis() + 86_400_000L
+                            VolumeAccessibilityService.instance?.showBloom(
+                                BloomOffer(
+                                    "preview", "", "",
+                                    listOf(BloomAction(BA_EVENT, "Preview", at), BloomAction(BA_MAP, "Preview")),
+                                ),
+                            )
+                        }) { Text(stringResource(R.string.bloom_pos_preview)) }
+                    }
+                }
+            }
             item {
                 var report by remember { mutableStateOf(BloomDebug.get(ctx)) }
                 Card(
