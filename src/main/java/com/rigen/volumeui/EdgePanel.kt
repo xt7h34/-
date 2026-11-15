@@ -1,5 +1,6 @@
 package com.rigen.volumeui
 
+import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
@@ -36,6 +37,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -57,6 +59,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import kotlin.math.abs
@@ -97,6 +100,7 @@ class EdgePanel(private val service: VolumeAccessibilityService) {
     private var limits: List<Int> = DEFAULT_LIMITS
     private var hapticsOn = true
     private var glance by mutableStateOf(EMPTY_GLANCE)
+    private var focus by mutableIntStateOf(FOCUS_NONE)
 
     private val closeRunnable = Runnable { close() }
     private val removeRunnable = Runnable { removePanel() }
@@ -218,6 +222,7 @@ class EdgePanel(private val service: VolumeAccessibilityService) {
             } catch (e: Exception) {
                 EMPTY_GLANCE
             }
+            focus = focusState()
             val left = stripLeft
 
             val lp = WindowManager.LayoutParams(
@@ -251,6 +256,8 @@ class EdgePanel(private val service: VolumeAccessibilityService) {
                         onRinger = { applyRinger(it) },
                         glance = glance,
                         onOpenDay = { openCalendar() },
+                        focus = focus,
+                        onFocus = { applyFocus(it) },
                     )
                 }
             }
@@ -333,6 +340,76 @@ class EdgePanel(private val service: VolumeAccessibilityService) {
         }
     }
 
+    // ───────────── Focus modes ─────────────
+
+    private fun focusPrefs() = service.getSharedPreferences("kanade_edge_focus", Context.MODE_PRIVATE)
+
+    /** Which focus mode is on, read from Do Not Disturb itself, so it is right even if you changed it elsewhere. */
+    private fun focusState(): Int {
+        val nm = service.getSystemService(NotificationManager::class.java) ?: return FOCUS_NONE
+        return when (nm.currentInterruptionFilter) {
+            NotificationManager.INTERRUPTION_FILTER_PRIORITY ->
+                if (focusPrefs().getBoolean("work", false)) FOCUS_WORK else FOCUS_DND
+            NotificationManager.INTERRUPTION_FILTER_NONE -> FOCUS_DND
+            NotificationManager.INTERRUPTION_FILTER_ALARMS -> FOCUS_ALARMS
+            else -> FOCUS_NONE
+        }
+    }
+
+    /**
+     * Turns a focus mode on, or off if it is the one already on. "Work" is Do Not Disturb (priority only) with the
+     * phone on vibrate, and puts the ringer back the way it was when you leave it.
+     */
+    private fun applyFocus(mode: Int) {
+        try {
+            val nm = service.getSystemService(NotificationManager::class.java) ?: return
+            if (!nm.isNotificationPolicyAccessGranted) {
+                Toast.makeText(
+                    service,
+                    Prefs.localized(service).getString(R.string.toast_dnd_needed),
+                    Toast.LENGTH_SHORT,
+                ).show()
+                return
+            }
+            val sp = focusPrefs()
+            val current = focusState()
+            val target = if (mode == current) FOCUS_NONE else mode
+            if (current == FOCUS_WORK && target != FOCUS_WORK) {
+                val before = sp.getInt("ringer_before", -1)
+                if (before >= 0) {
+                    try {
+                        controller.setRingerMode(before)
+                    } catch (e: SecurityException) {
+                        // Leave the ringer as it is.
+                    }
+                }
+            }
+            when (target) {
+                FOCUS_NONE -> nm.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_ALL)
+                FOCUS_DND -> nm.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_PRIORITY)
+                FOCUS_ALARMS -> nm.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_ALARMS)
+                FOCUS_WORK -> {
+                    if (current != FOCUS_WORK) sp.edit().putInt("ringer_before", controller.ringerMode()).apply()
+                    nm.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_PRIORITY)
+                    try {
+                        controller.setRingerMode(AudioManager.RINGER_MODE_VIBRATE)
+                    } catch (e: SecurityException) {
+                        // Do Not Disturb is on anyway.
+                    }
+                }
+            }
+            sp.edit().putBoolean("work", target == FOCUS_WORK).apply()
+            // Android takes a moment to apply it, so ask again a little later.
+            main.postDelayed({
+                focus = focusState()
+                ringer = controller.ringerMode()
+            }, 300L)
+            haptic()
+        } catch (e: Exception) {
+            Diag.error(service, "Edge panel focus", e)
+        }
+    }
+
     private fun openCalendar() {
         try {
             service.startActivity(
@@ -356,7 +433,11 @@ class EdgePanel(private val service: VolumeAccessibilityService) {
     }
 
     private companion object {
-        const val PAGE_COUNT = 3
+        const val PAGE_COUNT = 4
+        const val FOCUS_NONE = 0
+        const val FOCUS_DND = 1
+        const val FOCUS_WORK = 2
+        const val FOCUS_ALARMS = 3
         const val IDLE_MS = 4000L
     }
 }
@@ -416,12 +497,15 @@ private fun EdgePanelContent(
     onRinger: (Int) -> Unit,
     glance: DayGlance,
     onOpenDay: () -> Unit,
+    focus: Int,
+    onFocus: (Int) -> Unit,
 ) {
     val t by animateFloatAsState(if (visible) 1f else 0f, tween(220), label = "edge_in")
     val height by animateDpAsState(when (page) {
             0 -> 200.dp
             1 -> 150.dp
-            else -> 196.dp
+            2 -> 196.dp
+            else -> 150.dp
         }, tween(260), label = "edge_h")
     val inset = 16.dp
 
@@ -458,7 +542,8 @@ private fun EdgePanelContent(
             when (page) {
                 0 -> VolumePage(level, maxLevel, onSeek)
                 1 -> RingerPage(ringer, onRinger)
-                else -> DayPage(glance, onOpenDay)
+                2 -> DayPage(glance, onOpenDay)
+                else -> FocusPage(focus, onFocus)
             }
         }
         Box(
@@ -472,7 +557,7 @@ private fun EdgePanelContent(
             contentAlignment = Alignment.BottomCenter,
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                for (i in 0 until 3) {
+                for (i in 0 until 4) {
                     Box(
                         Modifier
                             .size(if (i == page) 5.dp else 4.dp)
@@ -576,5 +661,31 @@ private fun DayPage(glance: DayGlance, onOpen: () -> Unit) {
     ) {
         GlassRingTile(glance.nextRing, Color(0xFF30E88B), glance.nextValue, glance.nextLabel)
         GlassRingTile(glance.doneRing, Color(0xFFE86FE0), glance.doneValue, glance.doneLabel)
+    }
+}
+
+@Composable
+private fun FocusPage(focus: Int, onFocus: (Int) -> Unit) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        FocusItem("\uD83C\uDF19", focus == 1) { onFocus(1) }
+        FocusItem("\uD83D\uDCBC", focus == 2) { onFocus(2) }
+        FocusItem("\u23F0", focus == 3) { onFocus(3) }
+    }
+}
+
+@Composable
+private fun FocusItem(emoji: String, selected: Boolean, onTap: () -> Unit) {
+    Box(
+        Modifier
+            .size(36.dp)
+            .clip(CircleShape)
+            .background(if (selected) Color(0xFF5E5CE6) else PanelButton)
+            .clickable { onTap() },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(emoji, fontSize = 17.sp)
     }
 }
