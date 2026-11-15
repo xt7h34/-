@@ -3,4 +3,9 @@
     <string name="edge_panel">Edge panel</string>
     <string name="edge_panel_hint">Swipe in from the screen edge, over any app, for volume and ringer controls. Needs the accessibility service to be on.</string>
     <string name="edge_panel_left">Put it on the left edge</string>
+    <string name="edge_timer_caption">%1$d min</string>
+    <string name="edge_timer_started">Timer started · %1$d min</string>
+    <string name="edge_expense_caption">Expense</string>
+    <string name="edge_goal_none">No goal</string>
+    <string name="edge_goal_none_toast">You have no active goal yet.</string>
 </resources>

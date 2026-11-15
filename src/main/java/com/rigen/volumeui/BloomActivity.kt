@@ -28,6 +28,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 
+/** Not a Bloom button: the Edge Panel shortcut that adds money to your first active goal. */
+const val BA_GOAL_QUICK = 10
+
 /**
  * Where a Bloom button that needs a look first lands: a small sheet over whatever you were doing, filled in
  * from the notification, so you can fix what Bloom guessed before anything is saved. After saving you can undo.
@@ -40,7 +43,7 @@ class BloomActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val kind = intent.getIntExtra("kind", -1)
-        if (kind != BA_EVENT && kind != BA_EXPENSE) {
+        if (kind != BA_EVENT && kind != BA_EXPENSE && kind != BA_GOAL_QUICK) {
             finish()
             return
         }
@@ -52,10 +55,10 @@ class BloomActivity : ComponentActivity() {
         val settings = Prefs.load(this)
         setContent {
             KanadeTheme(settings.themeMode, settings.dynamicColor, settings.accent, settings.amoled) {
-                if (kind == BA_EVENT) {
-                    BloomEventSheet(value, sender, at, allDay) { finish() }
-                } else {
-                    BloomExpenseSheet(value, sender, amount) { finish() }
+                when (kind) {
+                    BA_EVENT -> BloomEventSheet(value, sender, at, allDay) { finish() }
+                    BA_EXPENSE -> BloomExpenseSheet(value, sender, amount) { finish() }
+                    else -> QuickGoalSheet { finish() }
                 }
             }
         }
@@ -106,7 +109,7 @@ private fun BloomExpenseSheet(currency: String, sender: String, amount: Long, on
     val ctx = LocalContext.current
     val data = remember { BudgetStore.load(ctx) }
     val cats = remember { data.cats() }
-    var amountText by remember { mutableStateOf(editableMoney(amount)) }
+    var amountText by remember { mutableStateOf(if (amount > 0L) editableMoney(amount) else "") }
     var note by remember { mutableStateOf(sender) }
     var cat by remember { mutableStateOf("other") }
     var savedAt by remember { mutableStateOf(0L) }
@@ -185,4 +188,64 @@ private fun SavedDialog(onUndo: () -> Unit, onClose: () -> Unit) {
         confirmButton = { TextButton(onClick = onClose) { Text(stringResource(R.string.bloom_done)) } },
         dismissButton = { TextButton(onClick = onUndo) { Text(stringResource(R.string.bloom_undo)) } },
     )
+}
+
+@Composable
+private fun QuickGoalSheet(onClose: () -> Unit) {
+    val ctx = LocalContext.current
+    val goal = remember { GoalsStore.load(ctx).firstOrNull { !it.archived && it.completedAt == 0L } }
+    if (goal == null) {
+        LaunchedEffect(Unit) { onClose() }
+        return
+    }
+    var amountText by remember { mutableStateOf("") }
+    var note by remember { mutableStateOf("") }
+    var savedEntry by remember { mutableStateOf<String?>(null) }
+
+    if (savedEntry == null) {
+        AlertDialog(
+            onDismissRequest = onClose,
+            title = { Text((goal.emoji + " " + goal.name).trim()) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = amountText,
+                        onValueChange = { amountText = it },
+                        label = { Text(stringResource(R.string.bloom_amount)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    OutlinedTextField(
+                        value = note,
+                        onValueChange = { note = it },
+                        label = { Text(stringResource(R.string.cal_notes_hint)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            },
+            confirmButton = {
+                val minor = parseMoney(amountText)
+                TextButton(
+                    enabled = minor != null && minor > 0L,
+                    onClick = {
+                        val m = minor ?: return@TextButton
+                        GoalsStore.addEntry(ctx, goal.id, m, note)
+                        savedEntry = GoalsStore.load(ctx).firstOrNull { it.id == goal.id }
+                            ?.entries?.lastOrNull { it.amount == m }?.id.orEmpty()
+                    },
+                ) { Text(stringResource(R.string.cal_save)) }
+            },
+            dismissButton = { TextButton(onClick = onClose) { Text(stringResource(R.string.cal_cancel)) } },
+        )
+    } else {
+        SavedDialog(
+            onUndo = {
+                val id = savedEntry.orEmpty()
+                if (id.isNotEmpty()) GoalsStore.deleteEntry(ctx, goal.id, id)
+                onClose()
+            },
+            onClose = onClose,
+        )
+    }
 }

@@ -3,4 +3,9 @@
     <string name="edge_panel">لوحة الحافة</string>
     <string name="edge_panel_hint">اسحب من حافة الشاشة فوق أي تطبيق للتحكم في الصوت ووضع الرنين. لازم خدمة الإتاحة تكون شغّالة.</string>
     <string name="edge_panel_left">خليها على الحافة الشمال</string>
+    <string name="edge_timer_caption">%1$d د</string>
+    <string name="edge_timer_started">اشتغل التايمر · %1$d دقيقة</string>
+    <string name="edge_expense_caption">مصروف</string>
+    <string name="edge_goal_none">مفيش هدف</string>
+    <string name="edge_goal_none_toast">ملكش هدف شغّال لسه.</string>
 </resources>

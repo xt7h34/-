@@ -23,6 +23,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -101,6 +102,9 @@ class EdgePanel(private val service: VolumeAccessibilityService) {
     private var hapticsOn = true
     private var glance by mutableStateOf(EMPTY_GLANCE)
     private var focus by mutableIntStateOf(FOCUS_NONE)
+    private var quickMinutes by mutableIntStateOf(5)
+    private var goalCaption by mutableStateOf("")
+    private var hasGoal = false
 
     private val closeRunnable = Runnable { close() }
     private val removeRunnable = Runnable { removePanel() }
@@ -223,6 +227,15 @@ class EdgePanel(private val service: VolumeAccessibilityService) {
                 EMPTY_GLANCE
             }
             focus = focusState()
+            quickMinutes = quickPrefs().getInt("minutes", 5)
+            val goal = try {
+                GoalsStore.load(service).firstOrNull { !it.archived && it.completedAt == 0L }
+            } catch (e: Exception) {
+                null
+            }
+            hasGoal = goal != null
+            goalCaption = goal?.let { (it.emoji + " " + it.name).trim() }
+                ?: Prefs.localized(service).getString(R.string.edge_goal_none)
             val left = stripLeft
 
             val lp = WindowManager.LayoutParams(
@@ -258,6 +271,15 @@ class EdgePanel(private val service: VolumeAccessibilityService) {
                         onOpenDay = { openCalendar() },
                         focus = focus,
                         onFocus = { applyFocus(it) },
+                        shortcuts = EdgeShortcuts(
+                            timerCaption = Prefs.localized(service).getString(R.string.edge_timer_caption, quickMinutes),
+                            expenseCaption = Prefs.localized(service).getString(R.string.edge_expense_caption),
+                            goalCaption = goalCaption,
+                            onTimer = { startQuickTimer() },
+                            onTimerLong = { cycleQuickTimer() },
+                            onExpense = { launchSheet(BA_EXPENSE) },
+                            onGoal = { openQuickGoal() },
+                        ),
                     )
                 }
             }
@@ -410,6 +432,58 @@ class EdgePanel(private val service: VolumeAccessibilityService) {
         }
     }
 
+    // ───────────── Shortcuts ─────────────
+
+    private fun quickPrefs() = service.getSharedPreferences("kanade_edge_quick", Context.MODE_PRIVATE)
+
+    /** Starts a timer with the length shown under the button. */
+    private fun startQuickTimer() {
+        try {
+            ClockEngine.timerStart(service, quickMinutes * 60_000L)
+            Toast.makeText(
+                service,
+                Prefs.localized(service).getString(R.string.edge_timer_started, quickMinutes),
+                Toast.LENGTH_SHORT,
+            ).show()
+        } catch (e: Exception) {
+            Diag.error(service, "Edge panel timer", e)
+        }
+        close()
+    }
+
+    /** A long press on the timer button picks the next length: 5, 10, 15, 25 or 45 minutes. */
+    private fun cycleQuickTimer() {
+        val i = QUICK_MINUTES.indexOf(quickMinutes)
+        quickMinutes = QUICK_MINUTES[(i + 1) % QUICK_MINUTES.size]
+        quickPrefs().edit().putInt("minutes", quickMinutes).apply()
+        haptic()
+    }
+
+    private fun openQuickGoal() {
+        if (!hasGoal) {
+            Toast.makeText(
+                service,
+                Prefs.localized(service).getString(R.string.edge_goal_none_toast),
+                Toast.LENGTH_SHORT,
+            ).show()
+            return
+        }
+        launchSheet(BA_GOAL_QUICK)
+    }
+
+    private fun launchSheet(kind: Int) {
+        try {
+            service.startActivity(
+                Intent(service, BloomActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    .putExtra("kind", kind),
+            )
+        } catch (e: Exception) {
+            Diag.error(service, "Edge panel sheet", e)
+        }
+        close()
+    }
+
     private fun openCalendar() {
         try {
             service.startActivity(
@@ -433,7 +507,8 @@ class EdgePanel(private val service: VolumeAccessibilityService) {
     }
 
     private companion object {
-        const val PAGE_COUNT = 4
+        const val PAGE_COUNT = 5
+        val QUICK_MINUTES = intArrayOf(5, 10, 15, 25, 45)
         const val FOCUS_NONE = 0
         const val FOCUS_DND = 1
         const val FOCUS_WORK = 2
@@ -499,13 +574,15 @@ private fun EdgePanelContent(
     onOpenDay: () -> Unit,
     focus: Int,
     onFocus: (Int) -> Unit,
+    shortcuts: EdgeShortcuts,
 ) {
     val t by animateFloatAsState(if (visible) 1f else 0f, tween(220), label = "edge_in")
     val height by animateDpAsState(when (page) {
             0 -> 200.dp
             1 -> 150.dp
             2 -> 196.dp
-            else -> 150.dp
+            3 -> 150.dp
+            else -> 204.dp
         }, tween(260), label = "edge_h")
     val inset = 16.dp
 
@@ -543,7 +620,8 @@ private fun EdgePanelContent(
                 0 -> VolumePage(level, maxLevel, onSeek)
                 1 -> RingerPage(ringer, onRinger)
                 2 -> DayPage(glance, onOpenDay)
-                else -> FocusPage(focus, onFocus)
+                3 -> FocusPage(focus, onFocus)
+                else -> ShortcutsPage(shortcuts)
             }
         }
         Box(
@@ -557,7 +635,7 @@ private fun EdgePanelContent(
             contentAlignment = Alignment.BottomCenter,
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                for (i in 0 until 4) {
+                for (i in 0 until 5) {
                     Box(
                         Modifier
                             .size(if (i == page) 5.dp else 4.dp)
@@ -687,5 +765,55 @@ private fun FocusItem(emoji: String, selected: Boolean, onTap: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         Text(emoji, fontSize = 17.sp)
+    }
+}
+
+/** What the shortcuts page shows and does. The words are written by the panel, in the app's language. */
+private class EdgeShortcuts(
+    val timerCaption: String,
+    val expenseCaption: String,
+    val goalCaption: String,
+    val onTimer: () -> Unit,
+    val onTimerLong: () -> Unit,
+    val onExpense: () -> Unit,
+    val onGoal: () -> Unit,
+)
+
+@Composable
+private fun ShortcutsPage(s: EdgeShortcuts) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        ShortcutItem("\u23F1\uFE0F", s.timerCaption, onLong = s.onTimerLong, onTap = s.onTimer)
+        ShortcutItem("\uD83D\uDCB8", s.expenseCaption, onTap = s.onExpense)
+        ShortcutItem("\uD83C\uDFAF", s.goalCaption, onTap = s.onGoal)
+    }
+}
+
+@Composable
+private fun ShortcutItem(emoji: String, caption: String, onLong: (() -> Unit)? = null, onTap: () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            Modifier
+                .size(38.dp)
+                .clip(CircleShape)
+                .background(PanelButton)
+                .pointerInput(Unit) {
+                    detectTapGestures(onTap = { onTap() }, onLongPress = { onLong?.invoke() })
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(emoji, fontSize = 17.sp)
+        }
+        Text(
+            caption,
+            color = PanelMuted,
+            fontSize = 9.sp,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.width(66.dp),
+        )
     }
 }
