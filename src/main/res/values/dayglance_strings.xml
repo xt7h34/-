@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dg_in_m">%1$dm</string>
+    <string name="dg_in_hm">%1$dh %2$dm</string>
+    <string name="dg_next_none">Nothing coming up</string>
+    <string name="dg_tomorrow">%1$s · tomorrow</string>
+    <string name="dg_done_label">Done today</string>
+    <string name="dg_done_none">Nothing scheduled</string>
+</resources>

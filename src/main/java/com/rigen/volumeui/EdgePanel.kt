@@ -1,6 +1,7 @@
 package com.rigen.volumeui
 
 import android.content.Context
+import android.content.Intent
 import android.graphics.PixelFormat
 import android.graphics.Rect
 import android.graphics.drawable.GradientDrawable
@@ -95,6 +96,7 @@ class EdgePanel(private val service: VolumeAccessibilityService) {
     private var ringer by mutableIntStateOf(AudioManager.RINGER_MODE_NORMAL)
     private var limits: List<Int> = DEFAULT_LIMITS
     private var hapticsOn = true
+    private var glance by mutableStateOf(EMPTY_GLANCE)
 
     private val closeRunnable = Runnable { close() }
     private val removeRunnable = Runnable { removePanel() }
@@ -211,6 +213,11 @@ class EdgePanel(private val service: VolumeAccessibilityService) {
             maxLevel = controller.max(AudioManager.STREAM_MUSIC)
             level = controller.level(AudioManager.STREAM_MUSIC)
             ringer = controller.ringerMode()
+            glance = try {
+                dayGlance(Prefs.localized(service), System.currentTimeMillis())
+            } catch (e: Exception) {
+                EMPTY_GLANCE
+            }
             val left = stripLeft
 
             val lp = WindowManager.LayoutParams(
@@ -242,6 +249,8 @@ class EdgePanel(private val service: VolumeAccessibilityService) {
                         onSeek = { seek(it) },
                         ringer = ringer,
                         onRinger = { applyRinger(it) },
+                        glance = glance,
+                        onOpenDay = { openCalendar() },
                     )
                 }
             }
@@ -324,6 +333,19 @@ class EdgePanel(private val service: VolumeAccessibilityService) {
         }
     }
 
+    private fun openCalendar() {
+        try {
+            service.startActivity(
+                Intent(service, MainActivity::class.java)
+                    .putExtra(EXTRA_PAGE, PAGE_CALENDAR)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+            )
+        } catch (e: Exception) {
+            Diag.error(service, "Edge panel calendar", e)
+        }
+        close()
+    }
+
     private fun haptic() {
         if (!hapticsOn) return
         try {
@@ -334,7 +356,7 @@ class EdgePanel(private val service: VolumeAccessibilityService) {
     }
 
     private companion object {
-        const val PAGE_COUNT = 2
+        const val PAGE_COUNT = 3
         const val IDLE_MS = 4000L
     }
 }
@@ -392,9 +414,15 @@ private fun EdgePanelContent(
     onSeek: (Float) -> Unit,
     ringer: Int,
     onRinger: (Int) -> Unit,
+    glance: DayGlance,
+    onOpenDay: () -> Unit,
 ) {
     val t by animateFloatAsState(if (visible) 1f else 0f, tween(220), label = "edge_in")
-    val height by animateDpAsState(if (page == 0) 200.dp else 150.dp, tween(260), label = "edge_h")
+    val height by animateDpAsState(when (page) {
+            0 -> 200.dp
+            1 -> 150.dp
+            else -> 196.dp
+        }, tween(260), label = "edge_h")
     val inset = 16.dp
 
     Box(
@@ -427,10 +455,10 @@ private fun EdgePanelContent(
                 ),
             contentAlignment = Alignment.Center,
         ) {
-            if (page == 0) {
-                VolumePage(level, maxLevel, onSeek)
-            } else {
-                RingerPage(ringer, onRinger)
+            when (page) {
+                0 -> VolumePage(level, maxLevel, onSeek)
+                1 -> RingerPage(ringer, onRinger)
+                else -> DayPage(glance, onOpenDay)
             }
         }
         Box(
@@ -444,7 +472,7 @@ private fun EdgePanelContent(
             contentAlignment = Alignment.BottomCenter,
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                for (i in 0 until 2) {
+                for (i in 0 until 3) {
                     Box(
                         Modifier
                             .size(if (i == page) 5.dp else 4.dp)
@@ -534,5 +562,19 @@ private fun RingerItem(glyph: Glyph, selected: Boolean, accent: Color, onTap: ()
         contentAlignment = Alignment.Center,
     ) {
         PathIcon(glyph.pathData, tint, 18.dp)
+    }
+}
+
+@Composable
+private fun DayPage(glance: DayGlance, onOpen: () -> Unit) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clickable { onOpen() },
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        GlassRingTile(glance.nextRing, Color(0xFF30E88B), glance.nextValue, glance.nextLabel)
+        GlassRingTile(glance.doneRing, Color(0xFFE86FE0), glance.doneValue, glance.doneLabel)
     }
 }

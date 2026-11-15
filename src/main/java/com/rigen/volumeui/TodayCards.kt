@@ -24,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -146,6 +147,10 @@ internal fun TodayCards(onOpen: (String) -> Unit) {
                     )
                 }
             }
+            // Two glass capsules read from the calendar: what is next and how much of today is done.
+            val glance = remember(CalendarStore.tick) { dayGlance(ctx, System.currentTimeMillis()) }
+            RingPill(glance.nextRing, Color(0xFF30E88B), glance.nextValue, glance.nextLabel) { onOpen(PAGE_CALENDAR) }
+            RingPill(glance.doneRing, Color(0xFFE86FE0), glance.doneValue, glance.doneLabel) { onOpen(PAGE_CALENDAR) }
             for (r in rows) {
                 Row(
                     Modifier.fillMaxWidth().clickable {

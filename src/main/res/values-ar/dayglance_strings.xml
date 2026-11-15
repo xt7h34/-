@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dg_in_m">%1$d د</string>
+    <string name="dg_in_hm">%1$d س %2$d د</string>
+    <string name="dg_next_none">مفيش حاجة جاية</string>
+    <string name="dg_tomorrow">%1$s · بكرة</string>
+    <string name="dg_done_label">خلص النهارده</string>
+    <string name="dg_done_none">مفيش جدول النهارده</string>
+</resources>
