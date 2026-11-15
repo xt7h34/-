@@ -64,6 +64,8 @@ class BloomCapsule(private val service: VolumeAccessibilityService) {
     private var cachedWindowKey = ""
     private var cachedCard: Rect? = null
     private var reported = false
+    private var lastWindows: List<AccessibilityWindowInfo> = emptyList()
+    private var windowsProblem = ""
 
     private val tickRunnable = object : Runnable {
         override fun run() {
@@ -131,6 +133,10 @@ class BloomCapsule(private val service: VolumeAccessibilityService) {
         } else if (!followed) {
             if (elapsed >= RULE_AFTER_MS && !usingRule) {
                 usingRule = true
+                if (!reported) {
+                    reported = true
+                    writeReport(lastWindows, null, null, null)
+                }
                 val screenW = service.resources.displayMetrics.widthPixels
                 place(ruleTop(), dp(16), screenW - dp(32))
             }
@@ -159,10 +165,13 @@ class BloomCapsule(private val service: VolumeAccessibilityService) {
      */
     private fun findHeadsUp(): Rect? {
         val windows = try {
-            service.windows
+            service.windows.also { windowsProblem = "" }
         } catch (e: Exception) {
+            windowsProblem = e.javaClass.simpleName
+            lastWindows = emptyList()
             return null
         }
+        lastWindows = windows
         val screenW = service.resources.displayMetrics.widthPixels
         val r = Rect()
         for (w in windows) {
@@ -228,8 +237,11 @@ class BloomCapsule(private val service: VolumeAccessibilityService) {
         return result
     }
 
-    /** What Bloom saw, as sizes only, so the placement can be fixed from real numbers. Shown in Bloom\'s settings. */
-    private fun writeReport(windows: List<AccessibilityWindowInfo>, chosen: AccessibilityWindowInfo, window: Rect, card: Rect?) {
+    /**
+     * What Bloom saw, as sizes only (no text), so the placement can be fixed from real numbers. Written when it finds the
+     * notification's window and also when it does not, and shown in Bloom's settings.
+     */
+    private fun writeReport(windows: List<AccessibilityWindowInfo>, chosen: AccessibilityWindowInfo?, window: Rect?, card: Rect?) {
         try {
             val dm = service.resources.displayMetrics
             val version = try {
@@ -240,25 +252,44 @@ class BloomCapsule(private val service: VolumeAccessibilityService) {
             val sb = StringBuilder()
             sb.append("Kanade ").append(version).append("\n")
             sb.append("screen ").append(dm.widthPixels).append("x").append(dm.heightPixels).append(" density ").append(dm.density).append("\n")
+            sb.append("windows seen: ").append(windows.size)
+            if (windowsProblem.isNotEmpty()) sb.append(" (error: ").append(windowsProblem).append(")")
+            sb.append("\n")
             val r = Rect()
             windows.forEachIndexed { i, w ->
                 w.getBoundsInScreen(r)
                 sb.append("window ").append(i).append(": type=").append(w.type).append(" layer=").append(w.layer)
                     .append(" bounds=").append(r.toShortString()).append("\n")
             }
-            sb.append("notification window: ").append(window.toShortString()).append("\n")
-            sb.append("card found: ").append(card?.toShortString() ?: "none").append("\n")
-            sb.append("boxes inside the window:\n")
-            val rootNode = chosen.root
-            if (rootNode == null) {
-                sb.append("  (the window shows no views)\n")
+            if (window != null) {
+                sb.append("notification window: ").append(window.toShortString()).append("\n")
+                sb.append("card found: ").append(card?.toShortString() ?: "none").append("\n")
             } else {
+                sb.append("notification window: NOT FOUND, so the capsule was placed by the rule\n")
+            }
+            // Boxes inside the notification's window, or inside every system window near the top if it was not found.
+            val targets = if (chosen != null) {
+                listOf(chosen)
+            } else {
+                windows.filter {
+                    it.getBoundsInScreen(r)
+                    it.type == AccessibilityWindowInfo.TYPE_SYSTEM && r.top <= dp(300) && r.height() <= dp(500)
+                }
+            }
+            for (target in targets) {
+                target.getBoundsInScreen(r)
+                sb.append("boxes inside window ").append(r.toShortString()).append(":\n")
+                val rootNode = target.root
+                if (rootNode == null) {
+                    sb.append("  (the window shows no views)\n")
+                    continue
+                }
                 var count = 0
                 val box = Rect()
                 fun dump(node: AccessibilityNodeInfo, depth: Int) {
                     if (depth > 6) return
                     for (i in 0 until node.childCount) {
-                        if (count++ >= 60) return
+                        if (count++ >= 40) return
                         val child = node.getChild(i) ?: continue
                         child.getBoundsInScreen(box)
                         sb.append("  ").append("-".repeat(depth)).append(" ")
