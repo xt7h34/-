@@ -1876,6 +1876,11 @@ private fun AppPage(settings: PanelSettings, onChange: (PanelSettings) -> Unit, 
 
     PageScaffold(stringResource(R.string.item_app_title), onBack) { padding ->
         PageColumn(padding) {
+            Section(stringResource(R.string.ob_replay_section)) {
+                OutlinedButton(onClick = { IntroSignal.replay = true }) {
+                    Text(stringResource(R.string.ob_replay_button))
+                }
+            }
             Section(stringResource(R.string.section_theme)) {
                 Row(
                     modifier = Modifier.horizontalScroll(rememberScrollState()),
@@ -2010,6 +2015,7 @@ class MainActivity : ComponentActivity() {
     private var serviceEnabled by mutableStateOf(false)
     private var dndAccess by mutableStateOf(true)
     private var mediaAccess by mutableStateOf(false)
+    private var introNeeded = false
 
     /** Uses the language chosen inside the app, if there is one. */
     override fun attachBaseContext(newBase: Context) {
@@ -2019,6 +2025,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // First-run steps only for someone who has not seen them and has not already set the app up.
+        if (!OnboardingPrefs.done(this)) {
+            if (isServiceEnabled()) OnboardingPrefs.setDone(this) else introNeeded = true
+        }
         setContent { AppRoot() }
     }
 
@@ -2051,6 +2061,14 @@ class MainActivity : ComponentActivity() {
         }
 
         KanadeTheme(settings.themeMode, settings.dynamicColor, settings.accent, settings.amoled) {
+            var intro by rememberSaveable { mutableStateOf(this@MainActivity.introNeeded) }
+            if (intro || IntroSignal.replay) {
+                OnboardingFlow(serviceEnabled, dndAccess, mediaAccess) {
+                    intro = false
+                    IntroSignal.replay = false
+                }
+                return@KanadeTheme
+            }
             // The service can ask for a page, for example from the Volume Station's gear.
             val startPage = this@MainActivity.intent?.getStringExtra(EXTRA_PAGE) ?: PAGE_HOME
             var page by rememberSaveable { mutableStateOf(startPage) }

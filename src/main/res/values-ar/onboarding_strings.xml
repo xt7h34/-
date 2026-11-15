@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ob_skip">تخطّي</string>
+    <string name="ob_next">التالي</string>
+    <string name="ob_start">ابدأ</string>
+    <string name="ob_open_settings">افتح الإعدادات</string>
+    <string name="ob_welcome_title">أهلاً بيك في Kanade</string>
+    <string name="ob_welcome_sub">كام خطوة سريعة ويبقى جاهز. وتقدر تغيّر أي حاجة بعدين.</string>
+    <string name="ob_feat_panel_t">لوحة الصوت ولوحة الحافة</string>
+    <string name="ob_feat_panel_d">لوحة صوت بتاعتك، ولوحة على حافة الشاشة للصوت والتركيز والاختصارات.</string>
+    <string name="ob_feat_cal_t">التقويم</string>
+    <string name="ob_feat_cal_d">المواعيد والمنبّهات والصلاة والأهداف مع بعض.</string>
+    <string name="ob_feat_bloom_t">Kanade Bloom</string>
+    <string name="ob_feat_bloom_d">أزرار ذكية تحت إشعاراتك.</string>
+    <string name="ob_service_title">شغّل الخدمة</string>
+    <string name="ob_service_sub">Kanade محتاج خدمة الإتاحة بتاعته عشان يعرض لوحة الصوت ولوحة الحافة. ومبيقراش اللي على شاشتك.</string>
+    <string name="ob_service_on">الخدمة شغّالة</string>
+    <string name="ob_service_off">الخدمة مقفولة</string>
+    <string name="ob_dnd_title">الوصول لعدم الإزعاج</string>
+    <string name="ob_dnd_sub">أوضاع التركيز والوضع الصامت محتاجين الإذن ده. تقدر تتخطّاه وترجعله بعدين.</string>
+    <string name="ob_dnd_on">الإذن متفعّل</string>
+    <string name="ob_dnd_off">لسه ما اتفعّلش</string>
+    <string name="ob_budget_title">ميزانيتك الشهرية</string>
+    <string name="ob_budget_sub">تقريباً بتصرف كام في الشهر. لفّ العجلة.</string>
+    <string name="ob_budget_label">الميزانية الشهرية</string>
+    <string name="ob_budget_none">مش دلوقتي</string>
+    <string name="ob_bloom_sub">أزرار ذكية تحت إشعارات الرسايل: إضافة للتقويم، ونسخ كود، وتسجيل مصروف. وبيفضل مقفول لحد ما تشغّله.</string>
+    <string name="ob_bloom_switch">شغّل Kanade Bloom</string>
+    <string name="ob_done_title">كله جاهز</string>
+    <string name="ob_done_sub">تحب لوحة على حافة شاشتك؟</string>
+    <string name="ob_replay_section">خطوات البداية</string>
+    <string name="ob_replay_button">اعرض خطوات البداية تاني</string>
+</resources>

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ob_skip">Skip</string>
+    <string name="ob_next">Next</string>
+    <string name="ob_start">Start</string>
+    <string name="ob_open_settings">Open settings</string>
+    <string name="ob_welcome_title">Welcome to Kanade</string>
+    <string name="ob_welcome_sub">A few quick steps and it is ready. You can change everything later.</string>
+    <string name="ob_feat_panel_t">Volume and edge panel</string>
+    <string name="ob_feat_panel_d">Your own volume panel, and a panel on the screen edge for sound, focus and shortcuts.</string>
+    <string name="ob_feat_cal_t">Calendar</string>
+    <string name="ob_feat_cal_d">Events, alarms, prayers and goals together.</string>
+    <string name="ob_feat_bloom_t">Kanade Bloom</string>
+    <string name="ob_feat_bloom_d">Smart buttons under your notifications.</string>
+    <string name="ob_service_title">Turn on the service</string>
+    <string name="ob_service_sub">Kanade needs its accessibility service to show the volume panel and the edge panel. It does not read what is on your screen.</string>
+    <string name="ob_service_on">The service is on</string>
+    <string name="ob_service_off">The service is off</string>
+    <string name="ob_dnd_title">Do Not Disturb access</string>
+    <string name="ob_dnd_sub">Focus modes and silent mode need this permission. You can skip it and come back later.</string>
+    <string name="ob_dnd_on">Access granted</string>
+    <string name="ob_dnd_off">Not granted yet</string>
+    <string name="ob_budget_title">Your monthly budget</string>
+    <string name="ob_budget_sub">Roughly how much you plan to spend each month. Turn the wheel.</string>
+    <string name="ob_budget_label">Monthly budget</string>
+    <string name="ob_budget_none">Not now</string>
+    <string name="ob_bloom_sub">Smart buttons under message notifications: add to the calendar, copy a code, log an expense. It stays off until you turn it on.</string>
+    <string name="ob_bloom_switch">Turn on Kanade Bloom</string>
+    <string name="ob_done_title">You are all set</string>
+    <string name="ob_done_sub">Want the panel on the edge of your screen?</string>
+    <string name="ob_replay_section">First steps</string>
+    <string name="ob_replay_button">Show the first steps again</string>
+</resources>
