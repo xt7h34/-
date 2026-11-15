@@ -102,21 +102,39 @@ fun CalendarPage(onBack: () -> Unit) {
     val selected = LocalDate.parse(dayKey)
     var editor by remember { mutableStateOf<CalEvent?>(null) }
     var editorIsNew by remember { mutableStateOf(false) }
+    var wheel by rememberSaveable { mutableStateOf(false) }
+    val pick = { d: LocalDate ->
+        dayKey = d.toString()
+        monthKey = YearMonth.from(d).toString()
+    }
 
     PageScaffold(stringResource(R.string.cal_title), onBack) { pad ->
         PageColumn(pad) {
             MonthHeader(
-                month = month,
+                month = if (wheel) YearMonth.from(selected) else month,
                 locale = locale,
-                onPrev = { monthKey = month.minusMonths(1).toString() },
-                onNext = { monthKey = month.plusMonths(1).toString() },
-                onToday = {
-                    monthKey = YearMonth.from(today).toString()
-                    dayKey = today.toString()
+                wheel = wheel,
+                onToggleView = { wheel = !wheel },
+                onPrev = {
+                    if (wheel) {
+                        pick(selected.minusMonths(1))
+                    } else {
+                        monthKey = month.minusMonths(1).toString()
+                    }
                 },
+                onNext = {
+                    if (wheel) {
+                        pick(selected.plusMonths(1))
+                    } else {
+                        monthKey = month.plusMonths(1).toString()
+                    }
+                },
+                onToday = { pick(today) },
             )
-            MonthGrid(month, selected, today, locale, snap) {
-                dayKey = it.toString()
+            if (wheel) {
+                ArcDateWheel(selected, locale) { pick(it) }
+            } else {
+                MonthGrid(month, selected, today, locale, snap) { pick(it) }
             }
             DayPanel(
                 day = selected,
@@ -163,6 +181,8 @@ private fun newEvent(day: LocalDate): CalEvent {
 private fun MonthHeader(
     month: YearMonth,
     locale: Locale,
+    wheel: Boolean,
+    onToggleView: () -> Unit,
     onPrev: () -> Unit,
     onNext: () -> Unit,
     onToday: () -> Unit,
@@ -181,6 +201,9 @@ private fun MonthHeader(
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
         )
+        TextButton(onClick = onToggleView) {
+            Text(stringResource(if (wheel) R.string.cal_view_month else R.string.cal_view_wheel))
+        }
         TextButton(onClick = onToday) { Text(stringResource(R.string.cal_today)) }
         Box(Modifier.size(44.dp).clip(CircleShape).clickable { onNext() }, contentAlignment = Alignment.Center) {
             PathIcon(Glyph.NEXT.pathData, tint, 24.dp, flip)

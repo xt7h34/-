@@ -55,4 +55,6 @@
         <item>Dhu al-Qi\'dah</item>
         <item>Dhu al-Hijjah</item>
     </string-array>
+    <string name="cal_view_wheel">Wheel</string>
+    <string name="cal_view_month">Month</string>
 </resources>

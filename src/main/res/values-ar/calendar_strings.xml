@@ -55,4 +55,6 @@
         <item>ذو القعدة</item>
         <item>ذو الحجة</item>
     </string-array>
+    <string name="cal_view_wheel">العجلة</string>
+    <string name="cal_view_month">الشهر</string>
 </resources>
