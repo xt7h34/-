@@ -29,4 +29,9 @@
     <string name="bloom_undo">تراجع</string>
     <string name="bloom_kind_map">العناوين (فتح في الخرائط)</string>
     <string name="bloom_open_map">افتح الخريطة</string>
+    <string name="bloom_report_title">تقرير المكان</string>
+    <string name="bloom_report_hint">اللي شافه Bloom آخر مرة حط فيها الكبسولة: مقاسات بس من غير أي نص. انسخه لو عايز مساعدة في ضبط المكان.</string>
+    <string name="bloom_report_empty">لسه مفيش حاجة. ابعت لنفسك رسالة تطلّع الكبسولة وارجع اعمل تحديث.</string>
+    <string name="bloom_report_copy">نسخ</string>
+    <string name="bloom_report_refresh">تحديث</string>
 </resources>

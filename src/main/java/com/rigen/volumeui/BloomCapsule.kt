@@ -63,6 +63,7 @@ class BloomCapsule(private val service: VolumeAccessibilityService) {
     private var lastKey = ""
     private var cachedWindowKey = ""
     private var cachedCard: Rect? = null
+    private var reported = false
 
     private val tickRunnable = object : Runnable {
         override fun run() {
@@ -86,6 +87,7 @@ class BloomCapsule(private val service: VolumeAccessibilityService) {
         lastKey = ""
         cachedWindowKey = ""
         cachedCard = null
+        reported = false
         main.postDelayed(tickRunnable, FIRST_TICK_MS)
     }
 
@@ -169,7 +171,12 @@ class BloomCapsule(private val service: VolumeAccessibilityService) {
             val h = r.height()
             if (r.top <= dp(140) && h in dp(56)..dp(280) && r.width() >= screenW * 0.6f) {
                 val window = Rect(r)
-                return cardBounds(w, window, screenW) ?: Rect(window.left + dp(12), window.top, window.right - dp(12), window.bottom)
+                val card = cardBounds(w, window, screenW)
+                if (!reported) {
+                    reported = true
+                    writeReport(windows, w, window, card)
+                }
+                return card ?: Rect(window.left + dp(12), window.top, window.right - dp(12), window.bottom)
             }
         }
         return null
@@ -219,6 +226,59 @@ class BloomCapsule(private val service: VolumeAccessibilityService) {
         cachedWindowKey = key
         cachedCard = result
         return result
+    }
+
+    /** What Bloom saw, as sizes only, so the placement can be fixed from real numbers. Shown in Bloom\'s settings. */
+    private fun writeReport(windows: List<AccessibilityWindowInfo>, chosen: AccessibilityWindowInfo, window: Rect, card: Rect?) {
+        try {
+            val dm = service.resources.displayMetrics
+            val version = try {
+                service.packageManager.getPackageInfo(service.packageName, 0).versionName
+            } catch (e: Exception) {
+                "?"
+            }
+            val sb = StringBuilder()
+            sb.append("Kanade ").append(version).append("\n")
+            sb.append("screen ").append(dm.widthPixels).append("x").append(dm.heightPixels).append(" density ").append(dm.density).append("\n")
+            val r = Rect()
+            windows.forEachIndexed { i, w ->
+                w.getBoundsInScreen(r)
+                sb.append("window ").append(i).append(": type=").append(w.type).append(" layer=").append(w.layer)
+                    .append(" bounds=").append(r.toShortString()).append("\n")
+            }
+            sb.append("notification window: ").append(window.toShortString()).append("\n")
+            sb.append("card found: ").append(card?.toShortString() ?: "none").append("\n")
+            sb.append("boxes inside the window:\n")
+            val rootNode = chosen.root
+            if (rootNode == null) {
+                sb.append("  (the window shows no views)\n")
+            } else {
+                var count = 0
+                val box = Rect()
+                fun dump(node: AccessibilityNodeInfo, depth: Int) {
+                    if (depth > 6) return
+                    for (i in 0 until node.childCount) {
+                        if (count++ >= 60) return
+                        val child = node.getChild(i) ?: continue
+                        child.getBoundsInScreen(box)
+                        sb.append("  ").append("-".repeat(depth)).append(" ")
+                            .append(child.className?.toString()?.substringAfterLast('.') ?: "?").append(" ")
+                            .append(box.toShortString())
+                            .append(if (child.isVisibleToUser) " visible" else " hidden")
+                            .append(if (child.isClickable) " clickable" else "")
+                            .append("\n")
+                        dump(child, depth + 1)
+                        release(child)
+                    }
+                }
+                dump(rootNode, 0)
+                release(rootNode)
+                if (count == 0) sb.append("  (no boxes)\n")
+            }
+            BloomDebug.set(service, sb.toString())
+        } catch (e: Exception) {
+            BloomDebug.set(service, "Could not write the report: " + e.javaClass.simpleName)
+        }
     }
 
     @Suppress("DEPRECATION")
@@ -307,6 +367,7 @@ class BloomCapsule(private val service: VolumeAccessibilityService) {
             wm.addView(container, lp)
             root = container
             params = lp
+            BloomDebug.append(service, "capsule placed: top=" + top + " left=" + left + " width=" + width + (if (usingRule) " (by the rule)" else " (following the window)"))
             // A moment later, so it slides in instead of starting already open.
             main.postDelayed({ shown = true }, 30)
         } catch (e: Exception) {

@@ -29,4 +29,9 @@
     <string name="bloom_undo">Undo</string>
     <string name="bloom_kind_map">Addresses (open in Maps)</string>
     <string name="bloom_open_map">Open in Maps</string>
+    <string name="bloom_report_title">Placement report</string>
+    <string name="bloom_report_hint">What Bloom saw the last time it placed the capsule: sizes only, no text. Copy it if you want help fixing the placement.</string>
+    <string name="bloom_report_empty">Nothing yet. Send yourself a message that makes the capsule appear, then come back and refresh.</string>
+    <string name="bloom_report_copy">Copy</string>
+    <string name="bloom_report_refresh">Refresh</string>
 </resources>

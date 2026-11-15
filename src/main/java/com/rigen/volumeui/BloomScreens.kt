@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -116,6 +117,34 @@ fun BloomPage(notificationAccess: Boolean, onBack: () -> Unit) {
                 }
             }
             item { Text(stringResource(R.string.bloom_privacy), style = MaterialTheme.typography.bodySmall) }
+            item {
+                var report by remember { mutableStateOf(BloomDebug.get(ctx)) }
+                Card(
+                    Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                ) {
+                    androidx.compose.foundation.layout.Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(stringResource(R.string.bloom_report_title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.bloom_report_hint), style = MaterialTheme.typography.bodySmall)
+                        SelectionContainer {
+                            Text(
+                                report.ifBlank { stringResource(R.string.bloom_report_empty) },
+                                style = MaterialTheme.typography.bodySmall,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            )
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = {
+                                val cm = ctx.getSystemService(android.content.ClipboardManager::class.java)
+                                cm?.setPrimaryClip(android.content.ClipData.newPlainText("bloom", report))
+                            }, enabled = report.isNotBlank()) { Text(stringResource(R.string.bloom_report_copy)) }
+                            androidx.compose.material3.OutlinedButton(onClick = { report = BloomDebug.get(ctx) }) {
+                                Text(stringResource(R.string.bloom_report_refresh))
+                            }
+                        }
+                    }
+                }
+            }
             item {
                 Text(
                     stringResource(R.string.bloom_kinds),
